@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vector Mandala Core (v0.1)</title>
+  <style>
+    body{
+      margin:0;
+      font-family:system-ui,Arial,sans-serif;
+      min-height:100dvh;
+      display:flex;
+      flex-direction:column;
+    }
+    header{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      padding:10px;
+      border-bottom:1px solid #ddd;
+      background:#fff;
+    }
+    label{display:flex;gap:8px;align-items:center}
+    input[type="range"]{width:160px}
+    button{padding:8px 10px;cursor:pointer}
+    select{padding:6px}
+
+    main{
+      flex:1;
+      min-height:0;
+      display:flex;
+    }
+    #stage{
+      flex:1;
+      min-height:0;
+      overflow:auto;
+      padding:12px;
+      background:#fafafa;
+    }
+    #stage svg{
+      background:#fff;
+      border:1px solid #ddd;
+      max-width:100%;
+      height:auto;
+    }
+    .meta{font-variant-numeric:tabular-nums;color:#444}
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+      <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content: space-between;">
+        <h3 style="margin:0; font-size:1.1rem; color:#333;">Mandala Studio</h3>
+        <div style="display:flex; gap:8px;">
+           <button id="regen">🎲 Regenerar</button>
+           <button id="download">⬇ SVG</button>
+           <button id="downloadPng">⬇ PNG (300 DPI)</button>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; padding-top:8px; border-top:1px solid #eee;">
+        
+        <!-- Grupo Base -->
+        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
+           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Base</legend>
+           <label>Preset
+             <select id="preset">
+               <option value="A4">A4</option>
+               <option value="LETTER">Letter</option>
+             </select>
+           </label>
+           <label title="Número de segmentos radiales">Pétalos
+             <input id="petals" type="range" min="6" max="48" step="1" value="12" />
+             <output id="petalsOut">12</output>
+           </label>
+        </fieldset>
+
+        <!-- Grupo Estilo -->
+        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
+           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Estilo</legend>
+           <label title="Densidad de capas">Complejidad
+             <input id="complexity" type="range" min="20" max="240" step="5" value="110" />
+             <output id="complexityOut">110</output>
+           </label>
+           <label title="Geométrico vs Orgánico">Orgánico
+             <input id="organic" type="range" min="0" max="1" step="0.1" value="0.2" />
+             <output id="organicOut">0.2</output>
+           </label>
+        </fieldset>
+
+        <!-- Grupo Trazo -->
+        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
+           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Trazo & Detalles</legend>
+           <label title="Peso de línea en mm">Grosor
+             <input id="strokeWidth" type="range" min="0.2" max="1.5" step="0.1" value="0.6" />
+             <output id="strokeWidthOut">0.6</output>
+           </label>
+           <label title="Marcos y bordes decorativos">
+             <input id="frames" type="checkbox" checked /> Marcos
+           </label>
+        </fieldset>
+      </div>
+
+      <div style="font-size:0.8rem; color:#666; margin-top:4px;">
+         <span class="meta">Seed: <b id="seedText">—</b></span> <span style="margin:0 6px;">|</span>
+         <span class="meta">Paths: <b id="pathsText">—</b></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="stage" aria-label="SVG preview"></div>
+  </main>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,809 @@
+import { mulberry32, rFloat } from "../core/prng.js";
+import { PathBuilder } from "../core/pathBuilder.js";
+
+/**
+ * Mandala Radial (Book / Coloring) — Editorial
+ * - SVG puro, optimizado: wedge único + <use> radial
+ * - Formas cerradas coloreables
+ * - Sin micro-celdas (minCellAreaMm2 + guardias anti-sliver)
+ * - No líneas < minStrokeMm
+ * - Bindu y frames fuera del wedge (no duplicación por <use>)
+ */
+export function generateMandalaRadial(doc, opts) {
+  const {
+    seed,
+    centerMm,
+    radiusMm,
+
+    // Simetría
+    petals = 12,
+
+    // Trazo
+    stroke = "#000",
+    strokeWidthMm = 0.6,
+
+    // Complejidad (40..220 recomendado)
+    complexity = 120,
+
+    // Producción / libro
+    offsetXmm = 0,
+    offsetYmm = 0,
+    minStrokeMm = 0.30,
+    minCellAreaMm2 = 2.0,
+
+    // Núcleo
+    binduRadiusFrac = 0.10,
+    binduClearFrac = 0.16,
+
+    // Marcos
+    includeFrames = true,
+
+    // Estilo
+    organicLevel = 0.5, // 0.0 = Geometric, 1.0 = Very Organic
+  } = opts;
+
+  const rng = mulberry32((seed >>> 0) || 0);
+
+  // --- Pisos técnicos ---
+  const mainStroke = Math.max(minStrokeMm, strokeWidthMm);
+  const detailStroke = Math.max(minStrokeMm, mainStroke * 0.6);
+
+  // --- Complejidad normalizada ---
+  const cN = _clamp((complexity - 40) / (220 - 40), 0, 1);
+  const ringCount = _clamp(Math.round(3 + cN * 4), 3, 7);
+
+  const subProb = _lerp(0.18, 0.72, cN);
+  const detailProb = _lerp(0.35, 0.85, cN);
+
+  // --- Rejilla radial ---
+  const stepAngle = (2 * Math.PI) / petals;
+
+  // Centro con gutter
+  const cx = centerMm.x + offsetXmm;
+  const cy = centerMm.y + offsetYmm;
+
+  // --- Bindu / núcleo limpio ---
+  const binduR = radiusMm * _clamp(binduRadiusFrac, 0.06, 0.18);
+  const binduClearR = radiusMm * _clamp(binduClearFrac, binduRadiusFrac + 0.03, 0.26);
+
+  // --- Anillos (phi-like) ---
+  const phi = 1.61803398875;
+  const rMin = Math.max(binduClearR, radiusMm * 0.08);
+  const rMax = radiusMm * 0.985;
+
+  const totalSpan = Math.max(0, rMax - rMin);
+  const weights = [];
+  for (let i = 0; i < ringCount; i++) weights.push(Math.pow(phi, i));
+  if (rng() < 0.35) weights.reverse();
+  const sumW = weights.reduce((a, b) => a + b, 0);
+
+  // --- Semántica editorial ---
+  function densityForIndex(i, ringCount, cN) {
+    if (i === 0) return (cN < 0.55 ? "low" : "med");
+    if (i % 3 === 1) return "low";
+    if (i === ringCount - 1) return (cN < 0.65 ? "med" : "high");
+    if (cN < 0.35) return "med";
+    if (cN < 0.75) return (rng() < 0.55 ? "med" : "high");
+    return (rng() < 0.35 ? "med" : "high");
+  }
+
+  function roleForIndex(i, ringCount) {
+    if (i === 0) return "primary";
+    if (i === ringCount - 1) return "frame";
+    if (i % 3 === 1) return "rest";
+    return "secondary";
+  }
+
+  const rings = [];
+  let r0 = rMin;
+  let prevDensity = "low";
+
+  for (let i = 0; i < ringCount; i++) {
+    const w = weights[i] / sumW;
+
+    const role = roleForIndex(i, ringCount);
+    let density = densityForIndex(i, ringCount, cN);
+
+    if (prevDensity === "high" && density === "high") density = "med";
+    prevDensity = density;
+
+    const isInner = i === 0;
+    const jitterAmp = isInner ? 0.05 : (density === "low" ? 0.06 : 0.10);
+    const jitter = 1 + rFloat(rng, -jitterAmp, jitterAmp);
+
+    const thickness = totalSpan * w * jitter;
+    const r1 = Math.min(rMax, r0 + thickness);
+
+    rings.push({
+      start: r0,
+      end: r1,
+      idx: i,
+      role,
+      density,
+      allowDetail: (role !== "rest") && (i !== 0),
+      allowSubdivide: (role !== "rest") && (i !== 0),
+      type: null,
+    });
+
+    r0 = r1;
+  }
+  if (rings.length) rings[rings.length - 1].end = rMax;
+
+  // --- ID robusto ---
+  const wedgeId = `wedge_${(seed >>> 0)}_${petals}_${ringCount}_${Math.round(radiusMm * 10)}_${Math.round(mainStroke * 1000)}_${Math.round(complexity)}`;
+
+  // --- Builders ---
+  const pbMain = new PathBuilder();
+  const pbDetail = new PathBuilder();
+
+  // --- Selector de forma ---
+  function pickShapeForRing(ring, prevRing) {
+    const isOrganic = (rng() < organicLevel); /* Bias general */
+
+    if (ring.role === "rest") return (isOrganic ? pickPetalVariant(ring) : "arch");
+    if (ring.role === "frame") return (!isOrganic && rng() < 0.6 ? "diamond" : pickPetalVariant(ring));
+
+    if (ring.role === "primary") {
+      // High organic -> favor petals/arches
+      // Low organic -> favor geometry (though this engine is radial-petal based, we can use 'diamond' or 'arch' more)
+      if (!isOrganic && rng() < 0.6) return "diamond";
+      return (rng() < 0.60 ? pickPetalVariant(ring) : "arch");
+    }
+
+    const prevType = prevRing?.type;
+
+    if (prevRing && prevRing.density === "high" && ring.density !== "high") {
+      return (rng() < 0.65 ? "arch" : "petal");
+    }
+
+    // Logic influenced by organicLevel
+    const rand = rng();
+    // if organicLevel is high, threshold for diamond increases (harder to get diamond)
+    // if organicLevel is low, threshold for diamond decreases (easier to get diamond)
+    const diamondThresh = _lerp(0.7, 0.95, organicLevel);
+
+    if (rand > diamondThresh) return "diamond";
+    return (rng() < 0.5 ? "arch" : "petal");
+  }
+  function pickPetalVariant(ring) {
+    // Bias variants based on organicLevel
+    // Low organic -> pointy, fleur
+    // High organic -> round, almond, heart
+
+    const t = rng();
+
+    // Adjusted probabilities
+    let pPointy = _lerp(0.4, 0.1, organicLevel);
+    let pRound = _lerp(0.2, 0.5, organicLevel);
+    // remaining is almond/heart/fleur
+
+    if (ring.role === "frame") {
+      return t < 0.4 ? "petal_heart" : t < 0.7 ? "petal_round" : "petal_pointy";
+    }
+
+    if (t < pPointy) return "petal_pointy";
+    if (t < pPointy + pRound) return "petal_round";
+
+    // Rest split between almond and fleur
+    return (rng() < 0.7 ? "petal_almond" : "fleur");
+  }
+
+
+
+  // --- Área aproximada base ---
+  function allowSubdivideArea(ring, localStep) {
+    const h = Math.max(0, ring.end - ring.start);
+    const rMid = (ring.start + ring.end) / 2;
+    const arcW = Math.abs(rMid * localStep);
+    return (arcW * h) >= minCellAreaMm2;
+  }
+
+  // [SEAM-SAFE] Guardias anti-sliver (micro-celdas “en tirita”)
+  // - además de área, exige mínimos en dimensiones (arcW y h)
+  // - endurece umbral con petals alto y densidad high
+  function allowSubdivideSafe(ring, localStep) {
+    const h = Math.max(0, ring.end - ring.start);
+    const rMid = (ring.start + ring.end) / 2;
+    const arcW = Math.abs(rMid * localStep);
+    const area = arcW * h;
+
+    // lado mínimo derivado (heurística editorial): evita celdas ultra delgadas
+    // base ~ sqrt(minArea), pero endurecido con número de pétalos
+    const baseEdge = Math.sqrt(Math.max(0.01, minCellAreaMm2));
+    const petalsPenalty = _clamp((petals - 12) / 36, 0, 1); // 0 en 12, ~1 en 48+
+    const edgeMin = baseEdge * _lerp(0.95, 1.55, petalsPenalty);
+
+    // factor de seguridad de área: mayor cuando densidad alta o petals alto
+    let areaFactor = 1.15;
+    if (ring.density === "high") areaFactor += 0.20;
+    areaFactor += 0.35 * petalsPenalty; // hasta +0.35
+
+    // el anillo “frame” tolera un poco más subdiv (pero sin slivers)
+    if (ring.role === "frame") areaFactor = Math.max(1.10, areaFactor - 0.10);
+
+    // “rest” no subdivide por diseño (pero por si acaso)
+    if (ring.role === "rest") return false;
+
+    // chequeos
+    if (area < minCellAreaMm2 * areaFactor) return false;
+    if (arcW < edgeMin) return false;
+    if (h < edgeMin) return false;
+
+    // extra: si está demasiado cerca del umbral, evita subdividir
+    // (reduce resultados borderline que se ven “rasposos” en impresión)
+    const borderline = minCellAreaMm2 * areaFactor * 1.05;
+    if (area < borderline && rng() < 0.65) return false;
+
+    return true;
+  }
+
+  // --- Detalle CERRADO ---
+  function addCapsule(pb, ax, ay, bx, by, w) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) return;
+
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    const hw = w / 2;
+
+    const a1x = ax + nx * hw, a1y = ay + ny * hw;
+    const a2x = ax - nx * hw, a2y = ay - ny * hw;
+    const b1x = bx + nx * hw, b1y = by + ny * hw;
+    const b2x = bx - nx * hw, b2y = by - ny * hw;
+
+    pb.moveTo(a1x, a1y)
+      .lineTo(b1x, b1y)
+      .lineTo(b2x, b2y)
+      .lineTo(a2x, a2y)
+      .close();
+  }
+
+
+  function addCirclePoly(pb, cx, cy, r, seg = 16) {
+    if (r <= 0) return;
+    const step = (Math.PI * 2) / Math.max(6, seg);
+    let x0 = cx + Math.cos(0) * r;
+    let y0 = cy + Math.sin(0) * r;
+    pb.moveTo(x0, y0);
+    for (let i = 1; i < seg; i++) {
+      const a = step * i;
+      pb.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+    pb.close();
+  }
+
+  function addArcBand(pb, rCenter, thetaL, thetaR, thickness) {
+    const t = Math.max(0.10, thickness);
+    const rIn = Math.max(0.01, rCenter - t / 2);
+    const rOut = rCenter + t / 2;
+    const thetaC = (thetaL + thetaR) / 2;
+
+    const pL0 = _polar0(rIn, thetaL);
+    const pR0 = _polar0(rIn, thetaR);
+    const pL1 = _polar0(rOut, thetaL);
+    const pR1 = _polar0(rOut, thetaR);
+
+    const cO = _polar0(rOut, thetaC);
+    const cI = _polar0(rIn, thetaC);
+
+    pb.moveTo(pL0.x, pL0.y)
+      .lineTo(pL1.x, pL1.y)
+      .quadTo(cO.x, cO.y, pR1.x, pR1.y)
+      .lineTo(pR0.x, pR0.y)
+      .quadTo(cI.x, cI.y, pL0.x, pL0.y)
+      .close();
+  }
+
+  // --- Curvas más orgánicas: cubicTo compatible ---
+  // Si PathBuilder no soporta cubicTo, aproximamos con 2 cuadráticas.
+  function cubicToCompat(pb, c1x, c1y, c2x, c2y, x, y) {
+    if (typeof pb.cubicTo === "function") {
+      pb.cubicTo(c1x, c1y, c2x, c2y, x, y);
+      return;
+    }
+    // Aproximación: cubic -> 2 quads (split t=0.5).
+    const x0 = pb._x, y0 = pb._y;
+    if (!Number.isFinite(x0) || !Number.isFinite(y0)) {
+      pb.quadTo((c1x + c2x) * 0.5, (c1y + c2y) * 0.5, x, y);
+      return;
+    }
+    const p01x = (x0 + c1x) * 0.5, p01y = (y0 + c1y) * 0.5;
+    const p12x = (c1x + c2x) * 0.5, p12y = (c1y + c2y) * 0.5;
+    const p23x = (c2x + x) * 0.5, p23y = (c2y + y) * 0.5;
+
+    const p012x = (p01x + p12x) * 0.5, p012y = (p01y + p12y) * 0.5;
+    const p123x = (p12x + p23x) * 0.5, p123y = (p12y + p23y) * 0.5;
+
+    const p0123x = (p012x + p123x) * 0.5, p0123y = (p012y + p123y) * 0.5;
+
+    pb.quadTo(p012x, p012y, p0123x, p0123y);
+    pb.quadTo(p123x, p123y, x, y);
+  }
+
+  // --- Generación del wedge ---
+  let prevRing = null;
+
+  const overlapFactor = _lerp(0.12, 0.55, cN);
+
+  for (let ri = 0; ri < rings.length; ri++) {
+    const ring = rings[ri];
+    const nextRing = (ri + 1 < rings.length ? rings[ri + 1] : null);
+    const type = pickShapeForRing(ring, prevRing);
+    ring.type = type;
+
+    // Prohibimos subdivisión cerca del núcleo
+    let sub = 1;
+
+    if (ring.allowSubdivide && ring.start > binduClearR && rng() < subProb) {
+      // candidato 2 o 3, pero con guardia seam-safe
+      const candidateSub = (rng() < 0.55 ? 2 : 3);
+      const localStepTest = stepAngle / candidateSub;
+
+      // primero: área base
+      // luego: seam-safe (anti slivers)
+      if (allowSubdivideArea(ring, localStepTest) && allowSubdivideSafe(ring, localStepTest)) {
+        sub = candidateSub;
+      }
+    }
+
+    const localStep = stepAngle / sub;
+
+    for (let s = 0; s < sub; s++) {
+      const aOff = (s - (sub - 1) / 2) * localStep;
+
+      const thetaL = -localStep / 2 + aOff;
+      const thetaR = localStep / 2 + aOff;
+      const thetaC = aOff;
+
+      if (type === "petal" || type === "petal_pointy" || type === "petal_round" || type === "petal_almond") {
+        const outR = (nextRing && ring.role !== "frame" && ring.role !== "rest" && rng() < 0.78)
+          ? Math.min(rMax, ring.end + (nextRing.end - nextRing.start) * overlapFactor)
+          : ring.end;
+
+        const pIn = _polar0(ring.start, thetaC);
+        const pOut = _polar0(outR, thetaC);
+
+        const span = (ring.end - ring.start);
+        let midR = ring.start + span * 0.55;
+        let widthFactor = _clamp(0.40 + rng() * 0.50, 0.35, 0.90);
+
+        // Estilos más “libro de colorear”
+        if (type === "petal_pointy") {
+          // loto/tulipán: alarga y adelgaza
+          midR = ring.start + span * _clamp(rFloat(rng, 0.72, 0.90), 0.70, 0.92);
+          widthFactor = _clamp(rFloat(rng, 0.30, 0.58), 0.28, 0.68);
+        } else if (type === "petal_round") {
+          // pétalo gordito: abre más
+          midR = ring.start + span * _clamp(rFloat(rng, 0.40, 0.62), 0.38, 0.70);
+          widthFactor = _clamp(rFloat(rng, 0.62, 0.98), 0.58, 0.99);
+        } else if (type === "petal_almond") {
+          // almendra/hoja: más estrecha, con vena central
+          midR = ring.start + span * _clamp(rFloat(rng, 0.78, 0.92), 0.75, 0.94);
+          widthFactor = _clamp(rFloat(rng, 0.24, 0.46), 0.22, 0.52);
+        }
+
+        const cpL = _polar0(midR, thetaC - (localStep / 2) * widthFactor);
+        const cpR = _polar0(midR, thetaC + (localStep / 2) * widthFactor);
+
+        // Curva en “S”: cintura en la base + volumen en la punta
+        const waistR = ring.start + span * 0.28;
+        const c1L = _polar0(waistR, thetaC - localStep * 0.18 * widthFactor);
+        const c2L = _polar0(midR, thetaC - localStep * 0.42 * widthFactor);
+        const c1R = _polar0(midR, thetaC + localStep * 0.42 * widthFactor);
+        const c2R = _polar0(waistR, thetaC + localStep * 0.18 * widthFactor);
+
+        pbMain.moveTo(pIn.x, pIn.y);
+        cubicToCompat(pbMain, c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
+        cubicToCompat(pbMain, c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
+        pbMain.close();
+
+        // Contorno interno (muy típico en los ejemplos): “pétalo dentro de pétalo”
+        if (ring.allowDetail && allowSubdivideSafe(ring, localStep) && rng() < 0.70) {
+          const i0 = ring.start + span * _clamp(rFloat(rng, 0.14, 0.22), 0.12, 0.28);
+          const i1 = ring.end - span * _clamp(rFloat(rng, 0.10, 0.18), 0.08, 0.22);
+          if (i1 > i0 + span * 0.20) {
+            const pIn2 = _polar0(i0, thetaC);
+            const pOut2 = _polar0(i1, thetaC);
+            const midR2 = i0 + (i1 - i0) * _clamp(rFloat(rng, 0.52, 0.72), 0.45, 0.80);
+            const wf2 = widthFactor * _clamp(rFloat(rng, 0.55, 0.72), 0.45, 0.80);
+
+            const cpL2 = _polar0(midR2, thetaC - (localStep / 2) * wf2);
+            const cpR2 = _polar0(midR2, thetaC + (localStep / 2) * wf2);
+
+            pbDetail.moveTo(pIn2.x, pIn2.y)
+              .quadTo(cpL2.x, cpL2.y, pOut2.x, pOut2.y)
+              .quadTo(cpR2.x, cpR2.y, pIn2.x, pIn2.y)
+              .close();
+          }
+        }
+
+
+        // Micro-detalle botánico: estambres (3 filamentos + puntitos)
+        if (ring.allowDetail && rng() < _lerp(0.25, 0.55, cN) && allowSubdivideSafe(ring, localStep)) {
+          const baseR = ring.start + span * 0.14;
+          const tipR = ring.start + span * _clamp(rFloat(rng, 0.48, 0.62), 0.42, 0.68);
+          const wS = Math.max(detailStroke * 0.9, span * 0.035);
+
+
+          // Elementos intersticiales: rellena “V” entre pétalos (fase desplazada)
+          if (ring.allowDetail && ring.role !== "rest" && rng() < _lerp(0.18, 0.42, cN) && allowSubdivideSafe(ring, localStep)) {
+            const dropSpan = span * _clamp(rFloat(rng, 0.30, 0.46), 0.26, 0.55);
+            const dropInR = ring.start + span * _clamp(rFloat(rng, 0.10, 0.18), 0.08, 0.24);
+            const dropOutR = dropInR + dropSpan;
+            const dropW = _clamp(rFloat(rng, 0.20, 0.34), 0.18, 0.40);
+
+            for (const sign of [-1, 1]) {
+              const aD = thetaC + sign * localStep * 0.33;
+              const dIn = _polar0(dropInR, aD);
+              const dOut = _polar0(dropOutR, aD);
+              const dMid = dropInR + (dropOutR - dropInR) * 0.60;
+
+              const dCpL = _polar0(dMid, aD - localStep * dropW * 0.40);
+              const dCpR = _polar0(dMid, aD + localStep * dropW * 0.40);
+
+              pbDetail.moveTo(dIn.x, dIn.y)
+                .quadTo(dCpL.x, dCpL.y, dOut.x, dOut.y)
+                .quadTo(dCpR.x, dCpR.y, dIn.x, dIn.y)
+                .close();
+            }
+          }
+
+          for (let j = -1; j <= 1; j++) {
+            const aj = thetaC + j * localStep * 0.08;
+            const sA = _polar0(baseR, aj);
+            const sB = _polar0(tipR, aj);
+            if (wS * Math.hypot(sB.x - sA.x, sB.y - sA.y) >= minCellAreaMm2 * 0.55) {
+              addCapsule(pbDetail, sA.x, sA.y, sB.x, sB.y, wS);
+              addCirclePoly(pbDetail, sB.x, sB.y, Math.max(wS * 0.85, mainStroke * 1.2), 12);
+            }
+          }
+        }
+
+        // Vena central (capsulita cerrada) para hojas/lotus
+        if (ring.allowDetail && rng() < detailProb && allowSubdivideSafe(ring, localStep)) {
+          const vA = _polar0(ring.start + span * 0.18, thetaC);
+          const vB = _polar0(ring.end - span * 0.12, thetaC);
+
+          const w = Math.max(detailStroke * 1.6, span * (type === "petal_almond" ? 0.08 : 0.10));
+          const estArea = w * Math.hypot(vB.x - vA.x, vB.y - vA.y);
+
+          if (estArea >= minCellAreaMm2) addCapsule(pbDetail, vA.x, vA.y, vB.x, vB.y, w);
+
+          // venas laterales discretas solo en “almond”
+          if (type === "petal_almond" && rng() < 0.55) {
+            const a1 = thetaC - localStep * 0.10;
+            const a2 = thetaC + localStep * 0.10;
+            const sA = ring.start + span * 0.32;
+            const sB = ring.start + span * 0.78;
+            const w2 = Math.max(detailStroke * 1.2, span * 0.06);
+
+            const lA = _polar0(sA, a1);
+            const lB = _polar0(sB, a1);
+            const rA = _polar0(sA, a2);
+            const rB = _polar0(sB, a2);
+
+            if (w2 * Math.hypot(lB.x - lA.x, lB.y - lA.y) >= minCellAreaMm2 * 0.70) {
+              addCapsule(pbDetail, lA.x, lA.y, lB.x, lB.y, w2);
+              addCapsule(pbDetail, rA.x, rA.y, rB.x, rB.y, w2);
+            }
+          }
+        }
+
+      } else if (type === "petal_heart") {
+        // Corazón apuntando hacia afuera (anillo tipo página con corazones)
+        const span = (ring.end - ring.start);
+
+        const outR = (nextRing && ring.role !== "frame" && ring.role !== "rest" && rng() < 0.78)
+          ? Math.min(rMax, ring.end + (nextRing.end - nextRing.start) * overlapFactor)
+          : ring.end;
+
+        const tip = _polar0(outR, thetaC);                  // punta exterior
+        const base = _polar0(ring.start + span * 0.18, thetaC); // hendidura interior
+        const lobeR = ring.start + span * _clamp(rFloat(rng, 0.52, 0.70), 0.48, 0.76);
+
+        const aL = thetaC - localStep * 0.22;
+        const aR = thetaC + localStep * 0.22;
+
+        const lobeL = _polar0(lobeR, aL);
+        const lobeRgt = _polar0(lobeR, aR);
+
+        // Control points para redondear los lóbulos
+        const c1 = _polar0(lobeR + span * 0.10, thetaC - localStep * 0.34);
+        const c2 = _polar0(lobeR + span * 0.10, thetaC + localStep * 0.34);
+
+        pbMain.moveTo(base.x, base.y)
+          .quadTo(c1.x, c1.y, lobeL.x, lobeL.y)
+          .quadTo(tip.x, tip.y, lobeRgt.x, lobeRgt.y)
+          .quadTo(c2.x, c2.y, base.x, base.y)
+          .close();
+
+        // contorno interno simple (para que se vea “editorial”)
+        if (ring.allowDetail && allowSubdivideSafe(ring, localStep) && rng() < 0.65) {
+          const inTip = _polar0(ring.end - span * 0.18, thetaC);
+          const inBase = _polar0(ring.start + span * 0.30, thetaC);
+          const inLobeR = ring.start + span * 0.58;
+
+          const inL = _polar0(inLobeR, aL);
+          const inR = _polar0(inLobeR, aR);
+
+          const ic1 = _polar0(inLobeR + span * 0.05, thetaC - localStep * 0.32);
+          const ic2 = _polar0(inLobeR + span * 0.05, thetaC + localStep * 0.32);
+
+          pbDetail.moveTo(inBase.x, inBase.y)
+            .quadTo(ic1.x, ic1.y, inL.x, inL.y)
+            .quadTo(inTip.x, inTip.y, inR.x, inR.y)
+            .quadTo(ic2.x, ic2.y, inBase.x, inBase.y)
+            .close();
+        }
+
+      } else if (type === "fleur") {
+        // Flor-de-lis simplificada: punta central (cerrada) + “perlas” laterales (círculos cerrados)
+        const span = (ring.end - ring.start);
+        const outR = (nextRing && ring.role !== "frame" && ring.role !== "rest" && rng() < 0.78)
+          ? Math.min(rMax, ring.end + (nextRing.end - nextRing.start) * overlapFactor)
+          : ring.end;
+
+        const pIn = _polar0(ring.start, thetaC);
+        const pOut = _polar0(outR, thetaC);
+
+        const midR = ring.start + span * _clamp(rFloat(rng, 0.62, 0.82), 0.60, 0.88);
+        const widthFactor = _clamp(rFloat(rng, 0.32, 0.58), 0.28, 0.70);
+
+        const cpL = _polar0(midR, thetaC - (localStep / 2) * widthFactor);
+        const cpR = _polar0(midR, thetaC + (localStep / 2) * widthFactor);
+
+        pbMain.moveTo(pIn.x, pIn.y)
+          .quadTo(cpL.x, cpL.y, pOut.x, pOut.y)
+          .quadTo(cpR.x, cpR.y, pIn.x, pIn.y)
+          .close();
+
+        // Perlas laterales (cerradas) para textura sin micro-celdas
+        if (ring.allowDetail && allowSubdivideSafe(ring, localStep) && rng() < 0.85) {
+          const beadR = _clamp(span * rFloat(rng, 0.06, 0.12), mainStroke * 2.2, span * 0.20);
+          const beadMid = ring.start + span * _clamp(rFloat(rng, 0.28, 0.42), 0.25, 0.50);
+
+          const bL = _polar0(beadMid, thetaC - localStep * _clamp(rFloat(rng, 0.22, 0.34), 0.18, 0.42));
+          const bR = _polar0(beadMid, thetaC + localStep * _clamp(rFloat(rng, 0.22, 0.34), 0.18, 0.42));
+
+          addCirclePoly(pbDetail, bL.x, bL.y, beadR, 14);
+          addCirclePoly(pbDetail, bR.x, bR.y, beadR, 14);
+
+          // Punto conector en el borde interno (similar a “connecting dots”)
+          if (rng() < 0.55) {
+            const bC = _polar0(ring.start + span * 0.10, thetaC);
+            addCirclePoly(pbDetail, bC.x, bC.y, _clamp(beadR * 0.85, mainStroke * 2.0, beadR * 1.0), 12);
+          }
+        }
+
+
+
+      } else if (type === "diamond") {
+        const pIn = _polar0(ring.start, thetaC);
+        const pOut = _polar0(ring.end, thetaC);
+        const mid = (ring.start + ring.end) / 2;
+        const pL = _polar0(mid, thetaL);
+        const pR = _polar0(mid, thetaR);
+
+        pbMain.moveTo(pIn.x, pIn.y)
+          .lineTo(pL.x, pL.y)
+          .lineTo(pOut.x, pOut.y)
+          .lineTo(pR.x, pR.y)
+          .close();
+
+        if (ring.allowDetail && rng() < 0.55 && allowSubdivideSafe(ring, localStep)) {
+          const inset = (ring.end - ring.start) * 0.22;
+          const rIn2 = ring.start + inset;
+          const rOut2 = ring.end - inset;
+
+          if (rOut2 > rIn2) {
+            const mid2 = (rIn2 + rOut2) / 2;
+            const pIn2 = _polar0(rIn2, thetaC);
+            const pOut2 = _polar0(rOut2, thetaC);
+            const pL2 = _polar0(mid2, thetaL * 0.85);
+            const pR2 = _polar0(mid2, thetaR * 0.85);
+
+            pbDetail.moveTo(pIn2.x, pIn2.y)
+              .lineTo(pL2.x, pL2.y)
+              .lineTo(pOut2.x, pOut2.y)
+              .lineTo(pR2.x, pR2.y)
+              .close();
+          }
+        }
+
+      } else {
+        // arch = cinta cerrada (motivo)
+        const pL0 = _polar0(ring.start, thetaL);
+        const pR0 = _polar0(ring.start, thetaR);
+        const pL1 = _polar0(ring.end, thetaL);
+        const pR1 = _polar0(ring.end, thetaR);
+
+        const cO = _polar0(ring.end, thetaC);
+        const cI = _polar0(ring.start + (ring.end - ring.start) * 0.25, thetaC);
+
+        pbMain.moveTo(pL0.x, pL0.y)
+          .lineTo(pL1.x, pL1.y)
+          .quadTo(cO.x, cO.y, pR1.x, pR1.y)
+          .lineTo(pR0.x, pR0.y)
+          .quadTo(cI.x, cI.y, pL0.x, pL0.y)
+          .close();
+
+        // Puntos conectores (cerrados) en intersecciones para legibilidad al colorear
+        if (ring.allowDetail && rng() < 0.55 && allowSubdivideSafe(ring, localStep)) {
+          const dotR = _clamp((ring.end - ring.start) * rFloat(rng, 0.05, 0.10), mainStroke * 2.0, (ring.end - ring.start) * 0.16);
+          const d = _polar0(ring.start + (ring.end - ring.start) * 0.10, thetaC);
+          addCirclePoly(pbDetail, d.x, d.y, dotR, 14);
+        }
+
+        if (ring.allowDetail && rng() < detailProb && allowSubdivideSafe(ring, localStep)) {
+          const bands = 1 + (ring.idx % 2);
+          for (let b = 0; b < bands; b++) {
+            const t = (b + 1) / (bands + 1);
+            const rB = ring.start + (ring.end - ring.start) * t;
+
+            const bandT = Math.max(detailStroke * 1.8, (ring.end - ring.start) * 0.10);
+
+            const rMid = (ring.start + ring.end) / 2;
+            const arcW = Math.abs(rMid * (thetaR - thetaL));
+            if (arcW * bandT >= minCellAreaMm2 && arcW >= 0.9) {
+              addArcBand(pbDetail, rB, thetaL * 0.85, thetaR * 0.85, bandT);
+            }
+          }
+        }
+      }
+    }
+
+    prevRing = ring;
+  }
+
+  // --- SPOKES (radios) corregidos: mm -> rad y clamp al wedge ---
+  const spokeCount = _clamp(Math.round(petals * _lerp(0.6, 1.2, cN)), 10, 72);
+  const targetSpokeWmm = radiusMm * _lerp(0.010, 0.018, cN);
+
+  for (let i = 0; i < spokeCount; i++) {
+    // Less spokes if organic
+    if (rng() > _lerp(0.6, 0.3, organicLevel)) continue;
+
+    const rA = Math.max(binduR * 1.05, radiusMm * 0.12);
+    const rB = radiusMm * (0.55 + 0.40 * rng());
+    if (rB <= rA) continue;
+
+    const halfAngA = Math.atan2(targetSpokeWmm / 2, rA);
+    const halfAngB = Math.atan2(targetSpokeWmm / 2, rB);
+
+    const margin = Math.max(halfAngA, halfAngB) + 1e-4;
+    if (stepAngle <= 2 * margin) continue;
+
+    const a = rFloat(rng, -stepAngle / 2 + margin, stepAngle / 2 - margin);
+
+    const p1 = _polar0(rA, a - halfAngA);
+    const p2 = _polar0(rB, a - halfAngB);
+    const p3 = _polar0(rB, a + halfAngB);
+    const p4 = _polar0(rA, a + halfAngA);
+
+    pbMain.moveTo(p1.x, p1.y)
+      .lineTo(p2.x, p2.y)
+      .lineTo(p3.x, p3.y)
+      .lineTo(p4.x, p4.y)
+      .close();
+  }
+
+  // --- Guardar wedge (sin bindu) ---
+  const wedgeMain = pbMain.toPath({
+    stroke,
+    strokeWidthMm: mainStroke,
+    fill: "none",
+    linecap: "round",
+    linejoin: "round",
+  });
+
+  const wedgeDetail = pbDetail.toPath({
+    stroke,
+    strokeWidthMm: detailStroke,
+    fill: "none",
+    linecap: "round",
+    linejoin: "round",
+  });
+
+  doc.defs.push(`<g id="${wedgeId}">${wedgeMain}${wedgeDetail}</g>`);
+
+  // --- Render radial ---
+  for (let k = 0; k < petals; k++) {
+    const deg = (k * 360) / petals;
+    doc.body.push(
+      `<use href="#${wedgeId}" transform="translate(${_fmt(cx)} ${_fmt(cy)}) rotate(${_fmt(deg - 90)})" />`
+    );
+  }
+
+
+  // --- Motivo central adicional (roseta) ---
+  // Mantiene áreas grandes y cerradas para facilitar el coloreado.
+  if (rng() < 0.95) {
+    const cCount = (petals % 2 === 0 ? petals : petals + 1);
+    const inner = binduR * 1.05;
+    const outer = binduClearR * _clamp(rFloat(rng, 0.55, 0.80), 0.50, 0.86);
+    const step = (Math.PI * 2) / Math.max(6, cCount);
+
+    const pbC = new PathBuilder();
+    for (let k = 0; k < cCount; k++) {
+      const a = k * step;
+      const aL = a - step * 0.22;
+      const aR = a + step * 0.22;
+
+      const pIn = _polar0(inner, a);
+      const pOut = _polar0(outer, a);
+
+      // pétalo mixto (entre puntiagudo y redondeado)
+      const midR = inner + (outer - inner) * _clamp(rFloat(rng, 0.55, 0.78), 0.50, 0.86);
+      const cpL = _polar0(midR, aL);
+      const cpR = _polar0(midR, aR);
+
+      pbC.moveTo(cx + pIn.x, cy + pIn.y)
+        .quadTo(cx + cpL.x, cy + cpL.y, cx + pOut.x, cy + pOut.y)
+        .quadTo(cx + cpR.x, cy + cpR.y, cx + pIn.x, cy + pIn.y)
+        .close();
+    }
+
+    doc.body.push(
+      `<path d="${pbC.toString()}" fill="none" stroke="${stroke}" stroke-width="${_fmt(detailStroke)}" />`
+    );
+  }
+
+  // --- Bindu fuera del wedge (perfecto) ---
+  doc.body.push(
+    `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(mainStroke)}" />`
+  );
+  doc.body.push(
+    `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduR * 0.62)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(detailStroke)}" />`
+  );
+
+  // --- Frames fuera del wedge ---
+  if (includeFrames) {
+
+    // --- Estética “cuadernillo”: anillos de cuentas y borde festoneado (círculos grandes repetidos) ---
+    // 1) Bead ring (cerca del núcleo, típico en mandalas impresos)
+    if (rng() < 0.85) {
+      const beadRingR = binduClearR * _clamp(rFloat(rng, 0.72, 0.88), 0.66, 0.92);
+      const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 1.6, 2.4), 1.4, 2.8)), 18, 96);
+      const beadR = _clamp(radiusMm * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), mainStroke * 2.2, radiusMm * 0.020);
+
+      for (let i = 0; i < beadCount; i++) {
+        const a = (i * 2 * Math.PI) / beadCount;
+        const bx = cx + beadRingR * Math.cos(a);
+        const by = cy + beadRingR * Math.sin(a);
+        doc.body.push(
+          `<circle cx="${_fmt(bx)}" cy="${_fmt(by)}" r="${_fmt(beadR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(detailStroke)}" />`
+        );
+      }
+    }
+
+    // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
+    if (rng() < 0.80) {
+      const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 1.0, 1.8), 0.9, 2.2)), 12, 72);
+      const scallopR = _clamp(radiusMm * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), mainStroke * 2.6, radiusMm * 0.060);
+      const scallopCenterR = radiusMm * 0.985 - scallopR * 0.85;
+
+      for (let i = 0; i < scallopCount; i++) {
+        const a = (i * 2 * Math.PI) / scallopCount;
+        const sx = cx + scallopCenterR * Math.cos(a);
+        const sy = cy + scallopCenterR * Math.sin(a);
+        doc.body.push(
+          `<circle cx="${_fmt(sx)}" cy="${_fmt(sy)}" r="${_fmt(scallopR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(mainStroke)}" />`
+        );
+      }
+    }
+    doc.body.push(
+      `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduClearR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(Math.max(minStrokeMm, mainStroke * 0.7))}" />`
+    );
+  }
+}
+
+// --- Helpers ---
+function _polar0(r, theta) {
+  return { x: r * Math.cos(theta), y: r * Math.sin(theta) };
+}
+function _lerp(a, b, t) { return a + (b - a) * t; }
+function _clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function _fmt(n) { return (Math.round(n * 1000) / 1000).toString(); }
