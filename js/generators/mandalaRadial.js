@@ -163,29 +163,46 @@ export function generateMandalaRadial(doc, opts) {
     const diamondThresh = _lerp(0.7, 0.95, organicLevel);
 
     if (rand > diamondThresh) return "diamond";
+    if (rand < 0.3 * (1 - organicLevel)) return "islamic_interlace";
+    if (rand < 0.2 + 0.3 * organicLevel) return "peacock_feather";
+    if (rand < 0.4 + 0.2 * organicLevel) return "paisley_element";
     return (rng() < 0.5 ? "arch" : "petal");
   }
   function pickPetalVariant(ring) {
     // Bias variants based on organicLevel
-    // Low organic -> pointy, fleur
-    // High organic -> round, almond, heart
-
     const t = rng();
 
     // Adjusted probabilities
-    let pPointy = _lerp(0.4, 0.1, organicLevel);
-    let pRound = _lerp(0.2, 0.5, organicLevel);
-    // remaining is almond/heart/fleur
+    let pPointy = _lerp(0.3, 0.05, organicLevel);
+    let pRound = _lerp(0.2, 0.4, organicLevel);
+    let pLotus = _lerp(0.1, 0.3, organicLevel);
 
     if (ring.role === "frame") {
-      return t < 0.4 ? "petal_heart" : t < 0.7 ? "petal_round" : "petal_pointy";
+      if (t < 0.3) return "lotus_petal_advanced";
+      return t < 0.6 ? "petal_heart" : t < 0.8 ? "petal_round" : "petal_pointy";
     }
 
     if (t < pPointy) return "petal_pointy";
     if (t < pPointy + pRound) return "petal_round";
+    if (t < pPointy + pRound + pLotus) return "lotus_petal_advanced";
 
-    // Rest split between almond and fleur
     return (rng() < 0.7 ? "petal_almond" : "fleur");
+  }
+
+  // --- Helpers for natural look ---
+  function _wobble(val, intensity = 1.0) {
+    if (organicLevel < 0.05) return val;
+    const noise = Math.sin(val * 17.3 + (seed % 100)) * 0.5 + Math.cos(val * 11.7 + (seed % 71)) * 0.3;
+    return val + noise * organicLevel * intensity * 0.8;
+  }
+
+  function _polarW(r, theta, intensity = 0.5) {
+    const tw = _wobble(theta, intensity);
+    const rw = _wobble(r, intensity * 0.2);
+    return {
+      x: rw * Math.cos(tw),
+      y: rw * Math.sin(tw)
+    };
   }
 
 
@@ -358,7 +375,113 @@ export function generateMandalaRadial(doc, opts) {
       const thetaR = localStep / 2 + aOff;
       const thetaC = aOff;
 
-      if (type === "petal" || type === "petal_pointy" || type === "petal_round" || type === "petal_almond") {
+      const wobI = organicLevel * 0.6; // Wobble intensity
+
+      if (type === "peacock_feather") {
+        const span = ring.end - ring.start;
+        const pIn = _polarW(ring.start, thetaC, wobI);
+        const pOut = _polarW(ring.end, thetaC, wobI);
+
+        const midR = ring.start + span * 0.6;
+        const wFactor = 0.8;
+        const c1L = _polarW(ring.start + span * 0.2, thetaC - localStep * 0.1, wobI);
+        const c2L = _polarW(midR, thetaC - localStep * 0.5 * wFactor, wobI);
+        const c1R = _polarW(midR, thetaC + localStep * 0.5 * wFactor, wobI);
+        const c2R = _polarW(ring.start + span * 0.2, thetaC + localStep * 0.1, wobI);
+
+        pbMain.moveTo(pIn.x, pIn.y);
+        cubicToCompat(pbMain, c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
+        cubicToCompat(pbMain, c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
+        pbMain.close();
+
+        // Eye of the feather
+        const eyeR = ring.start + span * 0.75;
+        const eyeRad = span * 0.15;
+        const pEye = _polarW(eyeR, thetaC, wobI);
+        addCirclePoly(pbDetail, pEye.x, pEye.y, eyeRad, 12);
+        addCirclePoly(pbDetail, pEye.x, pEye.y, eyeRad * 0.5, 8);
+
+        // Radiating veins
+        for (let v = -1; v <= 1; v++) {
+          if (v === 0) continue;
+          const va = thetaC + v * localStep * 0.25;
+          const vS = _polarW(ring.start + span * 0.3, va, wobI);
+          const vE = _polarW(ring.start + span * 0.6, va, wobI);
+          addCapsule(pbDetail, vS.x, vS.y, vE.x, vE.y, detailStroke);
+        }
+
+      } else if (type === "islamic_interlace") {
+        const span = ring.end - ring.start;
+        const rMid = ring.start + span * 0.5;
+        const thickness = span * 0.2;
+
+        // Ribbon 1: Left-to-Center
+        const p1 = _polarW(ring.start, thetaL, wobI);
+        const p2 = _polarW(rMid, thetaC, wobI);
+        const p3 = _polarW(ring.end, thetaL, wobI);
+
+        pbMain.moveTo(p1.x, p1.y).quadTo(_polarW(rMid, thetaL, wobI).x, _polarW(rMid, thetaL, wobI).y, p2.x, p2.y)
+          .quadTo(_polarW(rMid, thetaL, wobI).x, _polarW(rMid, thetaL, wobI).y, p3.x, p3.y);
+
+        // Ribbon 2: Right-to-Center
+        const p4 = _polarW(ring.start, thetaR, wobI);
+        const p5 = _polarW(ring.end, thetaR, wobI);
+        pbMain.moveTo(p4.x, p4.y).quadTo(_polarW(rMid, thetaR, wobI).x, _polarW(rMid, thetaR, wobI).y, p2.x, p2.y)
+          .quadTo(_polarW(rMid, thetaR, wobI).x, _polarW(rMid, thetaR, wobI).y, p5.x, p5.y);
+
+      } else if (type === "lotus_petal_advanced") {
+        const span = ring.end - ring.start;
+        const pIn = _polarW(ring.start, thetaC, wobI);
+        const pOut = _polarW(ring.end, thetaC, wobI);
+
+        // Scalloped sides
+        const steps = 3;
+        let prevL = pIn;
+        let prevR = pIn;
+
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          const currR = ring.start + span * t;
+          const currAng = (localStep / 2) * Math.sin(t * Math.PI) * 0.9;
+          const pL = _polarW(currR, thetaC - currAng, wobI);
+          const pR = _polarW(currR, thetaC + currAng, wobI);
+
+          pbMain.moveTo(prevL.x, prevL.y).lineTo(pL.x, pL.y);
+          pbMain.moveTo(prevR.x, prevR.y).lineTo(pR.x, pR.y);
+
+          prevL = pL;
+          prevR = pR;
+        }
+        pbMain.moveTo(prevL.x, prevL.y).lineTo(pOut.x, pOut.y);
+        pbMain.moveTo(prevR.x, prevR.y).lineTo(pOut.x, pOut.y);
+
+        // Internal tiers
+        if (ring.allowDetail) {
+          const tierR = ring.start + span * 0.4;
+          const pTier = _polarW(tierR, thetaC, wobI);
+          addArcBand(pbDetail, tierR, thetaC - localStep * 0.2, thetaC + localStep * 0.2, detailStroke * 2);
+        }
+
+      } else if (type === "paisley_element") {
+        const span = ring.end - ring.start;
+        const pIn = _polarW(ring.start, thetaC, wobI);
+        const curveDir = rng() < 0.5 ? 1 : -1;
+
+        const pOut = _polarW(ring.end, thetaC + localStep * 0.4 * curveDir, wobI);
+        const cp1 = _polarW(ring.start + span * 0.6, thetaC + localStep * 0.8 * curveDir, wobI);
+        const cp2 = _polarW(ring.end + span * 0.2, thetaC - localStep * 0.2 * curveDir, wobI);
+
+        pbMain.moveTo(pIn.x, pIn.y)
+          .quadTo(cp1.x, cp1.y, pOut.x, pOut.y)
+          .quadTo(cp2.x, cp2.y, pIn.x, pIn.y)
+          .close();
+
+        // Small internal curl
+        const curlR = ring.start + span * 0.4;
+        const pCurl = _polarW(curlR, thetaC + localStep * 0.2 * curveDir, wobI);
+        addCirclePoly(pbDetail, pCurl.x, pCurl.y, span * 0.08, 10);
+
+      } else if (type === "petal" || type === "petal_pointy" || type === "petal_round" || type === "petal_almond") {
         const outR = (nextRing && ring.role !== "frame" && ring.role !== "rest" && rng() < 0.78)
           ? Math.min(rMax, ring.end + (nextRing.end - nextRing.start) * overlapFactor)
           : ring.end;
@@ -718,32 +841,50 @@ export function generateMandalaRadial(doc, opts) {
   }
 
 
-  // --- Motivo central adicional (roseta) ---
-  // Mantiene áreas grandes y cerradas para facilitar el coloreado.
-  if (rng() < 0.95) {
+  // --- Motivo central adicional (roseta avanzada) ---
+  if (rng() < 0.98) {
+    const rType = rng();
     const cCount = (petals % 2 === 0 ? petals : petals + 1);
     const inner = binduR * 1.05;
-    const outer = binduClearR * _clamp(rFloat(rng, 0.55, 0.80), 0.50, 0.86);
+    const outer = binduClearR * 0.9;
     const step = (Math.PI * 2) / Math.max(6, cCount);
 
     const pbC = new PathBuilder();
-    for (let k = 0; k < cCount; k++) {
-      const a = k * step;
-      const aL = a - step * 0.22;
-      const aR = a + step * 0.22;
 
-      const pIn = _polar0(inner, a);
-      const pOut = _polar0(outer, a);
+    if (rType < 0.5) {
+      // SUNBURST: Rayos y picos geométricos
+      for (let k = 0; k < cCount; k++) {
+        const a = k * step;
+        const aNext = (k + 1) * step;
+        const aMid = a + step * 0.5;
 
-      // pétalo mixto (entre puntiagudo y redondeado)
-      const midR = inner + (outer - inner) * _clamp(rFloat(rng, 0.55, 0.78), 0.50, 0.86);
-      const cpL = _polar0(midR, aL);
-      const cpR = _polar0(midR, aR);
+        const p1 = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
+        const p2 = { x: cx + outer * Math.cos(aMid), y: cy + outer * Math.sin(aMid) };
+        const p3 = { x: cx + inner * Math.cos(aNext), y: cy + inner * Math.sin(aNext) };
 
-      pbC.moveTo(cx + pIn.x, cy + pIn.y)
-        .quadTo(cx + cpL.x, cy + cpL.y, cx + pOut.x, cy + pOut.y)
-        .quadTo(cx + cpR.x, cy + cpR.y, cx + pIn.x, cy + pIn.y)
-        .close();
+        pbC.moveTo(p1.x, p1.y).lineTo(p2.x, p2.y).lineTo(p3.x, p3.y);
+
+        // Internal "spark"
+        const pSpark = { x: cx + (inner + (outer - inner) * 0.4) * Math.cos(aMid), y: cy + (inner + (outer - inner) * 0.4) * Math.sin(aMid) };
+        addCapsule(pbC, p1.x, p1.y, pSpark.x, pSpark.y, detailStroke * 0.5);
+      }
+    } else {
+      // FLORAL COMPASS: Puntos cardinales y pétalos suaves
+      for (let k = 0; k < cCount; k++) {
+        const a = k * step;
+        const pIn = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
+        const pOut = { x: cx + outer * Math.cos(a), y: cy + outer * Math.sin(a) };
+        const cpL = { x: cx + _lerp(inner, outer, 0.5) * Math.cos(a - step * 0.3), y: cy + _lerp(inner, outer, 0.5) * Math.sin(a - step * 0.3) };
+        const cpR = { x: cx + _lerp(inner, outer, 0.5) * Math.cos(a + step * 0.3), y: cy + _lerp(inner, outer, 0.5) * Math.sin(a + step * 0.3) };
+
+        pbC.moveTo(pIn.x, pIn.y).quadTo(cpL.x, cpL.y, pOut.x, pOut.y).quadTo(cpR.x, cpR.y, pIn.x, pIn.y).close();
+
+        // Compass line
+        if (k % (cCount / 4) === 0) {
+          const pTip = { x: cx + (outer * 1.15) * Math.cos(a), y: cy + (outer * 1.15) * Math.sin(a) };
+          addCapsule(pbC, pOut.x, pOut.y, pTip.x, pTip.y, mainStroke);
+        }
+      }
     }
 
     doc.body.push(
