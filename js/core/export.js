@@ -19,19 +19,19 @@ export function downloadPng(filename, svgString, widthMm, heightMm, dpi = 300) {
     canvas.width = wPx;
     canvas.height = hPx;
     const ctx = canvas.getContext("2d");
-    
+
     // White background for print
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, wPx, hPx);
-    
+
     ctx.drawImage(img, 0, 0, wPx, hPx);
-    
+
     canvas.toBlob((pngBlob) => {
       saveBlob(pngBlob, filename);
       URL.revokeObjectURL(url);
     }, "image/png");
   };
-  
+
   img.src = url;
 }
 
@@ -49,9 +49,9 @@ function saveBlob(blob, filename) {
 
 export function flattenSvgElement(svgEl) {
   const idMap = new Map();
-  svg.querySelectorAll("[id]").forEach((el) => idMap.set(el.getAttribute("id"), el));
+  svgEl.querySelectorAll("[id]").forEach((el) => idMap.set(el.getAttribute("id"), el));
 
-  const uses = Array.from(svg.querySelectorAll("use"));
+  const uses = Array.from(svgEl.querySelectorAll("use"));
   for (const use of uses) {
     const href = use.getAttribute("href") || use.getAttribute("xlink:href");
     if (!href || !href.startsWith("#")) continue;
@@ -73,7 +73,7 @@ export function flattenSvgElement(svgEl) {
     use.replaceWith(clone);
   }
 
-  return svg;
+  return svgEl;
 }
 
 function stripIdsDeep(node) {

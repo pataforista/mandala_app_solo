@@ -1,110 +1,195 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Vector Mandala Core (v0.1)</title>
   <style>
-    body{
-      margin:0;
-      font-family:system-ui,Arial,sans-serif;
-      min-height:100dvh;
-      display:flex;
-      flex-direction:column;
+    body {
+      margin: 0;
+      font-family: system-ui, Arial, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
     }
-    header{
-      display:flex;
-      gap:12px;
-      flex-wrap:wrap;
-      align-items:center;
-      padding:10px;
-      border-bottom:1px solid #ddd;
-      background:#fff;
-    }
-    label{display:flex;gap:8px;align-items:center}
-    input[type="range"]{width:160px}
-    button{padding:8px 10px;cursor:pointer}
-    select{padding:6px}
 
-    main{
-      flex:1;
-      min-height:0;
-      display:flex;
+    header {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      background: #fff;
     }
-    #stage{
-      flex:1;
-      min-height:0;
-      overflow:auto;
-      padding:12px;
-      background:#fafafa;
+
+    label {
+      display: flex;
+      gap: 8px;
+      align-items: center
     }
-    #stage svg{
-      background:#fff;
-      border:1px solid #ddd;
-      max-width:100%;
-      height:auto;
+
+    input[type="range"] {
+      width: 160px
     }
-    .meta{font-variant-numeric:tabular-nums;color:#444}
+
+    button {
+      padding: 8px 10px;
+      cursor: pointer
+    }
+
+    select {
+      padding: 6px
+    }
+
+    main {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+
+    #stage {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 12px;
+      background: #fafafa;
+    }
+
+    #stage svg {
+      background: #fff;
+      border: 1px solid #ddd;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .meta {
+      font-variant-numeric: tabular-nums;
+      color: #444
+    }
   </style>
 </head>
+
 <body>
   <header>
     <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
       <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content: space-between;">
-        <h3 style="margin:0; font-size:1.1rem; color:#333;">Mandala Studio</h3>
-        <div style="display:flex; gap:8px;">
-           <button id="regen">🎲 Regenerar</button>
-           <button id="download">⬇ SVG</button>
-           <button id="downloadPng">⬇ PNG (300 DPI)</button>
+        <h3 style="margin:0; font-size:1.1rem; color:#333;">Mandala & Zentangle Studio</h3>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <label>Modo
+            <select id="mode">
+              <option value="mandala">Mandala (Radial)</option>
+              <option value="zentangle">Zentangle (Mosaico)</option>
+            </select>
+          </label>
+          <div style="display:flex; gap:8px;">
+            <button id="regen">🎲 Regenerar</button>
+            <button id="download">⬇ SVG</button>
+            <button id="downloadPng">⬇ PNG (300 DPI)</button>
+          </div>
         </div>
       </div>
 
-      <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; padding-top:8px; border-top:1px solid #eee;">
-        
-        <!-- Grupo Base -->
+      <div
+        style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; padding-top:8px; border-top:1px solid #eee;">
+
+        <!-- Grupo Base (Común) -->
         <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
-           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Base</legend>
-           <label>Preset
-             <select id="preset">
-               <option value="A4">A4</option>
-               <option value="LETTER">Letter</option>
-             </select>
-           </label>
-           <label title="Número de segmentos radiales">Pétalos
-             <input id="petals" type="range" min="6" max="48" step="1" value="12" />
-             <output id="petalsOut">12</output>
-           </label>
+          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Base</legend>
+          <label>Papel
+            <select id="preset">
+              <option value="A4">A4</option>
+              <option value="LETTER">Letter</option>
+            </select>
+          </label>
+          <label title="Semilla aleatoria">Seed
+            <input id="seed" type="number" style="width:100px" value="1" />
+          </label>
         </fieldset>
 
-        <!-- Grupo Estilo -->
+        <!-- Controles Mandala (Solo modo Mandala) -->
+        <div id="mandalaControls" style="display:flex; gap:20px; flex-wrap:wrap;">
+          <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
+            <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Geometría Radial</legend>
+            <label title="Número de segmentos radiales">Pétalos
+              <input id="petals" type="range" min="6" max="48" step="1" value="12" />
+              <output id="petalsOut">12</output>
+            </label>
+          </fieldset>
+        </div>
+
+        <!-- Controles Zentangle (Solo modo Zentangle) -->
+        <div id="zentangleControls" style="display:none; gap:20px; flex-wrap:wrap;">
+          <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
+            <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Zentangle Cells</legend>
+            <label>Estilo
+              <select id="zPreset">
+                <option value="editorial_premium">Editorial Premium</option>
+                <option value="editorial_airy">Editorial Aireado</option>
+                <option value="dense_classic">Clásico Denso</option>
+              </select>
+            </label>
+            <label title="Número de celdas">Celdas
+              <input id="cellCount" type="range" min="8" max="55" step="1" value="30" />
+              <output id="cellCountOut">30</output>
+            </label>
+            <label title="Tamaño mínimo de celda">Tam. Min
+              <input id="minCellSizeMm" type="range" min="8" max="26" step="1" value="14" />
+              <output id="minCellSizeMmOut">14</output>
+            </label>
+          </fieldset>
+        </div>
+
+        <!-- Grupo Estilo (Común) -->
         <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
-           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Estilo</legend>
-           <label title="Densidad de capas">Complejidad
-             <input id="complexity" type="range" min="20" max="240" step="5" value="110" />
-             <output id="complexityOut">110</output>
-           </label>
-           <label title="Geométrico vs Orgánico">Orgánico
-             <input id="organic" type="range" min="0" max="1" step="0.1" value="0.2" />
-             <output id="organicOut">0.2</output>
-           </label>
+          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Estilo</legend>
+          <label title="Densidad de capas">Complejidad
+            <input id="complexity" type="range" min="20" max="240" step="5" value="110" />
+            <output id="complexityOut">110</output>
+          </label>
+          <label title="Geométrico vs Orgánico">Orgánico
+            <input id="organic" type="range" min="0" max="1" step="0.1" value="0.2" />
+            <output id="organicOut">0.2</output>
+          </label>
         </fieldset>
 
-        <!-- Grupo Trazo -->
+        <!-- Grupo Trazo (Común) -->
         <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
-           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Trazo & Detalles</legend>
-           <label title="Peso de línea en mm">Grosor
-             <input id="strokeWidth" type="range" min="0.2" max="1.5" step="0.1" value="0.6" />
-             <output id="strokeWidthOut">0.6</output>
-           </label>
-           <label title="Marcos y bordes decorativos">
-             <input id="frames" type="checkbox" checked /> Marcos
-           </label>
+          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Trazo & Detalles</legend>
+          <label title="Peso de línea en mm">Grosor
+            <input id="strokeWidth" type="range" min="0.2" max="1.5" step="0.1" value="0.6" />
+            <output id="strokeWidthOut">0.6</output>
+          </label>
+          <label title="Marcos y bordes decorativos">
+            <input id="frames" type="checkbox" checked /> Marcos
+          </label>
+          <label title="Orla ornamental en el borde de la página">
+            <input id="pageBorder" type="checkbox" checked /> Orla Pág.
+          </label>
+        </fieldset>
+
+        <!-- Grupo Master (Phase 3) -->
+        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
+          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px; color:#c2410c;">Master Tier</legend>
+          <label title="Alternancia de diseños dentro del mismo anillo">Ritmo
+            <input id="alternation" type="range" min="0" max="1" step="0.1" value="0.3" />
+            <output id="alternationOut">0.3</output>
+          </label>
+          <label title="Control de saturación y espacio negativo">Armonía
+            <input id="harmony" type="range" min="0" max="1" step="0.1" value="0.5" />
+            <output id="harmonyOut">0.5</output>
+          </label>
+          <label title="Efecto de presión de pincel (tapering)">Pincel
+            <input id="taper" type="range" min="0" max="1" step="0.1" value="0.2" />
+            <output id="taperOut">0.2</output>
+          </label>
         </fieldset>
       </div>
 
       <div style="font-size:0.8rem; color:#666; margin-top:4px;">
-         <span class="meta">Seed: <b id="seedText">—</b></span> <span style="margin:0 6px;">|</span>
-         <span class="meta">Paths: <b id="pathsText">—</b></span>
+        <span class="meta">Seed: <b id="seedText">—</b></span> <span style="margin:0 6px;">|</span>
+        <span class="meta">Paths: <b id="pathsText">—</b></span>
       </div>
     </div>
   </header>
@@ -115,4 +200,5 @@
 
   <script type="module" src="./js/app.js"></script>
 </body>
+
 </html>

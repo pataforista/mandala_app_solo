@@ -1,0 +1,53 @@
+// js/generators/zentangle.presets.js
+// Curated presets for the Zentangle engine.
+
+export const ZENTANGLE_PRESETS = {
+    editorial_premium: {
+        cellLayout: "rect_bsp",
+        cellCount: 24,
+        minCellSizeMm: 18,
+        cellBorderWidthMm: 0.82,
+        patternStrokeMm: 0.38,
+        minGapMm: 1.8,
+        whiteSpaceMm: 1.25,
+        maxPatternPassesPerCell: 2,
+        patternSkipProb: 0.26,
+        rotatePatterns: true,
+        rotationSet: "ergonomic",
+        innerOrganicBorderEnabled: true,
+        innerOrganicBorderInsetMm: 0.95,
+        innerOrganicJitterMm: 0.5,
+        innerOrganicRoundMm: 1.1,
+    },
+    editorial_airy: {
+        cellLayout: "rect_bsp",
+        cellCount: 26,
+        minCellSizeMm: 16,
+        cellBorderWidthMm: 0.75,
+        patternStrokeMm: 0.35,
+        minGapMm: 1.6,
+        whiteSpaceMm: 1.1,
+        maxPatternPassesPerCell: 2,
+        patternSkipProb: 0.22,
+        rotatePatterns: true,
+        rotationSet: "ergonomic",
+        innerOrganicBorderEnabled: true,
+        innerOrganicBorderInsetMm: 0.8,
+        innerOrganicJitterMm: 0.4,
+        innerOrganicRoundMm: 0.9,
+    },
+    dense_classic: {
+        cellLayout: "rect_bsp",
+        cellCount: 38,
+        minCellSizeMm: 10,
+        cellBorderWidthMm: 0.65,
+        patternStrokeMm: 0.32,
+        minGapMm: 1.2,
+        whiteSpaceMm: 0.8,
+        maxPatternPassesPerCell: 1,
+        patternSkipProb: 0.1,
+        rotatePatterns: true,
+        rotationSet: "full",
+        innerOrganicBorderEnabled: false,
+    }
+};
