@@ -962,8 +962,23 @@ export function generateMandalaRadial(doc, opts) {
   // --- Render radial ---
   for (let k = 0; k < petals; k++) {
     const deg = (k * 360) / petals;
+    const organicJitter = organicLevel * _lerp(0.05, 0.6, cN);
+    const phase = (k / Math.max(1, petals)) * Math.PI * 2;
+
+    // Humaniza la repetición radial: micro-variación angular y de escala
+    // para evitar el aspecto excesivamente sintético de un patrón 100% clonado.
+    const rotJitterDeg = Math.sin(phase * 2.7 + (seed % 37)) * organicJitter * 2.2;
+    const scaleJitter = 1 + Math.cos(phase * 1.9 + (seed % 19)) * organicJitter * 0.035;
+    const mirror = (k % 2 === 1 && alternation > 0.24) ? -1 : 1;
+
+    const transform = [
+      `translate(${_fmt(cx)} ${_fmt(cy)})`,
+      `rotate(${_fmt(deg - 90 + rotJitterDeg)})`,
+      `scale(${_fmt(mirror * scaleJitter)} ${_fmt(scaleJitter)})`
+    ].join(" ");
+
     doc.body.push(
-      `<use href="#${wedgeId}" transform="translate(${_fmt(cx)} ${_fmt(cy)}) rotate(${_fmt(deg - 90)})" />`
+      `<use href="#${wedgeId}" transform="${transform}" />`
     );
   }
 
@@ -1046,9 +1061,10 @@ export function generateMandalaRadial(doc, opts) {
 
     // --- Estética “cuadernillo”: anillos de cuentas y borde festoneado (círculos grandes repetidos) ---
     // 1) Bead ring (cerca del núcleo, típico en mandalas impresos)
-    if (rng() < 0.85) {
+    if (rng() < _lerp(0.95, 0.62, harmony)) {
       const beadRingR = binduClearR * _clamp(rFloat(rng, 0.72, 0.88), 0.66, 0.92);
-      const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 1.6, 2.4), 1.4, 2.8)), 18, 96);
+      const beadDensity = _lerp(2.4, 1.3, organicLevel);
+      const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82);
       const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), mainStroke * 2.2, computedRadius * 0.020);
 
       for (let i = 0; i < beadCount; i++) {
@@ -1062,8 +1078,8 @@ export function generateMandalaRadial(doc, opts) {
     }
 
     // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
-    if (rng() < 0.80) {
-      const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 1.0, 1.8), 0.9, 2.2)), 12, 72);
+    if (rng() < _lerp(0.88, 0.55, harmony)) {
+      const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56);
       const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), mainStroke * 2.6, computedRadius * 0.060);
       const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
 
