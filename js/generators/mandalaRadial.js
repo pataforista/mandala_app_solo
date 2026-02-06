@@ -116,6 +116,12 @@ export function generateMandalaRadial(doc, opts) {
     let density = densityForIndex(i, ringCount, cN);
 
     if (prevDensity === "high" && density === "high") density = "med";
+
+    // Spacer logic: if harmony is high, favor low density spacer rings to prevent clutter
+    if (harmony > 0.6 && i % 2 === 1 && i !== ringCount - 1) {
+      density = "low";
+    }
+
     prevDensity = density;
 
     const isInner = i === 0;
@@ -152,53 +158,50 @@ export function generateMandalaRadial(doc, opts) {
   function pickShapeForRing(ring, prevRing) {
     const isOrganic = (rng() < organicLevel); /* Bias general */
 
-    if (ring.role === "rest") return (isOrganic ? pickPetalVariant(ring) : "arch");
+    if (ring.role === "rest") return (isOrganic ? pickPetalVariant(ring) : "spacer_circles");
     if (ring.role === "frame") return (!isOrganic && rng() < 0.6 ? "diamond" : pickPetalVariant(ring));
 
     if (ring.role === "primary") {
-      // High organic -> favor petals/arches
-      // Low organic -> favor geometry (though this engine is radial-petal based, we can use 'diamond' or 'arch' more)
-      if (!isOrganic && rng() < 0.6) return "diamond";
-      return (rng() < 0.60 ? pickPetalVariant(ring) : "arch");
+      if (!isOrganic && rng() < 0.4) return "diamond";
+      return (rng() < 0.80 ? pickPetalVariant(ring) : "arch");
     }
 
     const prevType = prevRing?.type;
 
     if (prevRing && prevRing.density === "high" && ring.density !== "high") {
-      return (rng() < 0.65 ? "arch" : "petal");
+      return (rng() < 0.75 ? "arch" : "petal_teardrop");
     }
 
-    // Logic influenced by organicLevel
     const rand = rng();
-    // if organicLevel is high, threshold for diamond increases (harder to get diamond)
-    // if organicLevel is low, threshold for diamond decreases (easier to get diamond)
     const diamondThresh = _lerp(0.7, 0.95, organicLevel);
 
     if (rand > diamondThresh) return "diamond";
-    if (rand < 0.3 * (1 - organicLevel)) return "islamic_interlace";
+    if (rand < 0.25 * (1 - organicLevel)) return "islamic_interlace";
     if (rand < 0.2 + 0.3 * organicLevel) return "peacock_feather";
     if (rand < 0.4 + 0.2 * organicLevel) return "paisley_element";
+    if (rand < 0.6 + 0.1 * organicLevel) return "petal_teardrop";
     return (rng() < 0.5 ? "arch" : "petal");
   }
+
   function pickPetalVariant(ring) {
-    // Bias variants based on organicLevel
     const t = rng();
 
-    // Adjusted probabilities
-    let pPointy = _lerp(0.3, 0.05, organicLevel);
-    let pRound = _lerp(0.2, 0.4, organicLevel);
+    let pPointy = _lerp(0.4, 0.1, organicLevel);
+    let pRound = _lerp(0.2, 0.5, organicLevel);
     let pLotus = _lerp(0.1, 0.3, organicLevel);
+    let pTeardrop = _lerp(0.1, 0.2, organicLevel);
 
     if (ring.role === "frame") {
-      if (t < 0.3) return "lotus_petal_advanced";
-      return t < 0.6 ? "petal_heart" : t < 0.8 ? "petal_round" : "petal_pointy";
+      if (t < 0.35) return "lotus_petal_advanced";
+      return t < 0.65 ? "petal_heart" : t < 0.85 ? "petal_round" : "petal_pointy";
     }
 
     if (t < pPointy) return "petal_pointy";
     if (t < pPointy + pRound) return "petal_round";
-    if (t < pPointy + pRound + pLotus) return "lotus_petal_advanced";
+    if (t < pPointy + pRound + pTeardrop) return "petal_teardrop";
+    if (t < pPointy + pRound + pTeardrop + pLotus) return "lotus_petal_advanced";
 
-    return (rng() < 0.7 ? "petal_almond" : "fleur");
+    return (rng() < 0.75 ? "petal_almond" : "fleur");
   }
 
   // --- Helpers for natural look ---
@@ -606,13 +609,14 @@ export function generateMandalaRadial(doc, opts) {
           midR = ring.start + span * _clamp(rFloat(rng, 0.72, 0.90), 0.70, 0.92);
           widthFactor = _clamp(rFloat(rng, 0.30, 0.58), 0.28, 0.68);
         } else if (type === "petal_round") {
-          // pétalo gordito: abre más
-          midR = ring.start + span * _clamp(rFloat(rng, 0.40, 0.62), 0.38, 0.70);
-          widthFactor = _clamp(rFloat(rng, 0.62, 0.98), 0.58, 0.99);
+          midR = ring.start + span * _clamp(rFloat(rng, 0.45, 0.65), 0.40, 0.75);
+          widthFactor = _clamp(rFloat(rng, 0.70, 0.95), 0.60, 0.99);
         } else if (type === "petal_almond") {
-          // almendra/hoja: más estrecha, con vena central
-          midR = ring.start + span * _clamp(rFloat(rng, 0.78, 0.92), 0.75, 0.94);
-          widthFactor = _clamp(rFloat(rng, 0.24, 0.46), 0.22, 0.52);
+          midR = ring.start + span * _clamp(rFloat(rng, 0.80, 0.95), 0.75, 0.99);
+          widthFactor = _clamp(rFloat(rng, 0.25, 0.45), 0.20, 0.55);
+        } else if (type === "petal_teardrop") {
+          midR = ring.start + span * _clamp(rFloat(rng, 0.85, 0.98), 0.82, 0.99);
+          widthFactor = _clamp(rFloat(rng, 0.45, 0.75), 0.35, 0.88);
         }
 
         const cpL = _polar0(midR, thetaC - (localStep / 2) * widthFactor);
@@ -651,11 +655,21 @@ export function generateMandalaRadial(doc, opts) {
         }
 
 
-        // Micro-detalle botánico: estambres (3 filamentos + puntitos)
-        if (ring.allowDetail && rng() < _lerp(0.25, 0.55, cN) && allowSubdivideSafe(ring, localStep)) {
+        // Micro-detalle botánico: estambres y punteado (stippling)
+        if (ring.allowDetail && rng() < _lerp(0.3, 0.7, cN) && allowSubdivideSafe(ring, localStep)) {
           const baseR = ring.start + span * 0.14;
           const tipR = ring.start + span * _clamp(rFloat(rng, 0.48, 0.62), 0.42, 0.68);
           const wS = Math.max(detailStroke * 0.9, span * 0.035);
+
+          // Add stippling along the central axis
+          if (complexity > 120 && rng() < 0.6) {
+            const dotCount = Math.floor(_lerp(2, 5, cN));
+            for (let d = 0; d < dotCount; d++) {
+              const dr = _lerp(baseR, tipR, (d + 1) / (dotCount + 1));
+              const dp = _polar0(dr, thetaC);
+              addCirclePoly(pbDetail, dp.x, dp.y, fineStroke * 0.5, 6);
+            }
+          }
 
 
           // Elementos intersticiales: rellena “V” entre pétalos (fase desplazada)
@@ -1030,8 +1044,16 @@ export function generateMandalaRadial(doc, opts) {
     }
 
     doc.body.push(
-      `<path d="${pbC.toString()}" fill="none" stroke="${stroke}" stroke-width="${_fmt(detailStroke)}" />`
+      pbC.toPath({ stroke, strokeWidthMm: detailStroke, fill: "none" })
     );
+
+    // Layered central rosettes (Circle grid / petals)
+    if (rng() < 0.7) {
+      const pbExtra = new PathBuilder();
+      addCirclePoly(pbExtra, cx, cy, inner * 0.6, 12);
+      addCirclePoly(pbExtra, cx, cy, inner * 0.5, 8);
+      doc.body.push(pbExtra.toPath({ stroke, strokeWidthMm: fineStroke, fill: "none" }));
+    }
 
     // NESTED CORE (Double Core)
     if (complexity > 100) {
@@ -1044,7 +1066,9 @@ export function generateMandalaRadial(doc, opts) {
         else pbInner.lineTo(p.x, p.y);
       }
       pbInner.close();
-      doc.body.push(`<path d="${pbInner.toString()}" fill="none" stroke="${stroke}" stroke-width="${_fmt(fineStroke)}" />`);
+      doc.body.push(
+        pbInner.toPath({ stroke, strokeWidthMm: fineStroke, fill: "none" })
+      );
     }
   }
 
@@ -1118,7 +1142,7 @@ export function generateMandalaRadial(doc, opts) {
     addCirclePoly(pbB, x0, y1, cornerR, 12);
 
     doc.body.push(
-      `<path d="${pbB.toString()}" fill="none" stroke="${stroke}" stroke-width="${_fmt(mainStroke * 0.8)}" />`
+      pbB.toPath({ stroke, strokeWidthMm: mainStroke * 0.8, fill: "none" })
     );
 
     // Hairline detail inside border
@@ -1126,7 +1150,7 @@ export function generateMandalaRadial(doc, opts) {
     const b2m = borderMargin + 1.2;
     pbB2.moveTo(b2m, b2m).lineTo(wMm - b2m, b2m).lineTo(wMm - b2m, hMm - b2m).lineTo(b2m, hMm - b2m).close();
     doc.body.push(
-      `<path d="${pbB2.toString()}" fill="none" stroke="${stroke}" stroke-width="${_fmt(fineStroke * 0.7)}" />`
+      pbB2.toPath({ stroke, strokeWidthMm: fineStroke * 0.7, fill: "none" })
     );
   }
 }

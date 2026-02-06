@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Vector Mandala Core (v0.1)</title>
+  <title>Mandala Studio (v0.1)</title>
   <style>
     body {
       margin: 0;
@@ -31,22 +31,40 @@
     }
 
     input[type="range"] {
-      width: 160px
+      width: 120px;
     }
 
-    button {
-      padding: 8px 10px;
-      cursor: pointer
+    input[type="number"] {
+      padding: 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
 
     select {
-      padding: 6px
+      padding: 4px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
     }
 
-    main {
-      flex: 1;
-      min-height: 0;
-      display: flex;
+    button {
+      padding: 6px 14px;
+      border-radius: 4px;
+      border: 1px solid #bbb;
+      background: #eee;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.1s;
+    }
+
+    button:hover {
+      background: #e0e0e0;
+      border-color: #999;
+    }
+
+    button:active {
+      background: #ccc;
+      transform: translateY(1px);
     }
 
     #stage {
@@ -75,19 +93,11 @@
   <header>
     <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
       <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content: space-between;">
-        <h3 style="margin:0; font-size:1.1rem; color:#333;">Mandala & Zentangle Studio</h3>
-        <div style="display:flex; gap:12px; align-items:center;">
-          <label>Modo
-            <select id="mode">
-              <option value="mandala">Mandala (Radial)</option>
-              <option value="zentangle">Zentangle (Mosaico)</option>
-            </select>
-          </label>
-          <div style="display:flex; gap:8px;">
-            <button id="regen">🎲 Regenerar</button>
-            <button id="download">⬇ SVG</button>
-            <button id="downloadPng">⬇ PNG (300 DPI)</button>
-          </div>
+        <h3 style="margin:0; font-size:1.1rem; color:#333;">Mandala Studio</h3>
+        <div style="display:flex; gap:8px;">
+          <button id="regen">🎲 Regenerar</button>
+          <button id="download">⬇ SVG</button>
+          <button id="downloadPng">⬇ PNG (300 DPI)</button>
         </div>
       </div>
 
@@ -108,35 +118,12 @@
           </label>
         </fieldset>
 
-        <!-- Controles Mandala (Solo modo Mandala) -->
-        <div id="mandalaControls" style="display:flex; gap:20px; flex-wrap:wrap;">
+        <div style="display:flex; gap:20px; flex-wrap:wrap;">
           <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
             <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Geometría Radial</legend>
             <label title="Número de segmentos radiales">Pétalos
-              <input id="petals" type="range" min="6" max="48" step="1" value="12" />
+              <input id="petals" type="range" min="6" max="32" step="1" value="12" />
               <output id="petalsOut">12</output>
-            </label>
-          </fieldset>
-        </div>
-
-        <!-- Controles Zentangle (Solo modo Zentangle) -->
-        <div id="zentangleControls" style="display:none; gap:20px; flex-wrap:wrap;">
-          <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
-            <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Zentangle Cells</legend>
-            <label>Estilo
-              <select id="zPreset">
-                <option value="editorial_premium">Editorial Premium</option>
-                <option value="editorial_airy">Editorial Aireado</option>
-                <option value="dense_classic">Clásico Denso</option>
-              </select>
-            </label>
-            <label title="Número de celdas">Celdas
-              <input id="cellCount" type="range" min="8" max="55" step="1" value="30" />
-              <output id="cellCountOut">30</output>
-            </label>
-            <label title="Tamaño mínimo de celda">Tam. Min
-              <input id="minCellSizeMm" type="range" min="8" max="26" step="1" value="14" />
-              <output id="minCellSizeMmOut">14</output>
             </label>
           </fieldset>
         </div>
@@ -145,11 +132,11 @@
         <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Estilo</legend>
           <label title="Densidad de capas">Complejidad
-            <input id="complexity" type="range" min="20" max="240" step="5" value="110" />
+            <input id="complexity" type="range" min="40" max="250" step="5" value="110" />
             <output id="complexityOut">110</output>
           </label>
           <label title="Geométrico vs Orgánico">Orgánico
-            <input id="organic" type="range" min="0" max="1" step="0.1" value="0.2" />
+            <input id="organic" type="range" min="0" max="1" step="0.05" value="0.2" />
             <output id="organicOut">0.2</output>
           </label>
         </fieldset>
