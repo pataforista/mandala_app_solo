@@ -1,8 +1,12 @@
 import { getStateFromURL, setStateToURL, randomSeed32 } from "./core/urlState.js";
 import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
-import { downloadTextFile, downloadPng, flattenSvgElement } from "./core/export.js";
+import { downloadTextFile, downloadPng, downloadPdf, flattenSvgElement } from "./core/export.js";
 import { generateMandalaRadial } from "./generators/mandalaRadial.js";
+import { StateHistory } from "./core/history.js";
+import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
+
+const historyMan = new StateHistory();
 
 const stage = document.getElementById("stage");
 const presetEl = document.getElementById("preset");
@@ -17,20 +21,30 @@ const organicOut = document.getElementById("organicOut");
 const seedInputEl = document.getElementById("seed");
 
 const strokeWidthEl = document.getElementById("strokeWidth");
-const strokeWidthOut = document.getElementById("strokeWidthOut");
 const framesEl = document.getElementById("frames");
 const pageBorderEl = document.getElementById("pageBorder");
 
 const alternationEl = document.getElementById("alternation");
-const alternationOut = document.getElementById("alternationOut");
 const harmonyEl = document.getElementById("harmony");
-const harmonyOut = document.getElementById("harmonyOut");
 const taperEl = document.getElementById("taper");
-const taperOut = document.getElementById("taperOut");
+const kaleidoscopeEl = document.getElementById("kaleidoscope");
+const texturesEl = document.getElementById("textures");
 
 const regenBtn = document.getElementById("regen");
 const downloadBtn = document.getElementById("download");
 const downloadPngBtn = document.getElementById("downloadPng");
+const downloadPdfBtn = document.getElementById("downloadPdf");
+const shareBtn = document.getElementById("share");
+
+const undoBtn = document.getElementById("undo");
+const redoBtn = document.getElementById("redo");
+const saveFavBtn = document.getElementById("saveFav");
+const openGalleryBtn = document.getElementById("openGallery");
+const galleryDrawer = document.getElementById("galleryDrawer");
+const galleryContainer = document.getElementById("galleryContainer");
+const recentContainer = document.getElementById("recentContainer");
+const closeGalleryBtn = document.getElementById("closeGallery");
+
 const seedText = document.getElementById("seedText");
 const pathsText = document.getElementById("pathsText");
 
@@ -45,8 +59,12 @@ const DEFAULTS = {
   alternation: 0.3,
   harmony: 0.5,
   taper: 0.2,
+  kaleidoscope: true,
+  textures: true,
   seed: randomSeed32() >>> 0,
 };
+
+const recentSeeds = [];
 
 const state = getStateFromURL(DEFAULTS);
 
@@ -85,6 +103,8 @@ function render() {
     alternation: state.alternation,
     harmony: state.harmony,
     taper: state.taper,
+    kaleidoscope: state.kaleidoscope,
+    showTextures: state.textures,
   });
 
   const svgStr = renderDocToSvgString(doc);
@@ -93,29 +113,93 @@ function render() {
   const svgEl = stage.querySelector("svg");
   const pathCount = svgEl ? svgEl.querySelectorAll("path").length : 0;
   pathsText.textContent = String(pathCount);
+
+  // Track recent seeds
+  if (!recentSeeds.includes(state.seed)) {
+    recentSeeds.unshift(state.seed);
+    if (recentSeeds.length > 20) recentSeeds.pop();
+  }
+
+  // Push to history after render
+  historyMan.push(state);
+  updateUndoRedoButtons();
+}
+
+function updateUndoRedoButtons() {
+  if (undoBtn) undoBtn.disabled = !historyMan.canUndo();
+  if (redoBtn) redoBtn.disabled = !historyMan.canRedo();
+}
+
+async function refreshGallery() {
+  const favorites = await getFavorites();
+  galleryContainer.innerHTML = "";
+  recentContainer.innerHTML = "";
+
+  if (favorites.length === 0) {
+    galleryContainer.innerHTML = "<p style='grid-column: 1/-1; text-align: center; color: #666;'>No tienes favoritos aún.</p>";
+    return;
+  }
+
+  favorites.forEach(fav => {
+    const card = document.createElement("div");
+    card.style = "border: 1px solid #ddd; padding: 8px; border-radius: 8px; background: #fff; display: flex; flex-direction: column; gap: 8px;";
+
+    card.innerHTML = `
+      <div style="font-size: 0.8rem; color: #666;">Seed: ${fav.state.seed}</div>
+      <div style="display: flex; gap: 4px;">
+        <sl-button size="small" variant="primary" style="flex: 1;" class="load-fav">Cargar</sl-button>
+        <sl-button size="small" variant="danger" class="delete-fav"><sl-icon name="trash"></sl-icon></sl-button>
+      </div>
+    `;
+
+    card.querySelector(".load-fav").onclick = () => {
+      Object.assign(state, fav.state);
+      bindUI(); // Update UI controls
+      setStateToURL(state);
+      render();
+      galleryDrawer.hide();
+    };
+
+    card.querySelector(".delete-fav").onclick = async () => {
+      await deleteFavorite(fav.id);
+      refreshGallery();
+    };
+
+    galleryContainer.appendChild(card);
+  });
+
+  // Recent Seeds
+  recentSeeds.forEach(s => {
+    const badge = document.createElement("sl-badge");
+    badge.innerText = s;
+    badge.style.cursor = "pointer";
+    badge.variant = (s === state.seed) ? "primary" : "neutral";
+    badge.onclick = () => {
+      state.seed = s;
+      bindUI();
+      setStateToURL(state);
+      render();
+    };
+    recentContainer.appendChild(badge);
+  });
 }
 
 function bindUI() {
   presetEl.value = state.preset;
   petalsEl.value = String(state.petals);
-  petalsOut.value = String(state.petals);
+  petalsEl.value = String(state.petals);
 
   complexityEl.value = String(state.complexity);
-  complexityOut.value = String(state.complexity);
   organicEl.value = String(state.organic);
-  organicOut.value = String(state.organic);
 
   strokeWidthEl.value = String(state.strokeWidth);
-  strokeWidthOut.value = String(state.strokeWidth);
   framesEl.checked = state.frames;
   pageBorderEl.checked = state.pageBorder;
 
   alternationEl.value = String(state.alternation);
-  alternationOut.value = String(state.alternation);
   harmonyEl.value = String(state.harmony);
-  harmonyOut.value = String(state.harmony);
   taperEl.value = String(state.taper);
-  taperOut.value = String(state.taper);
+  kaleidoscopeEl.checked = state.kaleidoscope;
 
   seedInputEl.value = String(state.seed);
 
@@ -124,67 +208,102 @@ function bindUI() {
     render();
   };
 
-  seedInputEl.addEventListener("input", () => {
+  undoBtn.onclick = () => {
+    const prev = historyMan.undo();
+    if (prev) {
+      Object.assign(state, prev);
+      bindUI();
+      setStateToURL(state);
+      render();
+    }
+  };
+
+  redoBtn.onclick = () => {
+    const next = historyMan.redo();
+    if (next) {
+      Object.assign(state, next);
+      bindUI();
+      setStateToURL(state);
+      render();
+    }
+  };
+
+  saveFavBtn.onclick = async () => {
+    await saveToFavorites(state);
+    alert("¡Guardado en favoritos!");
+  };
+
+  openGalleryBtn.onclick = () => {
+    refreshGallery();
+    galleryDrawer.show();
+  };
+
+  closeGalleryBtn.onclick = () => galleryDrawer.hide();
+
+  seedInputEl.addEventListener("sl-input", () => {
     state.seed = (parseInt(seedInputEl.value, 10) >>> 0) || 0;
   });
-  seedInputEl.addEventListener("change", update);
+  seedInputEl.addEventListener("sl-change", update);
 
-  presetEl.addEventListener("change", () => {
+  presetEl.addEventListener("sl-change", () => {
     state.preset = presetEl.value;
     update();
   });
 
-  petalsEl.addEventListener("input", () => {
+  petalsEl.addEventListener("sl-input", () => {
     state.petals = clampInt(petalsEl.value, 6, 96);
-    petalsOut.value = String(state.petals);
   });
-  petalsEl.addEventListener("change", update);
+  petalsEl.addEventListener("sl-change", update);
 
-  complexityEl.addEventListener("input", () => {
+  complexityEl.addEventListener("sl-input", () => {
     state.complexity = clampInt(complexityEl.value, 20, 320);
-    complexityOut.value = String(state.complexity);
   });
-  complexityEl.addEventListener("change", update);
+  complexityEl.addEventListener("sl-change", update);
 
-  organicEl.addEventListener("input", () => {
+  organicEl.addEventListener("sl-input", () => {
     state.organic = clampFloat(organicEl.value, 0, 1);
-    organicOut.value = String(state.organic);
   });
-  organicEl.addEventListener("change", update);
+  organicEl.addEventListener("sl-change", update);
 
-  strokeWidthEl.addEventListener("input", () => {
+  strokeWidthEl.addEventListener("sl-input", () => {
     state.strokeWidth = clampFloat(strokeWidthEl.value, 0.1, 5.0);
-    strokeWidthOut.value = String(state.strokeWidth);
   });
-  strokeWidthEl.addEventListener("change", update);
+  strokeWidthEl.addEventListener("sl-change", update);
 
-  framesEl.addEventListener("change", () => {
+  framesEl.addEventListener("sl-change", () => {
     state.frames = framesEl.checked;
     update();
   });
 
-  pageBorderEl.addEventListener("change", () => {
+  pageBorderEl.addEventListener("sl-change", () => {
     state.pageBorder = pageBorderEl.checked;
     update();
   });
 
-  alternationEl.addEventListener("input", () => {
+  alternationEl.addEventListener("sl-input", () => {
     state.alternation = clampFloat(alternationEl.value, 0, 1);
-    alternationOut.value = String(state.alternation);
   });
-  alternationEl.addEventListener("change", update);
+  alternationEl.addEventListener("sl-change", update);
 
-  harmonyEl.addEventListener("input", () => {
+  harmonyEl.addEventListener("sl-input", () => {
     state.harmony = clampFloat(harmonyEl.value, 0, 1);
-    harmonyOut.value = String(state.harmony);
   });
-  harmonyEl.addEventListener("change", update);
+  harmonyEl.addEventListener("sl-change", update);
 
-  taperEl.addEventListener("input", () => {
+  taperEl.addEventListener("sl-input", () => {
     state.taper = clampFloat(taperEl.value, 0, 1);
-    taperOut.value = String(state.taper);
   });
-  taperEl.addEventListener("change", update);
+  taperEl.addEventListener("sl-change", update);
+
+  kaleidoscopeEl.addEventListener("sl-change", () => {
+    state.kaleidoscope = kaleidoscopeEl.checked;
+    update();
+  });
+
+  texturesEl.addEventListener("sl-change", () => {
+    state.textures = texturesEl.checked;
+    update();
+  });
 
   regenBtn.addEventListener("click", () => {
     state.seed = randomSeed32() >>> 0;
@@ -207,11 +326,67 @@ function bindUI() {
     downloadPng(filename, svg.outerHTML, wMm, hMm, 300);
   });
 
+  downloadPdfBtn.addEventListener("click", async () => {
+    const svg = stage.querySelector("svg");
+    if (!svg) return;
+    const doc = getCurrentDoc();
+    const filename = `mandala_${state.preset}_seed_${state.seed}.pdf`;
+    const { wMm, hMm } = doc.page;
+    await downloadPdf(filename, svg, wMm, hMm);
+  });
+
+  const downloadBookBtn = document.getElementById("downloadBook");
+  downloadBookBtn.addEventListener("click", async () => {
+    const doc = getCurrentDoc();
+    const { wMm, hMm } = doc.page;
+    const count = 5; // Default batch size
+    const filename = `mandala_coloring_book_${state.seed}.pdf`;
+
+    // Create a list of 5 variations based on the current state but different seeds
+    const batchStates = Array.from({ length: count }, (_, i) => ({
+      ...state,
+      seed: (state.seed + i * 1234567) >>> 0
+    }));
+
+    alert(`Generando un libro de ${count} mandalas... Por favor, espera.`);
+
+    await downloadBatchPdf(filename, batchStates, generateMandalaRadial, wMm, hMm);
+  });
+
+  shareBtn.addEventListener("click", async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Mandala Studio',
+          text: '¡Mira este mandala que he creado!',
+          url: window.location.href,
+        });
+        console.log('Shared successfully');
+      } catch (err) {
+        console.log('Share failed', err);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      navigator.clipboard.writeText(window.location.href);
+      alert('URL copiada al portapapeles');
+    }
+  });
+
   window.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() !== "f") return;
     const svg = stage.querySelector("svg");
     if (!svg) return;
     flattenSvgElement(svg);
+  });
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      console.log('SW registered!', reg);
+    }).catch(err => {
+      console.log('SW registration failed!', err);
+    });
   });
 }
 

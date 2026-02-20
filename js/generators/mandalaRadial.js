@@ -45,6 +45,8 @@ export function generateMandalaRadial(doc, opts) {
     alternation = 0.3,
     harmony = 0.5,
     taper = 0.2,
+    kaleidoscope = true,
+    showTextures = true,
   } = opts;
 
   const page = doc?.page ?? { wMm: 210, hMm: 297, marginMm: 10 };
@@ -582,7 +584,7 @@ export function generateMandalaRadial(doc, opts) {
           .close();
 
         // Texture: internal hatching
-        if (complexity > 120 && ring.allowDetail) {
+        if (showTextures && complexity > 120 && ring.allowDetail) {
           _addHatching(pbFine, pIn, cp1, pOut, cp2, 3);
         }
 
@@ -661,14 +663,23 @@ export function generateMandalaRadial(doc, opts) {
           const tipR = ring.start + span * _clamp(rFloat(rng, 0.48, 0.62), 0.42, 0.68);
           const wS = Math.max(detailStroke * 0.9, span * 0.035);
 
-          // Add stippling along the central axis
-          if (complexity > 120 && rng() < 0.6) {
-            const dotCount = Math.floor(_lerp(2, 5, cN));
+          // Add stippling along the central axis or as a shadow
+          if (showTextures && complexity > 110 && rng() < 0.7) {
+            const dotCount = Math.floor(_lerp(2, 6, cN));
             for (let d = 0; d < dotCount; d++) {
               const dr = _lerp(baseR, tipR, (d + 1) / (dotCount + 1));
-              const dp = _polar0(dr, thetaC);
-              addCirclePoly(pbDetail, dp.x, dp.y, fineStroke * 0.5, 6);
+              const dp = _polar0(dr, thetaC + rFloat(rng, -localStep * 0.05, localStep * 0.05));
+              addCirclePoly(pbFine, dp.x, dp.y, fineStroke * 0.4, 6);
             }
+          }
+
+          // Advanced Texture: Internal Hatching for shadows
+          if (showTextures && complexity > 150 && rng() < 0.5) {
+            const hp1 = _polar0(baseR, thetaC - localStep * 0.1);
+            const hp2 = _polar0(baseR, thetaC + localStep * 0.1);
+            const hp3 = _polar0(tipR, thetaC + localStep * 0.05);
+            const hp4 = _polar0(tipR, thetaC - localStep * 0.05);
+            _addHatching(pbFine, hp1, hp2, hp3, hp4, 4);
           }
 
 
@@ -983,7 +994,7 @@ export function generateMandalaRadial(doc, opts) {
     // para evitar el aspecto excesivamente sintético de un patrón 100% clonado.
     const rotJitterDeg = Math.sin(phase * 2.7 + (seed % 37)) * organicJitter * 2.2;
     const scaleJitter = 1 + Math.cos(phase * 1.9 + (seed % 19)) * organicJitter * 0.035;
-    const mirror = (k % 2 === 1 && alternation > 0.24) ? -1 : 1;
+    const mirror = (k % 2 === 1 && (alternation > 0.24 || kaleidoscope)) ? -1 : 1;
 
     const transform = [
       `translate(${_fmt(cx)} ${_fmt(cy)})`,

@@ -5,6 +5,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mandala Studio (v0.1)</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.1/cdn/themes/light.css" />
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.1/cdn/shoelace.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
       margin: 0;
@@ -93,85 +98,124 @@
   <header>
     <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
       <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content: space-between;">
-        <h3 style="margin:0; font-size:1.1rem; color:#333;">Mandala Studio</h3>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <h3 style="margin:0; font-size:1.1rem; color:#333;">Mandala Studio</h3>
+          <div style="display:flex; gap:4px;">
+            <sl-icon-button id="undo" name="arrow-90deg-left" label="Deshacer"
+              style="font-size: 1.2rem;"></sl-icon-button>
+            <sl-icon-button id="redo" name="arrow-90deg-right" label="Rehacer"
+              style="font-size: 1.2rem;"></sl-icon-button>
+          </div>
+        </div>
         <div style="display:flex; gap:8px;">
-          <button id="regen">🎲 Regenerar</button>
-          <button id="download">⬇ SVG</button>
-          <button id="downloadPng">⬇ PNG (300 DPI)</button>
+          <sl-button id="openGallery" variant="default" pill size="small">
+            <sl-icon slot="prefix" name="grid"></sl-icon>
+            Galería
+          </sl-button>
+          <sl-button id="saveFav" variant="warning" pill size="small">
+            <sl-icon slot="prefix" name="heart"></sl-icon>
+            Favorito
+          </sl-button>
+          <sl-button id="regen" pill size="small">
+            <sl-icon slot="prefix" name="dice-5"></sl-icon>
+            Regenerar
+          </sl-button>
+          <sl-button id="download" variant="primary" pill size="small">
+            <sl-icon slot="prefix" name="download"></sl-icon>
+            SVG
+          </sl-button>
+          <sl-button id="downloadPng" variant="success" pill size="small">
+            <sl-icon slot="prefix" name="image"></sl-icon>
+            PNG
+          </sl-button>
+          <sl-button id="downloadPdf" variant="danger" pill size="small">
+            <sl-icon slot="prefix" name="file-pdf"></sl-icon>
+            PDF
+          </sl-button>
+          <sl-button id="downloadBook" variant="neutral" pill size="small">
+            <sl-icon slot="prefix" name="book"></sl-icon>
+            Libro
+          </sl-button>
         </div>
       </div>
+
+      <sl-drawer label="Explorar y Guardar" id="galleryDrawer" style="--size: 400px;">
+        <div style="padding: 12px; display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <h4 style="margin: 0 0 8px 0;">Mis Favoritos</h4>
+            <div id="galleryContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <!-- Aquí se cargarán los favoritos -->
+            </div>
+          </div>
+          <sl-divider></sl-divider>
+          <div>
+            <h4 style="margin: 0 0 8px 0;">Semillas Recientes</h4>
+            <div id="recentContainer" style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <!-- Aquí se cargarán los recientes -->
+            </div>
+          </div>
+        </div>
+        <sl-button slot="footer" variant="primary" id="closeGallery">Cerrar</sl-button>
+      </sl-drawer>
 
       <div
         style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; padding-top:8px; border-top:1px solid #eee;">
 
         <!-- Grupo Base (Común) -->
-        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
+        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0; align-items: flex-end;">
           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Base</legend>
-          <label>Papel
-            <select id="preset">
-              <option value="A4">A4</option>
-              <option value="LETTER">Letter</option>
-            </select>
-          </label>
-          <label title="Semilla aleatoria">Seed
-            <input id="seed" type="number" style="width:100px" value="1" />
-          </label>
+          <sl-select id="preset" label="Papel" size="small" style="width: 100px;">
+            <sl-option value="A4">A4</sl-option>
+            <sl-option value="LETTER">Letter</sl-option>
+          </sl-select>
+          <sl-input id="seed" type="number" label="Seed" size="small" style="width: 120px;" value="1"
+            help-text="Semilla aleatoria"></sl-input>
         </fieldset>
 
         <div style="display:flex; gap:20px; flex-wrap:wrap;">
           <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
             <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Geometría Radial</legend>
-            <label title="Número de segmentos radiales">Pétalos
-              <input id="petals" type="range" min="6" max="32" step="1" value="12" />
-              <output id="petalsOut">12</output>
-            </label>
+            <sl-range id="petals" label="Pétalos" min="6" max="96" step="1" value="12" size="small"
+              help-text="Número de segmentos radiales"></sl-range>
+            <sl-checkbox id="kaleidoscope" checked size="small" style="margin-top: 8px;">Kaleidoscopio</sl-checkbox>
           </fieldset>
         </div>
 
-        <!-- Grupo Estilo (Común) -->
         <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Estilo</legend>
-          <label title="Densidad de capas">Complejidad
-            <input id="complexity" type="range" min="40" max="250" step="5" value="110" />
-            <output id="complexityOut">110</output>
-          </label>
-          <label title="Geométrico vs Orgánico">Orgánico
-            <input id="organic" type="range" min="0" max="1" step="0.05" value="0.2" />
-            <output id="organicOut">0.2</output>
-          </label>
+          <sl-range id="complexity" label="Complejidad" min="20" max="320" step="5" value="110" size="small"
+            help-text="Densidad de capas"></sl-range>
+          <sl-range id="organic" label="Orgánico" min="0" max="1" step="0.05" value="0.2" size="small"
+            help-text="Geométrico vs Orgánico"></sl-range>
+          <sl-checkbox id="textures" checked size="small" style="margin-top: 8px;">Texturas Avanzadas</sl-checkbox>
         </fieldset>
 
         <!-- Grupo Trazo (Común) -->
         <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Trazo & Detalles</legend>
-          <label title="Peso de línea en mm">Grosor
-            <input id="strokeWidth" type="range" min="0.2" max="1.5" step="0.1" value="0.6" />
-            <output id="strokeWidthOut">0.6</output>
-          </label>
-          <label title="Marcos y bordes decorativos">
-            <input id="frames" type="checkbox" checked /> Marcos
-          </label>
-          <label title="Orla ornamental en el borde de la página">
-            <input id="pageBorder" type="checkbox" checked /> Orla Pág.
-          </label>
+          <sl-range id="strokeWidth" label="Grosor" min="0.1" max="5" step="0.1" value="0.6" size="small"
+            help-text="Peso de línea en mm"></sl-range>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <sl-checkbox id="frames" checked size="small">Marcos</sl-checkbox>
+            <sl-checkbox id="pageBorder" checked size="small">Orla Pág.</sl-checkbox>
+          </div>
         </fieldset>
 
         <!-- Grupo Master (Phase 3) -->
         <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
           <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px; color:#c2410c;">Master Tier</legend>
-          <label title="Alternancia de diseños dentro del mismo anillo">Ritmo
-            <input id="alternation" type="range" min="0" max="1" step="0.1" value="0.3" />
-            <output id="alternationOut">0.3</output>
-          </label>
-          <label title="Control de saturación y espacio negativo">Armonía
-            <input id="harmony" type="range" min="0" max="1" step="0.1" value="0.5" />
-            <output id="harmonyOut">0.5</output>
-          </label>
-          <label title="Efecto de presión de pincel (tapering)">Pincel
-            <input id="taper" type="range" min="0" max="1" step="0.1" value="0.2" />
-            <output id="taperOut">0.2</output>
-          </label>
+          <sl-range id="alternation" label="Ritmo" min="0" max="1" step="0.1" value="0.3" size="small"
+            help-text="Alternancia de diseños"></sl-range>
+          <sl-range id="harmony" label="Armonía" min="0" max="1" step="0.1" value="0.5" size="small"
+            help-text="Saturación y espacio"></sl-range>
+          <sl-range id="taper" label="Pincel" min="0" max="1" step="0.1" value="0.2" size="small"
+            help-text="Presión (tapering)"></sl-range>
         </fieldset>
+
+        <sl-button id="share" variant="default" pill size="small" style="margin-top:auto;">
+          <sl-icon slot="prefix" name="share"></sl-icon>
+          Compartir
+        </sl-button>
       </div>
 
       <div style="font-size:0.8rem; color:#666; margin-top:4px;">

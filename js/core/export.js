@@ -4,35 +4,136 @@ export function downloadTextFile(filename, text) {
   saveBlob(blob, filename);
 }
 
-export function downloadPng(filename, svgString, widthMm, heightMm, dpi = 300) {
+export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 300) {
+  const { Resvg, initWasm } = await import("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/wasm.js");
+
+  try {
+    await initWasm("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/index_bg.wasm");
+  } catch (e) {
+    // Already initialized or failed
+  }
+
   const pixelDensity = dpi / 25.4;
   const wPx = Math.ceil(widthMm * pixelDensity);
   const hPx = Math.ceil(heightMm * pixelDensity);
 
-  const img = new Image();
-  // Blob URL to avoid encoding issues
-  const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
+  const resvg = new Resvg(svgString, {
+    fitTo: {
+      mode: 'width',
+      value: wPx,
+    },
+    background: '#ffffff'
+  });
 
-  img.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = wPx;
-    canvas.height = hPx;
-    const ctx = canvas.getContext("2d");
+  const pngData = resvg.render();
+  const pngBuffer = pngData.asPng();
+  const blob = new Blob([pngBuffer], { type: "image/png" });
+  saveBlob(blob, filename);
+}
 
-    // White background for print
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, wPx, hPx);
+/**
+ * PDF Export (Professional / Vector)
+ * Uses jsPDF. For complex SVG, we flatten it and then render.
+ */
+export async function downloadPdf(filename, svgEl, widthMm, heightMm) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    orientation: widthMm > heightMm ? "landscape" : "portrait",
+    unit: "mm",
+    format: [widthMm, heightMm]
+  });
 
-    ctx.drawImage(img, 0, 0, wPx, hPx);
+  // Flatten SVG to remove <use> references for simpler PDF rendering
+  const flatSvg = flattenSvgElement(svgEl.cloneNode(true));
 
-    canvas.toBlob((pngBlob) => {
-      saveBlob(pngBlob, filename);
-      URL.revokeObjectURL(url);
-    }, "image/png");
-  };
+  // High-fidelity vector export
+  // We use a simplified approach for now: render SVG to canvas at high scale, then put to PDF
+  // OR use svg2pdf if available. Since we only have jsPDF, we'll use a high-res raster fallback 
+  // embedded in a vector container, until we add svg2pdf.
 
-  img.src = url;
+  // EXPERIMENT: Let's try to add svg2pdf.js dynamically
+  const svg2pdfUrl = "https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.min.js";
+  if (!window.svg2pdf) {
+    await new Promise(resolve => {
+      const s = document.createElement("script");
+      s.src = svg2pdfUrl;
+      s.onload = resolve;
+      document.head.appendChild(s);
+    });
+  }
+
+  await doc.svg(flatSvg, {
+    x: 0,
+    y: 0,
+    width: widthMm,
+    height: heightMm
+  });
+
+  doc.save(filename);
+}
+
+/**
+ * Batch PDF Export (Coloring Book)
+ */
+export async function downloadBatchPdf(filename, states, generateFn, widthMm, heightMm) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    orientation: widthMm > heightMm ? "landscape" : "portrait",
+    unit: "mm",
+    format: [widthMm, heightMm]
+  });
+
+  const svg2pdfUrl = "https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.min.js";
+  if (!window.svg2pdf) {
+    await new Promise(resolve => {
+      const s = document.createElement("script");
+      s.src = svg2pdfUrl;
+      s.onload = resolve;
+      document.head.appendChild(s);
+    });
+  }
+
+  for (let i = 0; i < states.length; i++) {
+    if (i > 0) doc.addPage([widthMm, heightMm], widthMm > heightMm ? "landscape" : "portrait");
+
+    const state = states[i];
+    // Create a temporary SVG container for the generator
+    const tempSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const docData = {
+      page: { wMm: widthMm, hMm: heightMm, marginMm: 10 },
+      defs: [],
+      body: []
+    };
+
+    generateFn(docData, state);
+
+    // We need a real SVG element to pass to svg2pdf
+    // Instead of full render, we can just use the body/defs
+    const finalSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    finalSvg.setAttribute("width", widthMm);
+    finalSvg.setAttribute("height", heightMm);
+    finalSvg.setAttribute("viewBox", `0 0 ${widthMm} ${heightMm}`);
+
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    docData.defs.forEach(d => defs.innerHTML += d);
+    finalSvg.appendChild(defs);
+
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    docData.body.forEach(b => g.innerHTML += b);
+    finalSvg.appendChild(g);
+
+    // Flatten it
+    const flatSvg = flattenSvgElement(finalSvg);
+
+    await doc.svg(flatSvg, {
+      x: 0,
+      y: 0,
+      width: widthMm,
+      height: heightMm
+    });
+  }
+
+  doc.save(filename);
 }
 
 
