@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sin conexión | Mandala Studio</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fafafa; color:#222; }
+    .card { background:#fff; border:1px solid #ddd; border-radius:10px; padding:24px; max-width:520px; margin:16px; }
+    h1 { margin-top:0; font-size:1.2rem; }
+    p { line-height:1.4; }
+    button { padding:8px 14px; border-radius:6px; border:1px solid #aaa; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <section class="card">
+    <h1>Estás sin conexión</h1>
+    <p>No pudimos cargar esta pantalla porque no hay internet disponible en este momento.</p>
+    <p>Cuando vuelvas a tener conexión, toca el botón para reintentar.</p>
+    <button onclick="location.reload()">Reintentar</button>
+  </section>
+</body>
+</html>

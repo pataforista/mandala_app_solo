@@ -1,7 +1,7 @@
 import { getStateFromURL, setStateToURL, randomSeed32 } from "./core/urlState.js";
 import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
-import { downloadTextFile, downloadPng, downloadPdf, flattenSvgElement } from "./core/export.js";
+import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSvgElement } from "./core/export.js";
 import { generateMandalaRadial } from "./generators/mandalaRadial.js";
 import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
@@ -70,6 +70,12 @@ const state = getStateFromURL(DEFAULTS);
 
 if (typeof state.frames === "string") state.frames = state.frames === "true";
 if (typeof state.pageBorder === "string") state.pageBorder = state.pageBorder === "true";
+if (typeof state.kaleidoscope === "string") state.kaleidoscope = state.kaleidoscope === "true";
+if (typeof state.textures === "string") state.textures = state.textures === "true";
+
+if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl) {
+  throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
+}
 
 function clampInt(v, a, b) {
   return Math.max(a, Math.min(b, v | 0));
@@ -137,36 +143,35 @@ async function refreshGallery() {
 
   if (favorites.length === 0) {
     galleryContainer.innerHTML = "<p style='grid-column: 1/-1; text-align: center; color: #666;'>No tienes favoritos aún.</p>";
-    return;
+  } else {
+    favorites.forEach(fav => {
+      const card = document.createElement("div");
+      card.style = "border: 1px solid #ddd; padding: 8px; border-radius: 8px; background: #fff; display: flex; flex-direction: column; gap: 8px;";
+
+      card.innerHTML = `
+        <div style="font-size: 0.8rem; color: #666;">Seed: ${fav.state.seed}</div>
+        <div style="display: flex; gap: 4px;">
+          <sl-button size="small" variant="primary" style="flex: 1;" class="load-fav">Cargar</sl-button>
+          <sl-button size="small" variant="danger" class="delete-fav"><sl-icon name="trash"></sl-icon></sl-button>
+        </div>
+      `;
+
+      card.querySelector(".load-fav").onclick = () => {
+        Object.assign(state, fav.state);
+        bindUI();
+        setStateToURL(state);
+        render();
+        galleryDrawer.hide();
+      };
+
+      card.querySelector(".delete-fav").onclick = async () => {
+        await deleteFavorite(fav.id);
+        refreshGallery();
+      };
+
+      galleryContainer.appendChild(card);
+    });
   }
-
-  favorites.forEach(fav => {
-    const card = document.createElement("div");
-    card.style = "border: 1px solid #ddd; padding: 8px; border-radius: 8px; background: #fff; display: flex; flex-direction: column; gap: 8px;";
-
-    card.innerHTML = `
-      <div style="font-size: 0.8rem; color: #666;">Seed: ${fav.state.seed}</div>
-      <div style="display: flex; gap: 4px;">
-        <sl-button size="small" variant="primary" style="flex: 1;" class="load-fav">Cargar</sl-button>
-        <sl-button size="small" variant="danger" class="delete-fav"><sl-icon name="trash"></sl-icon></sl-button>
-      </div>
-    `;
-
-    card.querySelector(".load-fav").onclick = () => {
-      Object.assign(state, fav.state);
-      bindUI(); // Update UI controls
-      setStateToURL(state);
-      render();
-      galleryDrawer.hide();
-    };
-
-    card.querySelector(".delete-fav").onclick = async () => {
-      await deleteFavorite(fav.id);
-      refreshGallery();
-    };
-
-    galleryContainer.appendChild(card);
-  });
 
   // Recent Seeds
   recentSeeds.forEach(s => {
@@ -187,7 +192,6 @@ async function refreshGallery() {
 function bindUI() {
   presetEl.value = state.preset;
   petalsEl.value = String(state.petals);
-  petalsEl.value = String(state.petals);
 
   complexityEl.value = String(state.complexity);
   organicEl.value = String(state.organic);
@@ -200,6 +204,7 @@ function bindUI() {
   harmonyEl.value = String(state.harmony);
   taperEl.value = String(state.taper);
   kaleidoscopeEl.checked = state.kaleidoscope;
+  texturesEl.checked = state.textures;
 
   seedInputEl.value = String(state.seed);
 
