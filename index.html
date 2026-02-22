@@ -212,6 +212,22 @@
             help-text="Presión (tapering)"></sl-range>
         </fieldset>
 
+        <!-- Grupo Spiro (Phase 4) -->
+        <fieldset
+          style="display:flex; gap:12px; border:none; padding:0; margin:0; background: #fff7ed; padding: 8px; border-radius: 8px; border: 1px solid #ffedd5;">
+          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px; color:#9a3412;">Espirógrafo</legend>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <sl-checkbox id="spiroEnabled" size="small">Activar</sl-checkbox>
+            <sl-select id="spiroMode" value="hypo" size="small">
+              <sl-option value="hypo">Hipo</sl-option>
+              <sl-option value="epi">Epi</sl-option>
+            </sl-select>
+          </div>
+          <sl-range id="spiroR" label="R" min="10" max="150" step="1" value="60" size="small"></sl-range>
+          <sl-range id="spiror" label="r" min="1" max="100" step="1" value="25" size="small"></sl-range>
+          <sl-range id="spiroDistance" label="Dist" min="1" max="150" step="1" value="30" size="small"></sl-range>
+        </fieldset>
+
         <sl-button id="share" variant="default" pill size="small" style="margin-top:auto;">
           <sl-icon slot="prefix" name="share"></sl-icon>
           Compartir

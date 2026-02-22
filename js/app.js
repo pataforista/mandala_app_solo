@@ -30,6 +30,12 @@ const taperEl = document.getElementById("taper");
 const kaleidoscopeEl = document.getElementById("kaleidoscope");
 const texturesEl = document.getElementById("textures");
 
+const spiroEnabledEl = document.getElementById("spiroEnabled");
+const spiroModeEl = document.getElementById("spiroMode");
+const spiroREl = document.getElementById("spiroR");
+const spirorEl = document.getElementById("spiror");
+const spiroDistEl = document.getElementById("spiroDistance");
+
 const regenBtn = document.getElementById("regen");
 const downloadBtn = document.getElementById("download");
 const downloadPngBtn = document.getElementById("downloadPng");
@@ -62,6 +68,11 @@ const DEFAULTS = {
   kaleidoscope: true,
   textures: true,
   seed: randomSeed32() >>> 0,
+  spiroEnabled: false,
+  spiroMode: "hypo",
+  spiroR: 60,
+  spiror: 25,
+  spiroDistance: 30,
 };
 
 const recentSeeds = [];
@@ -72,6 +83,7 @@ if (typeof state.frames === "string") state.frames = state.frames === "true";
 if (typeof state.pageBorder === "string") state.pageBorder = state.pageBorder === "true";
 if (typeof state.kaleidoscope === "string") state.kaleidoscope = state.kaleidoscope === "true";
 if (typeof state.textures === "string") state.textures = state.textures === "true";
+if (typeof state.spiroEnabled === "string") state.spiroEnabled = state.spiroEnabled === "true";
 
 if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl) {
   throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
@@ -111,6 +123,11 @@ function render() {
     taper: state.taper,
     kaleidoscope: state.kaleidoscope,
     showTextures: state.textures,
+    spiroEnabled: state.spiroEnabled,
+    spiroMode: state.spiroMode,
+    spiroR: state.spiroR,
+    spiror: state.spiror,
+    spiroDistance: state.spiroDistance,
   });
 
   const svgStr = renderDocToSvgString(doc);
@@ -205,6 +222,12 @@ function bindUI() {
   taperEl.value = String(state.taper);
   kaleidoscopeEl.checked = state.kaleidoscope;
   texturesEl.checked = state.textures;
+
+  spiroEnabledEl.checked = state.spiroEnabled;
+  spiroModeEl.value = state.spiroMode;
+  spiroREl.value = String(state.spiroR);
+  spirorEl.value = String(state.spiror);
+  spiroDistEl.value = String(state.spiroDistance);
 
   seedInputEl.value = String(state.seed);
 
@@ -309,6 +332,31 @@ function bindUI() {
     state.textures = texturesEl.checked;
     update();
   });
+
+  spiroEnabledEl.addEventListener("sl-change", () => {
+    state.spiroEnabled = spiroEnabledEl.checked;
+    update();
+  });
+
+  spiroModeEl.addEventListener("sl-change", () => {
+    state.spiroMode = spiroModeEl.value;
+    update();
+  });
+
+  spiroREl.addEventListener("sl-input", () => {
+    state.spiroR = clampInt(spiroREl.value, 10, 200);
+  });
+  spiroREl.addEventListener("sl-change", update);
+
+  spirorEl.addEventListener("sl-input", () => {
+    state.spiror = clampInt(spirorEl.value, 1, 150);
+  });
+  spirorEl.addEventListener("sl-change", update);
+
+  spiroDistEl.addEventListener("sl-input", () => {
+    state.spiroDistance = clampInt(spiroDistEl.value, 1, 200);
+  });
+  spiroDistEl.addEventListener("sl-change", update);
 
   regenBtn.addEventListener("click", () => {
     state.seed = randomSeed32() >>> 0;

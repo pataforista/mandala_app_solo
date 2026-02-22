@@ -47,6 +47,14 @@ export function generateMandalaRadial(doc, opts) {
     taper = 0.2,
     kaleidoscope = true,
     showTextures = true,
+
+    // Phase 4: Spirograph
+    spiroEnabled = false,
+    spiroR = 60,
+    spiror = 25,
+    spiroDistance = 30,
+    spiroResolution = 500,
+    spiroMode = "hypo", // hypo or epi
   } = opts;
 
   const page = doc?.page ?? { wMm: 210, hMm: 297, marginMm: 10 };
@@ -56,10 +64,22 @@ export function generateMandalaRadial(doc, opts) {
 
   const rng = mulberry32((seed >>> 0) || 0);
 
-  // --- Pisos técnicos ---
-  const mainStroke = Math.max(minStrokeMm, strokeWidthMm);
-  const detailStroke = Math.max(minStrokeMm, mainStroke * 0.6);
-  const fineStroke = Math.max(minStrokeMm * 0.8, mainStroke * 0.4);
+  // --- Jerarquía de trazo base ---
+  const strokeBase = Math.max(minStrokeMm, strokeWidthMm);
+
+  function getStrokesForRadius(r, role) {
+    const rFrac = (r - rMin) / (rMax - rMin || 1);
+    // Jerarquía: Más grueso hacia afuera y en marcos
+    let weight = strokeBase;
+    if (role === "frame") weight *= 1.4;
+    else weight *= _lerp(0.85, 1.25, rFrac);
+
+    return {
+      main: Math.max(minStrokeMm, weight),
+      detail: Math.max(minStrokeMm, weight * 0.6),
+      fine: Math.max(minStrokeMm * 0.8, weight * 0.4)
+    };
+  }
 
   // --- Complejidad normalizada ---
   const cN = _clamp((complexity - 20) / (240 - 20), 0, 1);
@@ -133,6 +153,9 @@ export function generateMandalaRadial(doc, opts) {
     const thickness = totalSpan * w * jitter;
     const r1 = Math.min(rMax, r0 + thickness);
 
+    // Dynamic strokes for this ring
+    const ringStrokes = getStrokesForRadius(r1, role);
+
     rings.push({
       start: r0,
       end: r1,
@@ -142,6 +165,7 @@ export function generateMandalaRadial(doc, opts) {
       allowDetail: (role !== "rest") && (i !== 0),
       allowSubdivide: (role !== "rest") && (i !== 0),
       type: null,
+      strokes: ringStrokes
     });
 
     r0 = r1;
@@ -149,7 +173,7 @@ export function generateMandalaRadial(doc, opts) {
   if (rings.length) rings[rings.length - 1].end = rMax;
 
   // --- ID robusto ---
-  const wedgeId = `wedge_${(seed >>> 0)}_${petals}_${ringCount}_${Math.round(computedRadius * 10)}_${Math.round(mainStroke * 1000)}_${Math.round(complexity)}`;
+  const wedgeId = `wedge_${(seed >>> 0)}_${petals}_${ringCount}_${Math.round(computedRadius * 10)}_${Math.round(strokeBase * 1000)}_${Math.round(complexity)}`;
 
   // --- Builders ---
   const pbMain = new PathBuilder();
@@ -248,25 +272,24 @@ export function generateMandalaRadial(doc, opts) {
     const edgeMin = baseEdge * _lerp(0.95, 1.55, petalsPenalty);
 
     // factor de seguridad de área: mayor cuando densidad alta o petals alto
-    let areaFactor = 1.15;
-    if (ring.density === "high") areaFactor += 0.20;
-    areaFactor += 0.35 * petalsPenalty; // hasta +0.35
+    let areaFactor = 1.25; // Aumentado para el "Secret Sauce"
+    if (ring.density === "high") areaFactor += 0.35;
+    areaFactor += 0.50 * petalsPenalty;
 
     // el anillo “frame” tolera un poco más subdiv (pero sin slivers)
-    if (ring.role === "frame") areaFactor = Math.max(1.10, areaFactor - 0.10);
+    if (ring.role === "frame") areaFactor = Math.max(1.10, areaFactor - 0.15);
 
     // “rest” no subdivide por diseño (pero por si acaso)
     if (ring.role === "rest") return false;
 
     // chequeos
     if (area < minCellAreaMm2 * areaFactor) return false;
-    if (arcW < edgeMin) return false;
-    if (h < edgeMin) return false;
+    if (arcW < edgeMin * 1.2) return false; // Thicker threshold for arcW
+    if (h < edgeMin * 1.1) return false;
 
     // extra: si está demasiado cerca del umbral, evita subdividir
-    // (reduce resultados borderline que se ven “rasposos” en impresión)
-    const borderline = minCellAreaMm2 * areaFactor * 1.05;
-    if (area < borderline && rng() < 0.65) return false;
+    const borderline = minCellAreaMm2 * areaFactor * 1.15;
+    if (area < borderline && rng() < 0.75) return false;
 
     return true;
   }
@@ -409,6 +432,32 @@ export function generateMandalaRadial(doc, opts) {
     pb.quadTo(p123x, p123y, x, y);
   }
 
+  // --- PHASE 4: Spirograph (Hypotrochoid / Epitrochoid) ---
+  function addSpirograph(pb, R, r, d, steps, mode = "hypo") {
+    const step = (Math.PI * 2 * 10) / steps; // 10 loops for complexity
+    let first = true;
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i * step;
+      let x, y;
+
+      if (mode === "epi") {
+        x = (R + r) * Math.cos(t) - d * Math.cos(((R + r) / r) * t);
+        y = (R + r) * Math.sin(t) - d * Math.sin(((R + r) / r) * t);
+      } else {
+        x = (R - r) * Math.cos(t) + d * Math.cos(((R - r) / r) * t);
+        y = (R - r) * Math.sin(t) - d * Math.sin(((R - r) / r) * t);
+      }
+
+      if (first) {
+        pb.moveTo(cx + x, cy + y);
+        first = false;
+      } else {
+        pb.lineTo(cx + x, cy + y);
+      }
+    }
+  }
+
   // --- Generación del wedge ---
   let prevRing = null;
 
@@ -461,6 +510,7 @@ export function generateMandalaRadial(doc, opts) {
       const thetaC = aOff;
 
       const wobI = organicLevel * 0.6; // Wobble intensity
+      const { main: mainStroke, detail: detailStroke, fine: fineStroke } = ring.strokes;
 
       if (skipDetail && rng() < harmony * 0.8) {
         // Force a simple arch if harmonic suppression is active
@@ -957,10 +1007,13 @@ export function generateMandalaRadial(doc, opts) {
       .close();
   }
 
+  // Final wedge strokes for Spirograph reference or other uses
+  const outerRingStrokes = rings.length ? rings[rings.length - 1].strokes : getStrokesForRadius(computedRadius, "frame");
+
   // --- Guardar wedge (sin bindu) ---
   const wedgeMain = pbMain.toPath({
     stroke,
-    strokeWidthMm: mainStroke,
+    strokeWidthMm: outerRingStrokes.main,
     fill: "none",
     linecap: "round",
     linejoin: "round",
@@ -968,7 +1021,7 @@ export function generateMandalaRadial(doc, opts) {
 
   const wedgeDetail = pbDetail.toPath({
     stroke,
-    strokeWidthMm: detailStroke,
+    strokeWidthMm: outerRingStrokes.detail,
     fill: "none",
     linecap: "round",
     linejoin: "round",
@@ -976,7 +1029,7 @@ export function generateMandalaRadial(doc, opts) {
 
   const wedgeFine = pbFine.toPath({
     stroke,
-    strokeWidthMm: fineStroke,
+    strokeWidthMm: outerRingStrokes.fine,
     fill: "none",
     linecap: "round",
     linejoin: "round",
@@ -984,186 +1037,205 @@ export function generateMandalaRadial(doc, opts) {
 
   doc.defs.push(`<g id="${wedgeId}">${wedgeMain}${wedgeDetail}${wedgeFine}</g>`);
 
-  // --- Render radial ---
-  for (let k = 0; k < petals; k++) {
-    const deg = (k * 360) / petals;
-    const organicJitter = organicLevel * _lerp(0.05, 0.6, cN);
-    const phase = (k / Math.max(1, petals)) * Math.PI * 2;
+// --- Render radial ---
+for (let k = 0; k < petals; k++) {
+  const deg = (k * 360) / petals;
+  const organicJitter = organicLevel * _lerp(0.05, 0.6, cN);
+  const phase = (k / Math.max(1, petals)) * Math.PI * 2;
 
-    // Humaniza la repetición radial: micro-variación angular y de escala
-    // para evitar el aspecto excesivamente sintético de un patrón 100% clonado.
-    const rotJitterDeg = Math.sin(phase * 2.7 + (seed % 37)) * organicJitter * 2.2;
-    const scaleJitter = 1 + Math.cos(phase * 1.9 + (seed % 19)) * organicJitter * 0.035;
-    const mirror = (k % 2 === 1 && (alternation > 0.24 || kaleidoscope)) ? -1 : 1;
+  // Humaniza la repetición radial: micro-variación angular y de escala
+  // para evitar el aspecto excesivamente sintético de un patrón 100% clonado.
+  const rotJitterDeg = Math.sin(phase * 2.7 + (seed % 37)) * organicJitter * 2.2;
+  const scaleJitter = 1 + Math.cos(phase * 1.9 + (seed % 19)) * organicJitter * 0.035;
+  const mirror = (k % 2 === 1 && (alternation > 0.24 || kaleidoscope)) ? -1 : 1;
 
-    const transform = [
-      `translate(${_fmt(cx)} ${_fmt(cy)})`,
-      `rotate(${_fmt(deg - 90 + rotJitterDeg)})`,
-      `scale(${_fmt(mirror * scaleJitter)} ${_fmt(scaleJitter)})`
-    ].join(" ");
+  const transform = [
+    `translate(${_fmt(cx)} ${_fmt(cy)})`,
+    `rotate(${_fmt(deg - 90 + rotJitterDeg)})`,
+    `scale(${_fmt(mirror * scaleJitter)} ${_fmt(scaleJitter)})`
+  ].join(" ");
 
-    doc.body.push(
-      `<use href="#${wedgeId}" transform="${transform}" />`
-    );
+  doc.body.push(
+    `<use href="#${wedgeId}" transform="${transform}" />`
+  );
+}
+
+
+// --- Motivo central adicional (roseta avanzada) ---
+if (rng() < 0.98) {
+  const rType = rng();
+  const cCount = (petals % 2 === 0 ? petals : petals + 1);
+  const inner = binduR * 1.05;
+  const outer = binduClearR * 0.9;
+  const step = (Math.PI * 2) / Math.max(6, cCount);
+
+  const pbC = new PathBuilder();
+
+  if (rType < 0.5) {
+    // SUNBURST: Rayos y picos geométricos
+    for (let k = 0; k < cCount; k++) {
+      const a = k * step;
+      const aNext = (k + 1) * step;
+      const aMid = a + step * 0.5;
+
+      const p1 = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
+      const p2 = { x: cx + outer * Math.cos(aMid), y: cy + outer * Math.sin(aMid) };
+      const p3 = { x: cx + inner * Math.cos(aNext), y: cy + inner * Math.sin(aNext) };
+
+      pbC.moveTo(p1.x, p1.y).lineTo(p2.x, p2.y).lineTo(p3.x, p3.y);
+
+      // Internal "spark"
+      const pSpark = { x: cx + (inner + (outer - inner) * 0.4) * Math.cos(aMid), y: cy + (inner + (outer - inner) * 0.4) * Math.sin(aMid) };
+      addTaperedLine(pbC, p1, pSpark, outerRingStrokes.detail * 0.6, outerRingStrokes.fine * 0.3);
+    }
+  } else {
+    // FLORAL COMPASS: Puntos cardinales y pétalos suaves
+    for (let k = 0; k < cCount; k++) {
+      const a = k * step;
+      const pIn = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
+      const pOut = { x: cx + outer * Math.cos(a), y: cy + outer * Math.sin(a) };
+      const cpL = { x: cx + _lerp(inner, outer, 0.5) * Math.cos(a - step * 0.3), y: cy + _lerp(inner, outer, 0.5) * Math.sin(a - step * 0.3) };
+      const cpR = { x: cx + _lerp(inner, outer, 0.5) * Math.cos(a + step * 0.3), y: cy + _lerp(inner, outer, 0.5) * Math.sin(a + step * 0.3) };
+
+      pbC.moveTo(pIn.x, pIn.y).quadTo(cpL.x, cpL.y, pOut.x, pOut.y).quadTo(cpR.x, cpR.y, pIn.x, pIn.y).close();
+
+      // Compass line
+      if (k % (cCount / 4) === 0) {
+        const pTip = { x: cx + (outer * 1.15) * Math.cos(a), y: cy + (outer * 1.15) * Math.sin(a) };
+        addTaperedLine(pbC, pOut, pTip, outerRingStrokes.main, outerRingStrokes.detail * 0.5);
+      }
+    }
   }
 
+  doc.body.push(
+    pbC.toPath({ stroke, strokeWidthMm: outerRingStrokes.detail, fill: "none" })
+  );
 
-  // --- Motivo central adicional (roseta avanzada) ---
-  if (rng() < 0.98) {
-    const rType = rng();
-    const cCount = (petals % 2 === 0 ? petals : petals + 1);
-    const inner = binduR * 1.05;
-    const outer = binduClearR * 0.9;
-    const step = (Math.PI * 2) / Math.max(6, cCount);
+  // Layered central rosettes (Circle grid / petals)
+  if (rng() < 0.7) {
+    const pbExtra = new PathBuilder();
+    addCirclePoly(pbExtra, cx, cy, inner * 0.6, 12);
+    addCirclePoly(pbExtra, cx, cy, inner * 0.5, 8);
+    doc.body.push(pbExtra.toPath({ stroke, strokeWidthMm: outerRingStrokes.fine, fill: "none" }));
+  }
 
-    const pbC = new PathBuilder();
-
-    if (rType < 0.5) {
-      // SUNBURST: Rayos y picos geométricos
-      for (let k = 0; k < cCount; k++) {
-        const a = k * step;
-        const aNext = (k + 1) * step;
-        const aMid = a + step * 0.5;
-
-        const p1 = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
-        const p2 = { x: cx + outer * Math.cos(aMid), y: cy + outer * Math.sin(aMid) };
-        const p3 = { x: cx + inner * Math.cos(aNext), y: cy + inner * Math.sin(aNext) };
-
-        pbC.moveTo(p1.x, p1.y).lineTo(p2.x, p2.y).lineTo(p3.x, p3.y);
-
-        // Internal "spark"
-        const pSpark = { x: cx + (inner + (outer - inner) * 0.4) * Math.cos(aMid), y: cy + (inner + (outer - inner) * 0.4) * Math.sin(aMid) };
-        addTaperedLine(pbC, p1, pSpark, detailStroke * 0.6, fineStroke * 0.3);
-      }
-    } else {
-      // FLORAL COMPASS: Puntos cardinales y pétalos suaves
-      for (let k = 0; k < cCount; k++) {
-        const a = k * step;
-        const pIn = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
-        const pOut = { x: cx + outer * Math.cos(a), y: cy + outer * Math.sin(a) };
-        const cpL = { x: cx + _lerp(inner, outer, 0.5) * Math.cos(a - step * 0.3), y: cy + _lerp(inner, outer, 0.5) * Math.sin(a - step * 0.3) };
-        const cpR = { x: cx + _lerp(inner, outer, 0.5) * Math.cos(a + step * 0.3), y: cy + _lerp(inner, outer, 0.5) * Math.sin(a + step * 0.3) };
-
-        pbC.moveTo(pIn.x, pIn.y).quadTo(cpL.x, cpL.y, pOut.x, pOut.y).quadTo(cpR.x, cpR.y, pIn.x, pIn.y).close();
-
-        // Compass line
-        if (k % (cCount / 4) === 0) {
-          const pTip = { x: cx + (outer * 1.15) * Math.cos(a), y: cy + (outer * 1.15) * Math.sin(a) };
-          addTaperedLine(pbC, pOut, pTip, mainStroke, detailStroke * 0.5);
-        }
-      }
+  // NESTED CORE (Double Core)
+  if (complexity > 100) {
+    const pbInner = new PathBuilder();
+    const innerR = inner * 0.8;
+    for (let k = 0; k < cCount; k++) {
+      const a = k * (Math.PI * 2 / cCount);
+      const p = { x: cx + innerR * Math.cos(a), y: cy + innerR * Math.sin(a) };
+      if (k === 0) pbInner.moveTo(p.x, p.y);
+      else pbInner.lineTo(p.x, p.y);
     }
-
+    pbInner.close();
     doc.body.push(
-      pbC.toPath({ stroke, strokeWidthMm: detailStroke, fill: "none" })
+      pbInner.toPath({ stroke, strokeWidthMm: outerRingStrokes.fine, fill: "none" })
     );
+  }
+}
 
-    // Layered central rosettes (Circle grid / petals)
-    if (rng() < 0.7) {
-      const pbExtra = new PathBuilder();
-      addCirclePoly(pbExtra, cx, cy, inner * 0.6, 12);
-      addCirclePoly(pbExtra, cx, cy, inner * 0.5, 8);
-      doc.body.push(pbExtra.toPath({ stroke, strokeWidthMm: fineStroke, fill: "none" }));
-    }
+// --- Bindu fuera del wedge (perfecto) ---
+doc.body.push(
+  `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(outerRingStrokes.main)}" />`
+);
+doc.body.push(
+  `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduR * 0.62)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(outerRingStrokes.detail)}" />`
+);
 
-    // NESTED CORE (Double Core)
-    if (complexity > 100) {
-      const pbInner = new PathBuilder();
-      const innerR = inner * 0.8;
-      for (let k = 0; k < cCount; k++) {
-        const a = k * (Math.PI * 2 / cCount);
-        const p = { x: cx + innerR * Math.cos(a), y: cy + innerR * Math.sin(a) };
-        if (k === 0) pbInner.moveTo(p.x, p.y);
-        else pbInner.lineTo(p.x, p.y);
-      }
-      pbInner.close();
+// --- Frames fuera del wedge ---
+if (includeFrames) {
+
+  // --- Estética “cuadernillo”: anillos de cuentas y borde festoneado (círculos grandes repetidos) ---
+  // 1) Bead ring (cerca del núcleo, típico en mandalas impresos)
+  if (rng() < _lerp(0.95, 0.62, harmony)) {
+    const beadRingR = binduClearR * _clamp(rFloat(rng, 0.72, 0.88), 0.66, 0.92);
+    const beadDensity = _lerp(2.4, 1.3, organicLevel);
+    const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82);
+    const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), mainStroke * 2.2, computedRadius * 0.020);
+
+    for (let i = 0; i < beadCount; i++) {
+      const a = (i * 2 * Math.PI) / beadCount;
+      const bx = cx + beadRingR * Math.cos(a);
+      const by = cy + beadRingR * Math.sin(a);
       doc.body.push(
-        pbInner.toPath({ stroke, strokeWidthMm: fineStroke, fill: "none" })
+        `<circle cx="${_fmt(bx)}" cy="${_fmt(by)}" r="${_fmt(beadR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(outerRingStrokes.detail)}" />`
       );
     }
   }
 
-  // --- Bindu fuera del wedge (perfecto) ---
-  doc.body.push(
-    `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(mainStroke)}" />`
-  );
-  doc.body.push(
-    `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduR * 0.62)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(detailStroke)}" />`
-  );
+  // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
+  if (rng() < _lerp(0.88, 0.55, harmony)) {
+    const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56);
+    const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), mainStroke * 2.6, computedRadius * 0.060);
+    const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
 
-  // --- Frames fuera del wedge ---
-  if (includeFrames) {
-
-    // --- Estética “cuadernillo”: anillos de cuentas y borde festoneado (círculos grandes repetidos) ---
-    // 1) Bead ring (cerca del núcleo, típico en mandalas impresos)
-    if (rng() < _lerp(0.95, 0.62, harmony)) {
-      const beadRingR = binduClearR * _clamp(rFloat(rng, 0.72, 0.88), 0.66, 0.92);
-      const beadDensity = _lerp(2.4, 1.3, organicLevel);
-      const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82);
-      const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), mainStroke * 2.2, computedRadius * 0.020);
-
-      for (let i = 0; i < beadCount; i++) {
-        const a = (i * 2 * Math.PI) / beadCount;
-        const bx = cx + beadRingR * Math.cos(a);
-        const by = cy + beadRingR * Math.sin(a);
-        doc.body.push(
-          `<circle cx="${_fmt(bx)}" cy="${_fmt(by)}" r="${_fmt(beadR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(detailStroke)}" />`
-        );
-      }
+    for (let i = 0; i < scallopCount; i++) {
+      const a = (i * 2 * Math.PI) / scallopCount;
+      const sx = cx + scallopCenterR * Math.cos(a);
+      const sy = cy + scallopCenterR * Math.sin(a);
+      doc.body.push(
+        `<circle cx="${_fmt(sx)}" cy="${_fmt(sy)}" r="${_fmt(scallopR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(outerRingStrokes.main)}" />`
+      );
     }
-
-    // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
-    if (rng() < _lerp(0.88, 0.55, harmony)) {
-      const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56);
-      const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), mainStroke * 2.6, computedRadius * 0.060);
-      const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
-
-      for (let i = 0; i < scallopCount; i++) {
-        const a = (i * 2 * Math.PI) / scallopCount;
-        const sx = cx + scallopCenterR * Math.cos(a);
-        const sy = cy + scallopCenterR * Math.sin(a);
-        doc.body.push(
-          `<circle cx="${_fmt(sx)}" cy="${_fmt(sy)}" r="${_fmt(scallopR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(mainStroke)}" />`
-        );
-      }
-    }
-    doc.body.push(
-      `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduClearR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(Math.max(minStrokeMm, mainStroke * 0.7))}" />`
-    );
   }
+  doc.body.push(
+    `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduClearR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(Math.max(minStrokeMm, outerRingStrokes.main * 0.7))}" />`
+  );
+}
 
-  // --- PHASE 3: Ornamental Page Border ---
-  if (pageBorder) {
-    const { wMm, hMm } = page;
-    const borderMargin = marginMm * 0.5;
-    const pbB = new PathBuilder();
+// --- PHASE 3: Ornamental Page Border ---
+if (pageBorder) {
+  const { wMm, hMm } = page;
+  const borderMargin = marginMm * 0.5;
+  const pbB = new PathBuilder();
 
-    // Simple ornamental frame: Rect with corner rosettes
-    const x0 = borderMargin, y0 = borderMargin;
-    const x1 = wMm - borderMargin, y1 = hMm - borderMargin;
+  // Simple ornamental frame: Rect with corner rosettes
+  const x0 = borderMargin, y0 = borderMargin;
+  const x1 = wMm - borderMargin, y1 = hMm - borderMargin;
 
-    // Draw outer rect
-    pbB.moveTo(x0, y0).lineTo(x1, y0).lineTo(x1, y1).lineTo(x0, y1).close();
+  // Draw outer rect
+  pbB.moveTo(x0, y0).lineTo(x1, y0).lineTo(x1, y1).lineTo(x0, y1).close();
 
-    // Corners
-    const cornerR = marginMm * 0.8;
-    addCirclePoly(pbB, x0, y0, cornerR, 12);
-    addCirclePoly(pbB, x1, y0, cornerR, 12);
-    addCirclePoly(pbB, x1, y1, cornerR, 12);
-    addCirclePoly(pbB, x0, y1, cornerR, 12);
+  // Corners
+  const cornerR = marginMm * 0.8;
+  addCirclePoly(pbB, x0, y0, cornerR, 12);
+  addCirclePoly(pbB, x1, y0, cornerR, 12);
+  addCirclePoly(pbB, x1, y1, cornerR, 12);
+  addCirclePoly(pbB, x0, y1, cornerR, 12);
 
-    doc.body.push(
-      pbB.toPath({ stroke, strokeWidthMm: mainStroke * 0.8, fill: "none" })
-    );
+  doc.body.push(
+    pbB.toPath({ stroke, strokeWidthMm: mainStroke * 0.8, fill: "none" })
+  );
 
-    // Hairline detail inside border
-    const pbB2 = new PathBuilder();
-    const b2m = borderMargin + 1.2;
-    pbB2.moveTo(b2m, b2m).lineTo(wMm - b2m, b2m).lineTo(wMm - b2m, hMm - b2m).lineTo(b2m, hMm - b2m).close();
-    doc.body.push(
-      pbB2.toPath({ stroke, strokeWidthMm: fineStroke * 0.7, fill: "none" })
-    );
-  }
+  // Hairline detail inside border
+  const pbB2 = new PathBuilder();
+  const b2m = borderMargin + 1.2;
+  pbB2.moveTo(b2m, b2m).lineTo(wMm - b2m, b2m).lineTo(wMm - b2m, hMm - b2m).lineTo(b2m, hMm - b2m).close();
+  doc.body.push(
+    pbB2.toPath({ stroke, strokeWidthMm: outerRingStrokes.fine * 0.7, fill: "none" })
+  );
+}
+
+// --- PHASE 4: Spirograph Layer ---
+if (spiroEnabled) {
+  const pbSpiro = new PathBuilder();
+  addSpirograph(pbSpiro, spiroR, spiror, spiroDistance, spiroResolution, spiroMode);
+
+  // Hierarchical Spirograph weight based on its max reach
+  const maxSpiroR = (spiroMode === "epi") ? (spiroR + spiror + spiroDistance) : (spiroR - spiror + spiroDistance);
+  const spiroStrokes = getStrokesForRadius(maxSpiroR, "secondary");
+
+  doc.body.push(
+    pbSpiro.toPath({
+      stroke,
+      strokeWidthMm: spiroStrokes.detail,
+      fill: "none",
+      opacity: 0.8
+    })
+  );
+}
 }
 
 // --- Helpers ---
