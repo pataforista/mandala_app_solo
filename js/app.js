@@ -2,7 +2,7 @@ import { getStateFromURL, setStateToURL, randomSeed32 } from "./core/urlState.js
 import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
 import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSvgElement } from "./core/export.js";
-import { generateMandalaRadial } from "./generators/mandalaRadial.js";
+import { generateMandalaLayers } from "./generators/mandalaLayers.js";
 import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 
@@ -11,12 +11,9 @@ const historyMan = new StateHistory();
 const stage = document.getElementById("stage");
 const presetEl = document.getElementById("preset");
 const petalsEl = document.getElementById("petals");
-const petalsOut = document.getElementById("petalsOut");
 
 const complexityEl = document.getElementById("complexity");
-const complexityOut = document.getElementById("complexityOut");
 const organicEl = document.getElementById("organic");
-const organicOut = document.getElementById("organicOut");
 
 const seedInputEl = document.getElementById("seed");
 
@@ -24,17 +21,15 @@ const strokeWidthEl = document.getElementById("strokeWidth");
 const framesEl = document.getElementById("frames");
 const pageBorderEl = document.getElementById("pageBorder");
 
-const alternationEl = document.getElementById("alternation");
-const harmonyEl = document.getElementById("harmony");
-const taperEl = document.getElementById("taper");
-const kaleidoscopeEl = document.getElementById("kaleidoscope");
-const texturesEl = document.getElementById("textures");
-
-const spiroEnabledEl = document.getElementById("spiroEnabled");
-const spiroModeEl = document.getElementById("spiroMode");
-const spiroREl = document.getElementById("spiroR");
-const spirorEl = document.getElementById("spiror");
-const spiroDistEl = document.getElementById("spiroDistance");
+const styleModeEl = document.getElementById("styleMode");
+const layer1IntensityEl = document.getElementById("layer1Intensity");
+const layer2IntensityEl = document.getElementById("layer2Intensity");
+const layer3IntensityEl = document.getElementById("layer3Intensity");
+const layer4IntensityEl = document.getElementById("layer4Intensity");
+const layer5IntensityEl = document.getElementById("layer5Intensity");
+const layer6IntensityEl = document.getElementById("layer6Intensity");
+const layer7IntensityEl = document.getElementById("layer7Intensity");
+const layer8IntensityEl = document.getElementById("layer8Intensity");
 
 const regenBtn = document.getElementById("regen");
 const downloadBtn = document.getElementById("download");
@@ -62,17 +57,16 @@ const DEFAULTS = {
   strokeWidth: 0.6,
   frames: true,
   pageBorder: true,
-  alternation: 0.3,
-  harmony: 0.5,
-  taper: 0.2,
-  kaleidoscope: true,
-  textures: true,
+  styleMode: "hashiko",
+  layer1Intensity: 0.8,
+  layer2Intensity: 0.8,
+  layer3Intensity: 0.7,
+  layer4Intensity: 0.8,
+  layer5Intensity: 0.6,
+  layer6Intensity: 0.7,
+  layer7Intensity: 0.5,
+  layer8Intensity: 0.4,
   seed: randomSeed32() >>> 0,
-  spiroEnabled: false,
-  spiroMode: "hypo",
-  spiroR: 60,
-  spiror: 25,
-  spiroDistance: 30,
 };
 
 const recentSeeds = [];
@@ -81,9 +75,6 @@ const state = getStateFromURL(DEFAULTS);
 
 if (typeof state.frames === "string") state.frames = state.frames === "true";
 if (typeof state.pageBorder === "string") state.pageBorder = state.pageBorder === "true";
-if (typeof state.kaleidoscope === "string") state.kaleidoscope = state.kaleidoscope === "true";
-if (typeof state.textures === "string") state.textures = state.textures === "true";
-if (typeof state.spiroEnabled === "string") state.spiroEnabled = state.spiroEnabled === "true";
 
 if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl) {
   throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
@@ -110,7 +101,7 @@ function render() {
 
   const doc = getCurrentDoc();
 
-  generateMandalaRadial(doc, {
+  generateMandalaLayers(doc, {
     seed: state.seed,
     petals: state.petals,
     complexity: state.complexity,
@@ -118,16 +109,15 @@ function render() {
     organicLevel: state.organic,
     includeFrames: state.frames,
     pageBorder: state.pageBorder,
-    alternation: state.alternation,
-    harmony: state.harmony,
-    taper: state.taper,
-    kaleidoscope: state.kaleidoscope,
-    showTextures: state.textures,
-    spiroEnabled: state.spiroEnabled,
-    spiroMode: state.spiroMode,
-    spiroR: state.spiroR,
-    spiror: state.spiror,
-    spiroDistance: state.spiroDistance,
+    styleMode: state.styleMode,
+    layer1Intensity: state.layer1Intensity,
+    layer2Intensity: state.layer2Intensity,
+    layer3Intensity: state.layer3Intensity,
+    layer4Intensity: state.layer4Intensity,
+    layer5Intensity: state.layer5Intensity,
+    layer6Intensity: state.layer6Intensity,
+    layer7Intensity: state.layer7Intensity,
+    layer8Intensity: state.layer8Intensity,
   });
 
   const svgStr = renderDocToSvgString(doc);
@@ -217,17 +207,15 @@ function bindUI() {
   framesEl.checked = state.frames;
   pageBorderEl.checked = state.pageBorder;
 
-  alternationEl.value = String(state.alternation);
-  harmonyEl.value = String(state.harmony);
-  taperEl.value = String(state.taper);
-  kaleidoscopeEl.checked = state.kaleidoscope;
-  texturesEl.checked = state.textures;
-
-  spiroEnabledEl.checked = state.spiroEnabled;
-  spiroModeEl.value = state.spiroMode;
-  spiroREl.value = String(state.spiroR);
-  spirorEl.value = String(state.spiror);
-  spiroDistEl.value = String(state.spiroDistance);
+  styleModeEl.value = state.styleMode;
+  layer1IntensityEl.value = String(state.layer1Intensity);
+  layer2IntensityEl.value = String(state.layer2Intensity);
+  layer3IntensityEl.value = String(state.layer3Intensity);
+  layer4IntensityEl.value = String(state.layer4Intensity);
+  layer5IntensityEl.value = String(state.layer5Intensity);
+  layer6IntensityEl.value = String(state.layer6Intensity);
+  layer7IntensityEl.value = String(state.layer7Intensity);
+  layer8IntensityEl.value = String(state.layer8Intensity);
 
   seedInputEl.value = String(state.seed);
 
@@ -308,55 +296,50 @@ function bindUI() {
     update();
   });
 
-  alternationEl.addEventListener("sl-input", () => {
-    state.alternation = clampFloat(alternationEl.value, 0, 1);
-  });
-  alternationEl.addEventListener("sl-change", update);
-
-  harmonyEl.addEventListener("sl-input", () => {
-    state.harmony = clampFloat(harmonyEl.value, 0, 1);
-  });
-  harmonyEl.addEventListener("sl-change", update);
-
-  taperEl.addEventListener("sl-input", () => {
-    state.taper = clampFloat(taperEl.value, 0, 1);
-  });
-  taperEl.addEventListener("sl-change", update);
-
-  kaleidoscopeEl.addEventListener("sl-change", () => {
-    state.kaleidoscope = kaleidoscopeEl.checked;
+  styleModeEl.addEventListener("sl-change", () => {
+    state.styleMode = styleModeEl.value;
     update();
   });
 
-  texturesEl.addEventListener("sl-change", () => {
-    state.textures = texturesEl.checked;
-    update();
+  layer1IntensityEl.addEventListener("sl-input", () => {
+    state.layer1Intensity = clampFloat(layer1IntensityEl.value, 0, 1);
   });
+  layer1IntensityEl.addEventListener("sl-change", update);
 
-  spiroEnabledEl.addEventListener("sl-change", () => {
-    state.spiroEnabled = spiroEnabledEl.checked;
-    update();
+  layer2IntensityEl.addEventListener("sl-input", () => {
+    state.layer2Intensity = clampFloat(layer2IntensityEl.value, 0, 1);
   });
+  layer2IntensityEl.addEventListener("sl-change", update);
 
-  spiroModeEl.addEventListener("sl-change", () => {
-    state.spiroMode = spiroModeEl.value;
-    update();
+  layer3IntensityEl.addEventListener("sl-input", () => {
+    state.layer3Intensity = clampFloat(layer3IntensityEl.value, 0, 1);
   });
+  layer3IntensityEl.addEventListener("sl-change", update);
 
-  spiroREl.addEventListener("sl-input", () => {
-    state.spiroR = clampInt(spiroREl.value, 10, 200);
+  layer4IntensityEl.addEventListener("sl-input", () => {
+    state.layer4Intensity = clampFloat(layer4IntensityEl.value, 0, 1);
   });
-  spiroREl.addEventListener("sl-change", update);
+  layer4IntensityEl.addEventListener("sl-change", update);
 
-  spirorEl.addEventListener("sl-input", () => {
-    state.spiror = clampInt(spirorEl.value, 1, 150);
+  layer5IntensityEl.addEventListener("sl-input", () => {
+    state.layer5Intensity = clampFloat(layer5IntensityEl.value, 0, 1);
   });
-  spirorEl.addEventListener("sl-change", update);
+  layer5IntensityEl.addEventListener("sl-change", update);
 
-  spiroDistEl.addEventListener("sl-input", () => {
-    state.spiroDistance = clampInt(spiroDistEl.value, 1, 200);
+  layer6IntensityEl.addEventListener("sl-input", () => {
+    state.layer6Intensity = clampFloat(layer6IntensityEl.value, 0, 1);
   });
-  spiroDistEl.addEventListener("sl-change", update);
+  layer6IntensityEl.addEventListener("sl-change", update);
+
+  layer7IntensityEl.addEventListener("sl-input", () => {
+    state.layer7Intensity = clampFloat(layer7IntensityEl.value, 0, 1);
+  });
+  layer7IntensityEl.addEventListener("sl-change", update);
+
+  layer8IntensityEl.addEventListener("sl-input", () => {
+    state.layer8Intensity = clampFloat(layer8IntensityEl.value, 0, 1);
+  });
+  layer8IntensityEl.addEventListener("sl-change", update);
 
   regenBtn.addEventListener("click", () => {
     state.seed = randomSeed32() >>> 0;
@@ -403,7 +386,7 @@ function bindUI() {
 
     alert(`Generando un libro de ${count} mandalas... Por favor, espera.`);
 
-    await downloadBatchPdf(filename, batchStates, generateMandalaRadial, wMm, hMm);
+    await downloadBatchPdf(filename, batchStates, generateMandalaLayers, wMm, hMm);
   });
 
   shareBtn.addEventListener("click", async () => {
