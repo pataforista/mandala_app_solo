@@ -249,6 +249,31 @@ export function generateMandalaLayers(doc, opts) {
         addCirclePoly(pb, pTop.x, pTop.y, 2, 8);
       }
     }
+
+    // Motivo clásico: guirnalda de arcos con perlas exteriores
+    if (layer6Intensity > 0.35) {
+      const archCount = petals * 2;
+      const archRise = maxRadius * (0.02 + layer6Intensity * 0.03);
+      const pearlRadius = _clamp(maxRadius * 0.006 + layer6Intensity * 0.7, 0.5, 1.8);
+
+      for (let i = 0; i < archCount; i++) {
+        const a1 = (i / archCount) * Math.PI * 2;
+        const a2 = ((i + 1) / archCount) * Math.PI * 2;
+        const am = (a1 + a2) / 2;
+
+        const p1 = _polar0(rBase + 1.1, a1, center);
+        const p2 = _polar0(rBase + 1.1, a2, center);
+        const pArc = _polar0(rBase + archRise + 1.1, am, center);
+
+        pb.moveTo(p1.x, p1.y).quadTo(pArc.x, pArc.y, p2.x, p2.y);
+
+        if (i % 2 === 0) {
+          const pearl = _polar0(rTop + 1.6, am, center);
+          addCirclePoly(pb, pearl.x, pearl.y, pearlRadius, 8);
+        }
+      }
+    }
+
     addCirclePoly(pb, center.x, center.y, rBase, 128);
     paths.push(pb.toPath({ stroke, strokeWidthMm: mainStroke }));
   }
@@ -310,5 +335,7 @@ export function generateMandalaLayers(doc, opts) {
     paths.push(pb.toPath({ stroke, strokeWidthMm: mainStroke }));
   }
 
-  paths.forEach(p => { if (p) doc.paths.push(p); });
+  paths.forEach(p => {
+    if (p) doc.body.push(p);
+  });
 }
