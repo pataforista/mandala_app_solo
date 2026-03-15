@@ -2,6 +2,7 @@ import { getStateFromURL, setStateToURL, randomSeed32 } from "./core/urlState.js
 import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
 import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSvgElement } from "./core/export.js";
+import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
 import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
@@ -506,94 +507,97 @@ function bindUI() {
   const prevSeedBtn = document.getElementById("prevSeed");
   const nextSeedBtn = document.getElementById("nextSeed");
 
-  prevSeedBtn.addEventListener("click", () => {
-    state.seed = ((state.seed >>> 0) - 1) >>> 0;
-    seedInputEl.value = String(state.seed);
-    update();
-  });
+  if (prevSeedBtn) {
+    prevSeedBtn.addEventListener("click", () => {
+      state.seed = ((state.seed >>> 0) - 1) >>> 0;
+      seedInputEl.value = String(state.seed);
+      update();
+    });
+  }
 
-  nextSeedBtn.addEventListener("click", () => {
-    state.seed = ((state.seed >>> 0) + 1) >>> 0;
-    seedInputEl.value = String(state.seed);
-    update();
-  });
+  if (nextSeedBtn) {
+    nextSeedBtn.addEventListener("click", () => {
+      state.seed = ((state.seed >>> 0) + 1) >>> 0;
+      seedInputEl.value = String(state.seed);
+      update();
+    });
+  }
 
   regenBtn.addEventListener("click", () => {
     state.seed = randomSeed32() >>> 0;
+    seedInputEl.value = String(state.seed);
     update();
   });
 
-  downloadBtn.addEventListener("click", () => {
-    const svg = stage.querySelector("svg");
-    if (!svg) return;
-    const filename = `mandala_${state.preset}_seed_${state.seed}.svg`;
-    downloadTextFile(filename, svg.outerHTML);
-  });
+  const magicShuffleBtn = document.getElementById("magicShuffle");
+  if (magicShuffleBtn) {
+    magicShuffleBtn.addEventListener("click", () => {
+      // Magic Shuffle: Randomize EVERYTHING with quality safeguards
+      state.seed = randomSeed32() >>> 0;
+      seedInputEl.value = String(state.seed);
+      
+      const styles = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
+      state.styleMode = styles[Math.floor(Math.random() * styles.length)];
+      
+      state.petals = 8 + Math.floor(Math.random() * 40); // 8 to 48 petals
+      state.complexity = 120 + Math.floor(Math.random() * 200); // 120 to 320 (no more too simple)
+      
+      // Ensure at least 4 layers have high intensity to avoid "empty" mandalas
+      const layerCount = 8;
+      const intensities = Array.from({ length: layerCount }, () => 0.1 + Math.random() * 0.9);
+      
+      // Pick 3-4 random layers to force high intensity
+      for (let i = 0; i < 4; i++) {
+        const idx = Math.floor(Math.random() * layerCount);
+        intensities[idx] = 0.6 + Math.random() * 0.4;
+      }
 
-  downloadPngBtn.addEventListener("click", () => {
-    const svg = stage.querySelector("svg");
-    if (!svg) return;
-    const doc = getCurrentDoc();
-    const filename = `mandala_${state.preset}_seed_${state.seed}_300dpi.png`;
-    const { wMm, hMm } = doc.page;
-    downloadPng(filename, svg.outerHTML, wMm, hMm, 300);
-  });
-
-  downloadPdfBtn.addEventListener("click", async () => {
-    const svg = stage.querySelector("svg");
-    if (!svg) return;
-    const doc = getCurrentDoc();
-    const filename = `mandala_${state.preset}_seed_${state.seed}.pdf`;
-    const { wMm, hMm } = doc.page;
-    await downloadPdf(filename, svg, wMm, hMm);
-  });
-
-  const downloadBookBtn = document.getElementById("downloadBook");
-  const bookPageCountEl = document.getElementById("bookPageCount");
-  downloadBookBtn.addEventListener("click", async () => {
-    const doc = getCurrentDoc();
-    const { wMm, hMm } = doc.page;
-    const count = parseInt(bookPageCountEl.value, 10) || 10;
-    const filename = `mandala_coloring_book_${count}p_seed${state.seed}.pdf`;
-
-    // Build proper generator opts for each page
-    const buildOpts = (s) => ({
-      seed: s.seed,
-      petals: s.petals,
-      complexity: s.complexity,
-      strokeWidthMm: s.strokeWidth,
-      organicLevel: s.organic,
-      includeFrames: s.frames,
-      pageBorder: s.pageBorder,
-      kaleidoscope: s.kaleidoscope,
-      textures: s.textures,
-      styleMode: s.styleMode,
-      layer1Intensity: s.layer1Intensity,
-      layer2Intensity: s.layer2Intensity,
-      layer3Intensity: s.layer3Intensity,
-      layer4Intensity: s.layer4Intensity,
-      layer5Intensity: s.layer5Intensity,
-      layer6Intensity: s.layer6Intensity,
-      layer7Intensity: s.layer7Intensity,
-      layer8Intensity: s.layer8Intensity,
+      state.layer1Intensity = intensities[0];
+      state.layer2Intensity = intensities[1];
+      state.layer3Intensity = intensities[2];
+      state.layer4Intensity = intensities[3];
+      state.layer5Intensity = intensities[4];
+      state.layer6Intensity = intensities[5];
+      state.layer7Intensity = intensities[6];
+      state.layer8Intensity = intensities[7];
+      
+      state.strokeWidthMm = 0.4 + Math.random() * 0.6; // Better default range
+      state.organicLevel = Math.random();
+      
+      state.structurePreset = "custom";
+      bindUI();
+      update();
     });
+  }
 
-    const batchOpts = Array.from({ length: count }, (_, i) =>
-      buildOpts({ ...state, seed: (state.seed + i * 1234567) >>> 0 })
-    );
+  // Download menu handler
+  const downloadMenu = document.getElementById("downloadMenu");
+  if (downloadMenu) {
+    downloadMenu.addEventListener("sl-select", (event) => {
+      const item = event.detail.item;
+      const id = item.id;
+      
+      if (id === "download") {
+        const svg = stage.querySelector("svg");
+        if (!svg) return;
+        const filename = `mandala_${state.preset}_seed_${state.seed}.svg`;
+        downloadTextFile(filename, svg.outerHTML);
+      } else if (id === "downloadPng") {
+        const svg = stage.querySelector("svg");
+        if (!svg) return;
+        const doc = getCurrentDoc();
+        const filename = `mandala_${state.preset}_seed_${state.seed}_300dpi.png`;
+        const { wMm, hMm } = doc.page;
+        downloadPng(filename, svg.outerHTML, wMm, hMm, 300);
+      } else if (id === "downloadPdf") {
+        downloadManualPdf();
+      } else if (id === "share") {
+        shareBtnHandler();
+      }
+    });
+  }
 
-    downloadBookBtn.loading = true;
-    downloadBookBtn.disabled = true;
-
-    try {
-      await downloadBatchPdf(filename, batchOpts, generateMandalaLayers, wMm, hMm);
-    } finally {
-      downloadBookBtn.loading = false;
-      downloadBookBtn.disabled = false;
-    }
-  });
-
-  shareBtn.addEventListener("click", async () => {
+  const shareBtnHandler = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
@@ -610,7 +614,77 @@ function bindUI() {
       navigator.clipboard.writeText(window.location.href);
       alert('URL copiada al portapapeles');
     }
-  });
+  };
+  // Individual PDF download with flexible layout
+  const downloadPdfSidebar = document.getElementById("downloadPdfSidebar");
+  const pageLayoutEl = document.getElementById("pageLayout");
+
+  const downloadManualPdf = async () => {
+    const doc = getCurrentDoc();
+    const { wMm, hMm } = doc.page;
+    const layout = pageLayoutEl.value || "classic";
+    const filename = `mandala_page_${layout}_seed${state.seed}.pdf`;
+
+    // 1. Determine how many mandalas of the current design to print
+    let count = 1;
+    if (layout === "duo" || layout === "mirror") count = 2;
+    if (layout === "trio") count = 3;
+
+    // 2. Build opts (all same design)
+    const buildOpts = (s) => ({
+      seed: s.seed,
+      petals: s.petals,
+      complexity: s.complexity,
+      strokeWidthMm: s.strokeWidthMm,
+      organicLevel: s.organicLevel,
+      includeFrames: s.frames,
+      pageBorder: s.pageBorder,
+      kaleidoscope: s.kaleidoscope,
+      textures: s.textures,
+      styleMode: s.styleMode,
+      layer1Intensity: s.layer1Intensity,
+      layer2Intensity: s.layer2Intensity,
+      layer3Intensity: s.layer3Intensity,
+      layer4Intensity: s.layer4Intensity,
+      layer5Intensity: s.layer5Intensity,
+      layer6Intensity: s.layer6Intensity,
+      layer7Intensity: s.layer7Intensity,
+      layer8Intensity: s.layer8Intensity,
+    });
+
+    const batchOpts = Array.from({ length: count }, () => buildOpts(state));
+
+    // 3. Get quote if needed
+    let quotes = [];
+    if (layout === "inspirational" && typeof TAOISTA_DATASET !== "undefined") {
+      const allCards = TAOISTA_DATASET.cards || [];
+      // Pick one random quote for this page
+      quotes = [allCards[Math.floor(Math.random() * allCards.length)]];
+    }
+
+    if (downloadPdfSidebar) {
+      downloadPdfSidebar.loading = true;
+      downloadPdfSidebar.disabled = true;
+    }
+
+    try {
+      // We use downloadBatchPdf even for single pages because it handles layouts
+      await downloadBatchPdf(filename, batchOpts, generateMandalaLayers, wMm, hMm, layout, quotes);
+    } finally {
+      if (downloadPdfSidebar) {
+        downloadPdfSidebar.loading = false;
+        downloadPdfSidebar.disabled = false;
+      }
+    }
+  };
+
+  if (downloadPdfSidebar) {
+    downloadPdfSidebar.addEventListener("click", downloadManualPdf);
+  }
+
+  if (shareBtn) {
+    shareBtn.addEventListener("click", shareBtnHandler);
+  }
 
   // Keyboard shortcuts for rapid production
   window.addEventListener("keydown", (e) => {

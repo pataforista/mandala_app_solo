@@ -4,369 +4,352 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mandala Studio (v0.1)</title>
+  <title>Mandala Studio (v0.2)</title>
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#ffffff" />
+  <meta name="theme-color" content="#6750A4" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.1/cdn/themes/light.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.1/cdn/shoelace.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     :root {
-      --paper: #fcfaf5;
-      --ink: #1f2937;
-      --panel: rgba(255, 255, 255, 0.88);
-      --border-soft: #e5e7eb;
-      --accent: #7c3aed;
-      --accent-soft: #efe9ff;
+      /* M3 Tonal Palettes (Approximate) */
+      --m3-primary: #6750A4;
+      --m3-on-primary: #FFFFFF;
+      --m3-primary-container: #EADDFF;
+      --m3-on-primary-container: #21005D;
+      
+      --m3-secondary: #625B71;
+      --m3-on-secondary: #FFFFFF;
+      --m3-secondary-container: #E8DEF8;
+      --m3-on-secondary-container: #1D192B;
+      
+      --m3-surface: #FEF7FF;
+      --m3-surface-variant: #E7E0EC;
+      --m3-on-surface: #1C1B1F;
+      --m3-on-surface-variant: #49454F;
+      --m3-outline: #79747E;
+      
+      --app-font-heading: 'Outfit', sans-serif;
+      --app-font-body: 'Inter', sans-serif;
     }
 
     body {
       margin: 0;
-      font-family: "Inter", "Segoe UI", system-ui, Arial, sans-serif;
-      color: var(--ink);
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      background:
-        radial-gradient(circle at 10% 10%, #f8f4ea 0%, transparent 28%),
-        radial-gradient(circle at 90% 0%, #ede9fe 0%, transparent 24%),
-        linear-gradient(180deg, #f8f7f4 0%, #f3f4f6 100%);
+      font-family: var(--app-font-body);
+      color: var(--m3-on-surface);
+      background-color: var(--m3-surface);
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
     }
 
     header {
+      padding: 12px 24px;
+      background-color: var(--m3-surface);
+      border-bottom: 1px solid var(--m3-surface-variant);
       display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
+      justify-content: space-between;
       align-items: center;
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border-soft);
-      background: var(--panel);
-      backdrop-filter: blur(8px);
-      box-shadow: 0 2px 18px rgba(15, 23, 42, 0.07);
+      z-index: 10;
     }
 
-    label {
+    .brand {
       display: flex;
-      gap: 8px;
-      align-items: center
+      align-items: center;
+      gap: 16px;
     }
 
-    input[type="range"] {
-      width: 120px;
+    .brand h1 {
+      margin: 0;
+      font-family: var(--app-font-heading);
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--m3-primary);
     }
 
-    input[type="number"] {
-      padding: 4px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+    main {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      overflow: hidden;
     }
 
-    select {
-      padding: 4px 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background: #fff;
+    #sidebar {
+      background-color: var(--m3-surface);
+      border-right: 1px solid var(--m3-surface-variant);
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
     }
 
-    button {
-      padding: 6px 14px;
-      border-radius: 4px;
-      border: 1px solid #bbb;
-      background: #eee;
-      cursor: pointer;
-      font-weight: 500;
-      transition: all 0.1s;
-    }
-
-    button:hover {
-      background: #e0e0e0;
-      border-color: #999;
-    }
-
-    button:active {
-      background: #ccc;
-      transform: translateY(1px);
+    #stage-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--m3-surface-variant);
+      padding: 40px;
+      overflow: auto;
+      position: relative;
     }
 
     #stage {
-      flex: 1;
-      min-height: 0;
-      overflow: auto;
-      padding: 18px;
-      background:
-        radial-gradient(circle at center, #ffffff 0%, #f6f5f1 65%, #efefee 100%);
+      background-color: white;
+      border-radius: 28px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+      max-width: 100%;
+      height: auto;
+      transition: transform 0.3s ease;
+    }
+
+    #stage:hover {
+      transform: scale(1.02);
     }
 
     #stage svg {
-      background: #fff;
-      border: 1px solid #d6d3d1;
-      border-radius: 14px;
-      box-shadow: 0 18px 40px rgba(17, 24, 39, 0.1);
-      max-width: 100%;
+      display: block;
+      width: 100%;
       height: auto;
+      border-radius: 28px;
     }
 
-    h3 {
-      font-family: "Cormorant Garamond", "Times New Roman", serif;
-      letter-spacing: 0.02em;
+    .section-title {
+      font-family: var(--app-font-heading);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--m3-primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
-    fieldset {
-      background: rgba(255, 255, 255, 0.72);
-      border: 1px solid #e7e5e4 !important;
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    sl-range::part(base) {
+      padding: 4px 0;
+    }
+
+    sl-card::part(base) {
+      border: 1px solid var(--m3-surface-variant);
+      background-color: white;
+    }
+
+    .meta-footer {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      gap: 16px;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(8px);
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      color: var(--m3-on-surface-variant);
+      border: 1px solid var(--m3-surface-variant);
+    }
+
+    /* Scrollbar */
+    #sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+    #sidebar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #sidebar::-webkit-scrollbar-thumb {
+      background: var(--m3-surface-variant);
       border-radius: 10px;
-      padding: 9px !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     }
 
-    legend {
-      padding: 0 4px;
-      color: #475569;
-      letter-spacing: 0.02em;
-    }
-
-    .meta {
-      font-variant-numeric: tabular-nums;
-      color: #444
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+      #sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--m3-surface-variant);
+        max-height: 40vh;
+      }
     }
   </style>
 </head>
 
 <body>
   <header>
-    <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
-      <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content: space-between;">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <h3 style="margin:0; font-size:1.1rem; color:#333;">Mandala Studio</h3>
-          <div style="display:flex; gap:4px;">
-            <sl-icon-button id="undo" name="arrow-90deg-left" label="Deshacer"
-              style="font-size: 1.2rem;"></sl-icon-button>
-            <sl-icon-button id="redo" name="arrow-90deg-right" label="Rehacer"
-              style="font-size: 1.2rem;"></sl-icon-button>
-          </div>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <sl-button id="saveFav" variant="warning" pill size="small">
-            <sl-icon slot="prefix" name="heart"></sl-icon>
-            Favorito
-          </sl-button>
-          <sl-button id="regen" pill size="small">
-            <sl-icon slot="prefix" name="dice-5"></sl-icon>
-            Aleatorio
-          </sl-button>
-          <sl-button id="downloadPdf" variant="danger" pill size="small">
-            <sl-icon slot="prefix" name="file-pdf"></sl-icon>
-            PDF
-          </sl-button>
-          <sl-button id="downloadPng" variant="success" pill size="small">
-            <sl-icon slot="prefix" name="image"></sl-icon>
-            PNG
-          </sl-button>
-          <sl-button id="download" variant="primary" pill size="small">
-            <sl-icon slot="prefix" name="download"></sl-icon>
-            SVG
-          </sl-button>
-          <sl-dropdown placement="bottom">
-            <sl-button slot="trigger" variant="neutral" pill size="small" caret>
-              <sl-icon slot="prefix" name="tools"></sl-icon>
-              Más
-            </sl-button>
-            <sl-menu>
-              <sl-menu-item id="openGallery">
-                <sl-icon slot="prefix" name="grid"></sl-icon>
-                Galería de Favoritos
-              </sl-menu-item>
-              <sl-divider></sl-divider>
-              <sl-menu-label>Generar Libro</sl-menu-label>
-              <sl-menu-item>
-                <div style="display:flex; gap:8px; align-items:center; width:100%;">
-                  <sl-select id="bookPageCount" value="10" size="small" style="width: 60px; flex:0;">
-                    <sl-option value="5">5</sl-option>
-                    <sl-option value="10">10</sl-option>
-                    <sl-option value="20">20</sl-option>
-                    <sl-option value="50">50</sl-option>
-                  </sl-select>
-                  <sl-button id="downloadBook" size="small" style="flex:1;">
-                    <sl-icon slot="prefix" name="book"></sl-icon>
-                    Descargar Libro
-                  </sl-button>
-                </div>
-              </sl-menu-item>
-            </sl-menu>
-          </sl-dropdown>
-        </div>
+    <div class="brand">
+      <sl-icon-button id="openGallery" name="grid" label="Galería" style="font-size: 1.5rem;"></sl-icon-button>
+      <h1>Mandala Studio</h1>
+      <div style="display:flex; gap:4px; margin-left: 8px;">
+        <sl-icon-button id="undo" name="arrow-counterclockwise" label="Deshacer"></sl-icon-button>
+        <sl-icon-button id="redo" name="arrow-clockwise" label="Rehacer"></sl-icon-button>
       </div>
-
-      <sl-drawer label="Explorar y Guardar" id="galleryDrawer" style="--size: 400px;">
-        <div style="padding: 12px; display: flex; flex-direction: column; gap: 16px;">
-          <div>
-            <h4 style="margin: 0 0 8px 0;">Mis Favoritos</h4>
-            <div id="galleryContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-              <!-- Aquí se cargarán los favoritos -->
-            </div>
-          </div>
-          <sl-divider></sl-divider>
-          <div>
-            <h4 style="margin: 0 0 8px 0;">Semillas Recientes</h4>
-            <div id="recentContainer" style="display: flex; flex-wrap: wrap; gap: 8px;">
-              <!-- Aquí se cargarán los recientes -->
-            </div>
-          </div>
-        </div>
-        <sl-button slot="footer" variant="primary" id="closeGallery">Cerrar</sl-button>
-      </sl-drawer>
-
-      <!-- SECTION 1: GENERACIÓN RÁPIDA -->
-      <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-end; padding-top:8px; border-top:1px solid #eee;">
-        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0; align-items: flex-end;">
-          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Generador</legend>
-          <sl-select id="preset" label="Papel" size="small" style="width: 100px;">
-            <sl-option value="A4">A4</sl-option>
-            <sl-option value="LETTER">Letter</sl-option>
-          </sl-select>
-          <sl-input id="seed" type="number" label="Seed" size="small" style="width: 120px;" value="1"
-            help-text="Semilla del diseño"></sl-input>
-          <div style="display:flex; gap:2px; align-items:flex-end; padding-bottom:2px;">
-            <sl-icon-button id="prevSeed" name="chevron-left" label="Seed anterior" style="font-size:1.1rem;"></sl-icon-button>
-            <sl-icon-button id="nextSeed" name="chevron-right" label="Seed siguiente" style="font-size:1.1rem;"></sl-icon-button>
-          </div>
-        </fieldset>
-
-        <sl-button id="share" variant="default" pill size="small">
-          <sl-icon slot="prefix" name="share"></sl-icon>
-          Compartir
+    </div>
+    <div style="display:flex; gap:8px;">
+      <sl-button id="saveFav" variant="text" size="medium">
+        <sl-icon slot="prefix" name="heart"></sl-icon>
+        Guardar
+      </sl-button>
+      <sl-dropdown placement="bottom-end">
+        <sl-button slot="trigger" variant="primary" pill caret>
+          Descargar
         </sl-button>
-      </div>
-
-      <!-- SECTION 2: ESTRUCTURA RÁPIDA -->
-      <div style="padding-top:12px; border-top:1px solid #eee;">
-        <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
-          <span style="font-weight:bold; font-size:0.9rem;">Plantillas Rápidas:</span>
-          <sl-select id="structurePreset" size="small" style="width: 200px;" value="custom"
-            help-text="Aplica presets de configuración">
-            <sl-option value="custom">Personalizada</sl-option>
-            <sl-option value="simple">Simple para niños</sl-option>
-            <sl-option value="balanced">Equilibrada para imprimir</sl-option>
-            <sl-option value="detailed">Detallada experimental</sl-option>
-            <sl-option value="botanical">Botánica orgánica</sl-option>
-            <sl-option value="geometric">Geométrica técnica</sl-option>
-            <sl-option value="islamico">Islámico / Zellige ✦</sl-option>
-            <sl-option value="azteca">Azteca / Solar ☀</sl-option>
-            <sl-option value="yantra">Yantra / Védico ◈</sl-option>
-            <sl-option value="celtico">Céltico / Gótico ☘</sl-option>
-          </sl-select>
-          <sl-button id="applyStructure" size="small" variant="default" pill>
-            <sl-icon slot="prefix" name="stars"></sl-icon>
-            Aplicar
-          </sl-button>
-        </div>
-      </div>
-
-      <!-- SECTION 3: CONFIGURACIÓN PRINCIPAL -->
-      <div style="display:flex; gap:20px; flex-wrap:wrap; padding-top:12px; border-top:1px solid #eee;">
-
-        <!-- Geometría -->
-        <fieldset style="display:flex; flex-direction:column; gap:12px; border:none; padding:0; margin:0; min-width:200px;">
-          <legend style="font-weight:bold; font-size:0.85rem; color:#333;">📐 Geometría Radial</legend>
-          <sl-range id="petals" label="Pétalos" min="6" max="96" step="1" value="12" size="small"
-            help-text="Número de segmentos radiales"></sl-range>
-          <sl-checkbox id="kaleidoscope" checked size="small">Kaleidoscopio (simetría)</sl-checkbox>
-        </fieldset>
-
-        <!-- Estilo Visual -->
-        <fieldset style="display:flex; flex-direction:column; gap:12px; border:none; padding:0; margin:0; min-width:200px;">
-          <legend style="font-weight:bold; font-size:0.85rem; color:#333;">🎨 Estilo Visual</legend>
-          <sl-range id="complexity" label="Complejidad" min="20" max="320" step="5" value="110" size="small"
-            help-text="Densidad de detalles"></sl-range>
-          <sl-range id="organic" label="Orgánico" min="0" max="1" step="0.05" value="0.2" size="small"
-            help-text="0=Geométrico, 1=Orgánico"></sl-range>
-          <sl-checkbox id="textures" checked size="small">Texturas Avanzadas</sl-checkbox>
-        </fieldset>
-
-        <!-- Trazo -->
-        <fieldset style="display:flex; flex-direction:column; gap:12px; border:none; padding:0; margin:0; min-width:200px;">
-          <legend style="font-weight:bold; font-size:0.85rem; color:#333;">✏️ Trazo & Marco</legend>
-          <sl-range id="strokeWidth" label="Grosor de línea" min="0.1" max="5" step="0.1" value="0.6" size="small"
-            help-text="Peso en mm"></sl-range>
-          <sl-checkbox id="frames" checked size="small">Marcos interiores</sl-checkbox>
-          <sl-checkbox id="pageBorder" checked size="small">Orla de página</sl-checkbox>
-        </fieldset>
-
-        <!-- Estilo de Mandala -->
-        <fieldset style="display:flex; flex-direction:column; gap:12px; border:none; padding:0; margin:0; min-width:240px; background: #f0f9ff; padding: 10px; border-radius: 8px; border: 1px solid #bfdbfe;">
-          <legend style="font-weight:bold; font-size:0.85rem; color:#1e40af;">🌀 Estilo del Mandala</legend>
-          <sl-select id="styleMode" value="sashiko" size="small">
-            <sl-option value="sashiko">Sashiko (Repetitivo)</sl-option>
-            <sl-option value="floral">Floral (Botánico)</sl-option>
-            <sl-option value="geometric">Geométrico (Preciso)</sl-option>
-            <sl-option value="islamico">Islámico / Zellige ✦</sl-option>
-            <sl-option value="azteca">Azteca / Solar ☀</sl-option>
-            <sl-option value="yantra">Yantra / Védico ◈</sl-option>
-            <sl-option value="celtico">Céltico / Gótico ☘</sl-option>
-          </sl-select>
-        </fieldset>
-      </div>
-
-      <!-- SECTION 4: CONTROL FINO DE CAPAS -->
-      <sl-accordion style="margin-top:12px; border:1px solid #e7e5e4; border-radius:10px;">
-        <sl-accordion-item>
-          <span slot="summary" style="font-weight:bold; font-size:0.9rem;">🎛️ Control Fino de Capas (8 Intensidades)</span>
-          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:16px; padding:16px; background: #fffef7;">
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:0.8rem; font-weight:600; color:#333;">1. Núcleo Central</label>
-              <sl-range id="layer1Intensity" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
-              <span style="font-size:0.7rem; color:#666;">Centro y simetría inicial</span>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:0.8rem; font-weight:600; color:#333;">2. Pétalos Interiores</label>
-              <sl-range id="layer2Intensity" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
-              <span style="font-size:0.7rem; color:#666;">Corola interna</span>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:0.8rem; font-weight:600; color:#333;">3. Flores & Rosetas</label>
-              <sl-range id="layer3Intensity" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
-              <span style="font-size:0.7rem; color:#666;">Patrones repetitivos</span>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:0.8rem; font-weight:600; color:#333;">4. Anillo Geométrico</label>
-              <sl-range id="layer4Intensity" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
-              <span style="font-size:0.7rem; color:#666;">Conexión radial</span>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:0.8rem; font-weight:600; color:#333;">5. Detalles Finos</label>
-              <sl-range id="layer5Intensity" min="0" max="1" step="0.05" value="0.6" size="small"></sl-range>
-              <span style="font-size:0.7rem; color:#666;">Radios y puntos de luz</span>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:0.8rem; font-weight:600; color:#333;">6. Borde Decorativo</label>
-              <sl-range id="layer6Intensity" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
-              <span style="font-size:0.7rem; color:#666;">Corona exterior</span>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:0.8rem; font-weight:600; color:#333;">7. Elementos Naturales</label>
-              <sl-range id="layer7Intensity" min="0" max="1" step="0.05" value="0.5" size="small"></sl-range>
-              <span style="font-size:0.7rem; color:#666;">Hojas y tallos orgánicos</span>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <label style="font-size:0.8rem; font-weight:600; color:#333;">8. Texturas Finales</label>
-              <sl-range id="layer8Intensity" min="0" max="1" step="0.05" value="0.4" size="small"></sl-range>
-              <span style="font-size:0.7rem; color:#666;">Puntillismo y sombras</span>
-            </div>
-          </div>
-        </sl-accordion-item>
-      </sl-accordion>
-
-      <div style="font-size:0.8rem; color:#666; margin-top:4px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
-        <span class="meta">Seed: <b id="seedText">—</b></span> <span style="margin:0 2px;">|</span>
-        <span class="meta">Paths: <b id="pathsText">—</b></span> <span style="margin:0 2px;">|</span>
-        <span style="color:#999; font-size:0.7rem;">Atajos: <b>&larr;&rarr;</b> seed &middot; <b>Space/R</b> random &middot; <b>S</b> favorito</span>
-      </div>
+        <sl-menu id="downloadMenu">
+          <sl-menu-item id="download">SVG</sl-menu-item>
+          <sl-menu-item id="downloadPng">PNG (Alta Res)</sl-menu-item>
+          <sl-menu-item id="downloadPdf">Descargar PDF (Página Simple)</sl-menu-item>
+          <sl-divider></sl-divider>
+          <sl-menu-item id="share">Compartir</sl-menu-item>
+        </sl-menu>
+      </sl-dropdown>
     </div>
   </header>
 
   <main>
-    <div id="stage" aria-label="SVG preview"></div>
+    <div id="sidebar">
+      <!-- Generación -->
+      <div class="control-group">
+        <div class="section-title">
+          <sl-icon name="lightning-charge"></sl-icon> Rápido
+        </div>
+        <div style="display:flex; gap:12px; align-items: flex-end;">
+          <sl-input id="seed" type="number" label="Semilla" size="small" style="flex:1;" value="1"></sl-input>
+          <div style="display:flex; gap:2px;">
+            <sl-icon-button id="prevSeed" name="chevron-left" label="Anterior"></sl-icon-button>
+            <sl-icon-button id="nextSeed" name="chevron-right" label="Siguiente"></sl-icon-button>
+            <sl-icon-button id="regen" name="dice-5" label="Aleatorio" style="font-size: 1.5rem; color: var(--m3-primary);"></sl-icon-button>
+          </div>
+        </div>
+        <sl-button id="magicShuffle" variant="primary" size="medium" pill style="width: 100%; --sl-color-primary-600: #d81b60; --sl-color-primary-500: #e91e63;">
+          <sl-icon slot="prefix" name="magic"></sl-icon>
+          Mezcla Mágica
+        </sl-button>
+        <sl-select id="structurePreset" label="Plantilla" size="small" value="custom">
+          <sl-option value="custom">Personalizada</sl-option>
+          <sl-option value="simple">Simple</sl-option>
+          <sl-option value="balanced">Equilibrada</sl-option>
+          <sl-option value="detailed">Detallada</sl-option>
+          <sl-option value="botanical">Botánica</sl-option>
+          <sl-option value="geometric">Geométrica</sl-option>
+          <sl-option value="islamico">Islámica</sl-option>
+        </sl-select>
+        <sl-button id="applyStructure" variant="secondary" size="small" pill style="width: 100%;">Aplicar Plantilla</sl-button>
+      </div>
+
+      <sl-divider></sl-divider>
+
+      <!-- Configuración -->
+      <sl-accordion>
+        <sl-accordion-item open>
+          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="aspect-ratio"></sl-icon> Geometría</span>
+          <div class="control-group" style="padding: 12px 0;">
+            <sl-select id="preset" label="Formato de Papel" size="small" value="A4">
+              <sl-option value="A4">A4</sl-option>
+              <sl-option value="LETTER">Carta</sl-option>
+            </sl-select>
+            <sl-range id="petals" label="Pétalos" min="6" max="96" value="12"></sl-range>
+            <sl-select id="styleMode" label="Estilo" size="small">
+              <sl-option value="sashiko">Sashiko</sl-option>
+              <sl-option value="floral">Floral</sl-option>
+              <sl-option value="geometric">Geométrico</sl-option>
+              <sl-option value="islamico">Islámico</sl-option>
+              <sl-option value="azteca">Azteca</sl-option>
+              <sl-option value="yantra">Yantra</sl-option>
+              <sl-option value="celtico">Céltico</sl-option>
+            </sl-select>
+            <sl-checkbox id="kaleidoscope" checked>Simetría (Kaleidoscopio)</sl-checkbox>
+          </div>
+        </sl-accordion-item>
+
+        <sl-accordion-item>
+          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="palette"></sl-icon> Trazo & Detalle</span>
+          <div class="control-group" style="padding: 12px 0;">
+            <sl-range id="complexity" label="Complejidad" min="20" max="320" value="110"></sl-range>
+            <sl-range id="organic" label="Organicidad" min="0" max="1" step="0.05" value="0.2"></sl-range>
+            <sl-range id="strokeWidth" label="Grosor" min="0.1" max="5" step="0.1" value="0.6"></sl-range>
+            <sl-checkbox id="textures" checked>Texturas avanzadas</sl-checkbox>
+            <sl-checkbox id="frames" checked>Marcos interiores</sl-checkbox>
+            <sl-checkbox id="pageBorder" checked>Borde de página</sl-checkbox>
+          </div>
+        </sl-accordion-item>
+
+        <sl-accordion-item>
+          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="layers"></sl-icon> Capas (8)</span>
+          <div class="control-group" style="padding: 12px 0;">
+            <sl-range id="layer1Intensity" label="Capas 1 (Centro)" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
+            <sl-range id="layer2Intensity" label="Capas 2" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
+            <sl-range id="layer3Intensity" label="Capas 3" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
+            <sl-range id="layer4Intensity" label="Capas 4" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
+            <sl-range id="layer5Intensity" label="Capas 5" min="0" max="1" step="0.05" value="0.6" size="small"></sl-range>
+            <sl-range id="layer6Intensity" label="Capas 6" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
+            <sl-range id="layer7Intensity" label="Capas 7" min="0" max="1" step="0.05" value="0.5" size="small"></sl-range>
+            <sl-range id="layer8Intensity" label="Capas 8 (Borde)" min="0" max="1" step="0.05" value="0.4" size="small"></sl-range>
+          </div>
+        </sl-accordion-item>
+      </sl-accordion>
+      
+      <sl-divider></sl-divider>
+
+      <!-- Layout de Exportación -->
+      <div class="control-group">
+        <div class="section-title">
+          <sl-icon name="file-earmark-pdf"></sl-icon> Layout PDF
+        </div>
+        <sl-select id="pageLayout" value="classic" size="small" pill>
+          <sl-option value="classic">Cásico (1 solo)</sl-option>
+          <sl-option value="duo">Dúo (2 mandalas)</sl-option>
+          <sl-option value="mirror">Espejo (2 simétricos)</sl-option>
+          <sl-option value="trio">Trío (3 mandalas)</sl-option>
+          <sl-option value="inspirational">Inspiracional (Frase)</sl-option>
+        </sl-select>
+        <sl-button id="downloadPdfSidebar" variant="primary" size="medium" pill style="width: 100%;">
+          <sl-icon slot="prefix" name="download"></sl-icon>
+          Descargar PDF
+        </sl-button>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 24px; text-align: center; color: var(--m3-on-surface-variant); font-size: 0.8rem;">
+        Desarrollado con ❤️ para Mandala Studio
+      </div>
+    </div>
+
+    <div id="stage-container">
+      <div id="stage"></div>
+      
+      <div class="meta-footer">
+        <span>Semilla: <b id="seedText">—</b></span>
+        <span>Caminos: <b id="pathsText">—</b></span>
+        <sl-tooltip content="Presiona 'R' para aleatorio, '&larr;' o '&rarr;' para cambiar semilla">
+          <sl-icon name="info-circle"></sl-icon>
+        </sl-tooltip>
+      </div>
+    </div>
   </main>
+
+  <!-- Gallery Drawer -->
+  <sl-drawer label="Mis Favoritos" id="galleryDrawer" style="--size: 400px;">
+    <div style="padding: 12px; display: flex; flex-direction: column; gap: 16px;">
+      <div id="galleryContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <!-- Favoritos -->
+      </div>
+      <sl-divider></sl-divider>
+      <div id="recentContainer" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <!-- Recientes -->
+      </div>
+    </div>
+    <sl-button slot="footer" variant="primary" id="closeGallery">Cerrar</sl-button>
+  </sl-drawer>
 
   <script type="module" src="./js/app.js"></script>
 </body>

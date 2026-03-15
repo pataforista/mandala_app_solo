@@ -236,9 +236,20 @@ export function generateMandalaLayers(doc, opts) {
   const cFactor = _clamp((complexity - 20) / (320 - 20), 0, 1);
 
   const mainW = strokeWidthMm;
-  const detailW = strokeWidthMm * 0.7;
-  const fineW = strokeWidthMm * 0.4;
+  const detailW = strokeWidthMm * 0.75;
+  const fineW = strokeWidthMm * 0.45;
   const hairW = strokeWidthMm * 0.25;
+
+  // Structural Jitter: vary the base radii of rings based on seed
+  const rJitter = (base, scale = 0.05) => base * (1 + (rng() - 0.5) * 2 * scale);
+  const R1 = rJitter(0.12); // L1 radius
+  const R2 = rJitter(0.24); // L2 radius limit
+  const R3 = rJitter(0.42); // L3 radius limit
+  const R4 = rJitter(0.55); // L4 radius limit
+  const R5 = rJitter(0.68); // L5 radius limit
+  const R6 = rJitter(0.80); // L6 radius limit
+  const R7 = rJitter(0.92); // L7 radius limit
+  const R8 = rJitter(1.0);  // L8 radius limit
 
   // Helper: push a PathBuilder as a path element
   const pushPath = (pb, w = detailW) => {
@@ -249,19 +260,19 @@ export function generateMandalaLayers(doc, opts) {
   // ==================== L1: NÚCLEO (BINDU) ====================
   if (layer1Intensity > 0.05) {
     const pb = new PathBuilder();
-    const rCore = R * 0.12 * layer1Intensity;
+    const rCore = R * R1 * layer1Intensity;
 
-    // Bindu central
-    addCircle(pb, center.x, center.y, rCore * 0.12, 10);
+    // Bindu central - make it slightly bolder
+    addCircle(pb, center.x, center.y, rCore * 0.14, 12);
 
     // Seed of life pattern (6 overlapping circles)
     if (layer1Intensity > 0.3) {
-      const seedR = rCore * 0.35;
+      const seedR = rCore * 0.38;
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
-        addSmoothCircle(pb, center.x + Math.cos(a) * seedR, center.y + Math.sin(a) * seedR, seedR, 10);
+        addSmoothCircle(pb, center.x + Math.cos(a) * seedR, center.y + Math.sin(a) * seedR, seedR, 12);
       }
-      addSmoothCircle(pb, center.x, center.y, seedR, 10);
+      addSmoothCircle(pb, center.x, center.y, seedR, 12);
     }
 
     // Inner protection ring with small petals
@@ -306,8 +317,8 @@ export function generateMandalaLayers(doc, opts) {
   // ==================== L2: PÉTALOS INTERNOS (Compound) ====================
   if (layer2Intensity > 0.05) {
     const pb = new PathBuilder();
-    const rIn = R * 0.13;
-    const rOut = rIn + R * 0.17 * layer2Intensity;
+    const rIn = R * R1 + 2; 
+    const rOut = rIn + (R * R2 - rIn) * layer2Intensity;
     const count = petals;
     const angStep = (Math.PI * 2) / count;
 
@@ -370,7 +381,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== RING A: Transition ring (between L2 and L3) ====================
   {
-    const rRing = R * 0.31;
+    const rRing = R * (R1 + R2) / 2 + 5;
     const intensity = Math.min(layer2Intensity, layer3Intensity);
     if (intensity > 0.2) {
       const pb = new PathBuilder();
@@ -393,7 +404,7 @@ export function generateMandalaLayers(doc, opts) {
   // ==================== L3: PATRÓN CULTURAL (Enhanced) ====================
   if (layer3Intensity > 0.05) {
     const pb = new PathBuilder();
-    const rMid = R * 0.42;
+    const rMid = R * R3;
     const fSize = R * 0.11 * layer3Intensity;
 
     // Complexity scales element count per motif ring
