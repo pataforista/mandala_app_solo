@@ -7,8 +7,59 @@ export function downloadTextFile(filename, text) {
   saveBlob(blob, filename);
 }
 
+/**
+ * Convert SVG string to canvas image data URL
+ */
+function svgStringToImageData(svgString, widthPx, heightPx) {
+  return new Promise((resolve, reject) => {
+    try {
+      const img = new Image();
+      const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = widthPx;
+          canvas.height = heightPx;
+          const ctx = canvas.getContext("2d");
+
+          // White background
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, widthPx, heightPx);
+
+          // Draw image
+          ctx.drawImage(img, 0, 0, widthPx, heightPx);
+          URL.revokeObjectURL(url);
+
+          resolve(canvas.toDataURL("image/png"));
+        } catch (e) {
+          URL.revokeObjectURL(url);
+          reject(e);
+        }
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("No se pudo cargar la imagen SVG"));
+      };
+
+      img.src = url;
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+/**
+ * Download PNG from SVG
+ */
 export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 300) {
   try {
+    const pixelDensity = dpi / 25.4;
+    const wPx = Math.ceil(widthMm * pixelDensity);
+    const hPx = Math.ceil(heightMm * pixelDensity);
+
     const { Resvg, initWasm } = await import("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/wasm.js");
 
     try {
@@ -16,10 +67,6 @@ export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 
     } catch (e) {
       console.warn("WASM initialization failed, but continuing", e);
     }
-
-    const pixelDensity = dpi / 25.4;
-    const wPx = Math.ceil(widthMm * pixelDensity);
-    const hPx = Math.ceil(heightMm * pixelDensity);
 
     const resvg = new Resvg(svgString, {
       fitTo: {
@@ -35,67 +82,28 @@ export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 
     saveBlob(blob, filename);
   } catch (error) {
     console.error("PNG download failed:", error);
-    alert("❌ Error: No se pudo descargar PNG.\n\nIntenta de nuevo o usa SVG como alternativa.\n\nDetalles: " + (error.message || String(error)));
+    alert("❌ Error: No se pudo descargar PNG.\n\nIntenta de nuevo o usa SVG como alternativa.");
     throw error;
   }
 }
 
 /**
- * Renders an SVG element to a PNG data URL using Canvas.
- * @param {SVGElement} svgEl - The SVG element (must have width/height/viewBox set)
- * @param {number} widthMm - Width in mm (for sizing the canvas)
- * @param {number} heightMm - Height in mm
+ * Simple PDF export - convert SVG to image and embed in PDF
  */
-async function svgElToDataUrl(svgEl, widthMm, heightMm) {
-  const wPx = Math.ceil(widthMm * RENDER_PX_PER_MM);
-  const hPx = Math.ceil(heightMm * RENDER_PX_PER_MM);
-
-  // Set pixel dimensions while keeping the viewBox in document units
-  const clone = svgEl.cloneNode(true);
-  clone.setAttribute("width", wPx);
-  clone.setAttribute("height", hPx);
-  // Ensure xmlns is set for serialization
-  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-  clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-
-  const svgString = new XMLSerializer().serializeToString(clone);
-
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = wPx;
-      canvas.height = hPx;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, wPx, hPx);
-      ctx.drawImage(img, 0, 0, wPx, hPx);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/png"));
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Error al renderizar SVG en canvas"));
-    };
-
-    img.src = url;
-  });
-}
-
-/**
- * PDF Export (Professional / Raster via Canvas)
- * Renders SVG to canvas and embeds as PNG in jsPDF — no svg2pdf required.
- */
-export async function downloadPdf(filename, svgEl, widthMm, heightMm) {
+export async function downloadPdf(filename, svgString, widthMm, heightMm) {
   try {
-    if (!window.jspdf) {
-      throw new Error("jsPDF no está disponible. Verifica tu conexión.");
+    // Check if jsPDF is loaded
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error("jsPDF no está cargado correctamente");
     }
 
+    const wPx = Math.ceil(widthMm * RENDER_PX_PER_MM);
+    const hPx = Math.ceil(heightMm * RENDER_PX_PER_MM);
+
+    // Convert SVG to image data
+    const imageData = await svgStringToImageData(svgString, wPx, hPx);
+
+    // Create PDF
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({
       orientation: widthMm > heightMm ? "landscape" : "portrait",
@@ -103,25 +111,22 @@ export async function downloadPdf(filename, svgEl, widthMm, heightMm) {
       format: [widthMm, heightMm]
     });
 
-    const flatSvg = flattenSvgElement(svgEl.cloneNode(true));
-    const dataUrl = await svgElToDataUrl(flatSvg, widthMm, heightMm);
-    doc.addImage(dataUrl, "PNG", 0, 0, widthMm, heightMm);
+    doc.addImage(imageData, "PNG", 0, 0, widthMm, heightMm);
     doc.save(filename);
   } catch (error) {
     console.error("PDF download failed:", error);
-    alert("❌ Error: No se pudo descargar PDF.\n\n" + (error.message || "Intenta de nuevo más tarde."));
     throw error;
   }
 }
 
 /**
- * Batch PDF Export (Coloring Book) with multi-layout support.
- * Renders each mandala SVG to canvas and embeds as PNG — no svg2pdf required.
+ * Batch PDF Export (multiple mandalas per PDF)
  */
 export async function downloadBatchPdf(filename, states, generateFn, widthMm, heightMm, layout = "classic", quotes = []) {
   try {
-    if (!window.jspdf) {
-      throw new Error("jsPDF no está disponible. Verifica tu conexión.");
+    // Check if jsPDF is loaded
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error("jsPDF no está cargado correctamente");
     }
 
     const { jsPDF } = window.jspdf;
@@ -132,7 +137,11 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
     });
 
     const margin = 12;
+    const dpi = 150; // Lower DPI for batch PDFs to reduce file size
 
+    /**
+     * Create SVG element for a given state
+     */
     const makeSvgEl = (state, w, h, mirrorX = false) => {
       const docData = {
         page: { wMm: w, hMm: h, marginMm: 5 },
@@ -157,13 +166,22 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       docData.body.forEach(b => g.innerHTML += b);
       finalSvg.appendChild(g);
 
-      return flattenSvgElement(finalSvg);
+      return finalSvg;
     };
 
+    /**
+     * Draw a mandala on the PDF at specified position
+     */
     const drawMandala = async (state, x, y, w, h, quote = null, mirrorX = false) => {
       const svgEl = makeSvgEl(state, w, h, mirrorX);
-      const dataUrl = await svgElToDataUrl(svgEl, w, h);
-      doc.addImage(dataUrl, "PNG", x, y, w, h);
+      const svgString = new XMLSerializer().serializeToString(svgEl);
+
+      const pixelDensity = dpi / 25.4;
+      const wPx = Math.ceil(w * pixelDensity);
+      const hPx = Math.ceil(h * pixelDensity);
+
+      const imageData = await svgStringToImageData(svgString, wPx, hPx);
+      doc.addImage(imageData, "PNG", x, y, w, h);
 
       if (quote) {
         doc.setFontSize(12);
@@ -177,6 +195,7 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       }
     };
 
+    // Handle different layouts
     if (layout === "classic" || layout === "inspirational") {
       for (let i = 0; i < states.length; i++) {
         if (i > 0) doc.addPage();
@@ -229,7 +248,6 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
     doc.save(filename);
   } catch (error) {
     console.error("Batch PDF download failed:", error);
-    alert("❌ Error: No se pudo descargar PDF de lote.\n\n" + (error.message || "Intenta de nuevo más tarde."));
     throw error;
   }
 }

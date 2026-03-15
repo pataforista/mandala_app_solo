@@ -685,10 +685,10 @@ function bindUI() {
     try {
       // We use downloadBatchPdf even for single pages because it handles layouts
       await downloadBatchPdf(filename, batchOpts, generateMandalaLayers, wMm, hMm, layout, quotes);
+      alert("✅ PDF descargado correctamente");
     } catch (error) {
       console.error("PDF download error:", error);
-      // Error alert is shown in downloadBatchPdf
-      throw error;
+      alert("❌ Error al descargar PDF: " + (error.message || "Intenta de nuevo"));
     } finally {
       if (downloadPdfSidebar) {
         downloadPdfSidebar.loading = false;
