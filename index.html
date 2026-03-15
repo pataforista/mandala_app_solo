@@ -168,6 +168,19 @@
             <sl-option value="A4">A4</sl-option>
             <sl-option value="LETTER">Letter</sl-option>
           </sl-select>
+          <sl-select id="structurePreset" label="Estructura" size="small" style="width: 180px;" value="custom"
+            help-text="Plantillas rápidas para empezar">
+            <sl-option value="custom">Personalizada</sl-option>
+            <sl-option value="simple">Simple para niños</sl-option>
+            <sl-option value="balanced">Equilibrada para imprimir</sl-option>
+            <sl-option value="detailed">Detallada experimental</sl-option>
+            <sl-option value="botanical">Botánica orgánica</sl-option>
+            <sl-option value="geometric">Geométrica técnica</sl-option>
+          </sl-select>
+          <sl-button id="applyStructure" size="small" variant="default" pill>
+            <sl-icon slot="prefix" name="stars"></sl-icon>
+            Aplicar
+          </sl-button>
           <sl-input id="seed" type="number" label="Seed" size="small" style="width: 120px;" value="1"
             help-text="Semilla aleatoria"></sl-input>
         </fieldset>
