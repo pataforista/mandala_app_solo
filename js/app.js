@@ -105,6 +105,30 @@ const STRUCTURE_PRESETS = {
     layer4Intensity: 0.9, layer5Intensity: 0.6, layer6Intensity: 0.8, layer7Intensity: 0.0, layer8Intensity: 0.2,
     frames: true, pageBorder: true,
   },
+  islamico: {
+    petals: 8, complexity: 150, organic: 0.0, strokeWidth: 0.55,
+    styleMode: "islamico", layer1Intensity: 0.9, layer2Intensity: 0.85, layer3Intensity: 0.9,
+    layer4Intensity: 0.85, layer5Intensity: 0.55, layer6Intensity: 0.85, layer7Intensity: 0.7, layer8Intensity: 0.45,
+    frames: true, pageBorder: true,
+  },
+  azteca: {
+    petals: 20, complexity: 170, organic: 0.05, strokeWidth: 0.6,
+    styleMode: "azteca", layer1Intensity: 0.95, layer2Intensity: 0.75, layer3Intensity: 0.85,
+    layer4Intensity: 0.9, layer5Intensity: 0.7, layer6Intensity: 0.85, layer7Intensity: 0.75, layer8Intensity: 0.5,
+    frames: true, pageBorder: true,
+  },
+  yantra: {
+    petals: 8, complexity: 130, organic: 0.1, strokeWidth: 0.6,
+    styleMode: "yantra", layer1Intensity: 0.95, layer2Intensity: 0.9, layer3Intensity: 0.85,
+    layer4Intensity: 0.8, layer5Intensity: 0.5, layer6Intensity: 0.75, layer7Intensity: 0.8, layer8Intensity: 0.35,
+    frames: true, pageBorder: true,
+  },
+  celtico: {
+    petals: 12, complexity: 120, organic: 0.6, strokeWidth: 0.6,
+    styleMode: "celtico", layer1Intensity: 0.75, layer2Intensity: 0.8, layer3Intensity: 0.85,
+    layer4Intensity: 0.8, layer5Intensity: 0.5, layer6Intensity: 0.75, layer7Intensity: 0.7, layer8Intensity: 0.35,
+    frames: true, pageBorder: true,
+  },
 };
 
 const recentSeeds = [];
