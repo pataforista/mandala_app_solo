@@ -4,7 +4,7 @@ import { PathBuilder } from "../core/pathBuilder.js";
 /**
  * Mandala con arquitectura de capas modulares - VERSION PREMIUM
  * - 8 capas independientes y controlables
- * - Dual style modes: Hashiko (flores) & Geometric
+ * - Triple style modes: Hashiko (flores), Sashiko (patrones repetitivos) & Geometric
  * - Geometría de alta calidad para libros de colorear
  */
 
@@ -77,6 +77,9 @@ export function generateMandalaLayers(doc, opts) {
   const rng = mulberry32(seed);
   const paths = [];
 
+  // Compatibilidad: algunos estados guardados usan "hashiko" para el estilo floral base.
+  const normalizedStyleMode = styleMode === "hashiko" ? "sashiko" : styleMode;
+
   const mainStroke = strokeWidthMm;
   const detailStroke = strokeWidthMm * 0.7;
   const fineStroke = strokeWidthMm * 0.4;
@@ -139,18 +142,32 @@ export function generateMandalaLayers(doc, opts) {
     paths.push(pb.toPath({ stroke, strokeWidthMm: mainStroke }));
   }
 
-  // ==================== L3: HASHIKO FLOWERS / GEOMETRIC ====================
+  // ==================== L3: FLORES / SASHIKO / GEOMÉTRICO ====================
   if (layer3Intensity > 0.05) {
     const pb = new PathBuilder();
     const rMid = maxRadius * 0.4;
     const fSize = maxRadius * 0.12 * layer3Intensity;
-    const count = Math.max(6, Math.round(petals / 2));
+    const count = normalizedStyleMode === "sashiko"
+      ? Math.max(8, petals)
+      : Math.max(6, Math.round(petals / 2));
     
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
       const fCenter = _polar0(rMid, a, center);
       
-      if (styleMode === "hashiko") {
+      if (normalizedStyleMode === "sashiko") {
+        // Rosetas repetitivas inspiradas en bordados Sashiko
+        const pCount = 6;
+        for (let j = 0; j < pCount; j++) {
+          const pa = (j / pCount) * Math.PI * 2 + a;
+          const pOuter = _polar0(fSize, pa, fCenter);
+          const pInner = _polar0(fSize * 0.4, pa + Math.PI / pCount, fCenter);
+          pb.moveTo(fCenter.x, fCenter.y).lineTo(pOuter.x, pOuter.y);
+          pb.moveTo(pInner.x, pInner.y).lineTo(pOuter.x, pOuter.y);
+        }
+        addCirclePoly(pb, fCenter.x, fCenter.y, fSize * 0.78, 12);
+        addCirclePoly(pb, fCenter.x, fCenter.y, fSize * 0.3, 10);
+      } else if (normalizedStyleMode === "floral") {
         const pCount = 5;
         for (let j = 0; j < pCount; j++) {
           const pa = (j / pCount) * Math.PI * 2 + a;
@@ -194,10 +211,16 @@ export function generateMandalaLayers(doc, opts) {
       const p2a = _polar0(r1, a2, center);
       const pM = _polar0(r2, aM, center);
       
-      if (styleMode === "geometric") {
+      if (normalizedStyleMode === "geometric") {
         pb.moveTo(p1a.x, p1a.y).lineTo(pM.x, pM.y).lineTo(p2a.x, p2a.y);
       } else {
         pb.moveTo(p1a.x, p1a.y).quadTo(pM.x, pM.y, p2a.x, p2a.y);
+      }
+
+      if (normalizedStyleMode === "sashiko" && i % 3 === 0) {
+        const pInner = _polar0(r1 - maxRadius * 0.03, aM, center);
+        const pOuter = _polar0(r2 + maxRadius * 0.025, aM, center);
+        addCapsule(pb, pInner.x, pInner.y, pOuter.x, pOuter.y, fineStroke * 0.6);
       }
     }
     paths.push(pb.toPath({ stroke, strokeWidthMm: mainStroke }));
@@ -279,7 +302,7 @@ export function generateMandalaLayers(doc, opts) {
   }
 
   // ==================== L7: NATURAL / HOJAS ====================
-  if (layer7Intensity > 0.05 && styleMode === "hashiko") {
+  if (layer7Intensity > 0.05 && normalizedStyleMode !== "geometric") {
     const pb = new PathBuilder();
     const rInner = maxRadius * 0.45;
     const rOuter = rInner + maxRadius * 0.25 * layer7Intensity;
@@ -306,13 +329,34 @@ export function generateMandalaLayers(doc, opts) {
   // ==================== L8: TEXTURAS ====================
   if (layer8Intensity > 0.1) {
     const pb = new PathBuilder();
-    const dotCount = Math.round(complexity * 4 * layer8Intensity);
-    for (let i = 0; i < dotCount; i++) {
-      const a = rFloat(rng, 0, Math.PI * 2);
-      const r = rFloat(rng, maxRadius * 0.1, maxRadius * 0.98);
-      const dotX = center.x + Math.cos(a) * r;
-      const dotY = center.y + Math.sin(a) * r;
-      addCirclePoly(pb, dotX, dotY, 0.4, 4);
+    if (normalizedStyleMode === "sashiko") {
+      // Trama de puntadas: líneas cortas repetitivas en anillos concéntricos
+      const ringCount = Math.max(3, Math.round(4 + layer8Intensity * 8));
+      for (let ring = 0; ring < ringCount; ring++) {
+        const t = ring / Math.max(1, ringCount - 1);
+        const rBase = _lerp(maxRadius * 0.2, maxRadius * 0.95, t);
+        const stitches = Math.max(24, Math.round(petals * (2.5 + layer8Intensity * 2.5) + ring * 8));
+        const stitchLen = maxRadius * (0.012 + layer8Intensity * 0.008);
+
+        for (let i = 0; i < stitches; i++) {
+          const a = (i / stitches) * Math.PI * 2 + ((ring % 2) * Math.PI / stitches);
+          const jitter = rFloat(rng, -0.6, 0.6);
+          const anchor = _polar0(rBase + jitter, a, center);
+          const tangent = a + Math.PI / 2;
+          const p1 = _polar0(stitchLen * 0.5, tangent, anchor);
+          const p2 = _polar0(stitchLen * 0.5, tangent + Math.PI, anchor);
+          pb.moveTo(p1.x, p1.y).lineTo(p2.x, p2.y);
+        }
+      }
+    } else {
+      const dotCount = Math.round(complexity * 4 * layer8Intensity);
+      for (let i = 0; i < dotCount; i++) {
+        const a = rFloat(rng, 0, Math.PI * 2);
+        const r = rFloat(rng, maxRadius * 0.1, maxRadius * 0.98);
+        const dotX = center.x + Math.cos(a) * r;
+        const dotY = center.y + Math.sin(a) * r;
+        addCirclePoly(pb, dotX, dotY, 0.4, 4);
+      }
     }
     paths.push(pb.toPath({ stroke, strokeWidthMm: fineStroke }));
   }
