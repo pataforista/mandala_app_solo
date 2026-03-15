@@ -231,9 +231,12 @@ export function generateMandalaRadial(doc, opts) {
   }
 
   // --- Helpers for natural look ---
+  // Use full seed bits for phase offsets to maximize variety across seeds
+  const _wPhase1 = ((seed ^ (seed >>> 16)) & 0xFFFF) * 9.587e-5;  // 0..6.28
+  const _wPhase2 = (((seed >>> 8) ^ (seed >>> 24)) & 0xFFFF) * 9.587e-5;
   function _wobble(val, intensity = 1.0) {
     if (organicLevel < 0.05) return val;
-    const noise = Math.sin(val * 17.3 + (seed % 100)) * 0.5 + Math.cos(val * 11.7 + (seed % 71)) * 0.3;
+    const noise = Math.sin(val * 17.3 + _wPhase1) * 0.5 + Math.cos(val * 11.7 + _wPhase2) * 0.3;
     return val + noise * organicLevel * intensity * 0.8;
   }
 
@@ -272,24 +275,24 @@ export function generateMandalaRadial(doc, opts) {
     const edgeMin = baseEdge * _lerp(0.95, 1.55, petalsPenalty);
 
     // factor de seguridad de área: mayor cuando densidad alta o petals alto
-    let areaFactor = 1.25; // Aumentado para el "Secret Sauce"
-    if (ring.density === "high") areaFactor += 0.35;
-    areaFactor += 0.50 * petalsPenalty;
+    let areaFactor = 1.0;
+    if (ring.density === “high”) areaFactor += 0.20;
+    areaFactor += 0.30 * petalsPenalty;
 
     // el anillo “frame” tolera un poco más subdiv (pero sin slivers)
-    if (ring.role === "frame") areaFactor = Math.max(1.10, areaFactor - 0.15);
+    if (ring.role === “frame”) areaFactor = Math.max(0.90, areaFactor - 0.10);
 
     // “rest” no subdivide por diseño (pero por si acaso)
-    if (ring.role === "rest") return false;
+    if (ring.role === “rest”) return false;
 
     // chequeos
     if (area < minCellAreaMm2 * areaFactor) return false;
-    if (arcW < edgeMin * 1.2) return false; // Thicker threshold for arcW
-    if (h < edgeMin * 1.1) return false;
+    if (arcW < edgeMin * 0.9) return false;
+    if (h < edgeMin * 0.9) return false;
 
     // extra: si está demasiado cerca del umbral, evita subdividir
-    const borderline = minCellAreaMm2 * areaFactor * 1.15;
-    if (area < borderline && rng() < 0.75) return false;
+    const borderline = minCellAreaMm2 * areaFactor * 1.10;
+    if (area < borderline && rng() < 0.60) return false;
 
     return true;
   }
