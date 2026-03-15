@@ -60,7 +60,7 @@ const DEFAULTS = {
   strokeWidth: 0.6,
   frames: true,
   pageBorder: true,
-  styleMode: "hashiko",
+  styleMode: "sashiko",
   layer1Intensity: 0.8,
   layer2Intensity: 0.6,
   layer3Intensity: 0.7,
@@ -77,25 +77,25 @@ const STRUCTURE_PRESETS = {
   custom: null,
   simple: {
     petals: 10, complexity: 55, organic: 0.15, strokeWidth: 1.1,
-    styleMode: "hashiko", layer1Intensity: 0.6, layer2Intensity: 0.5, layer3Intensity: 0.35,
+    styleMode: "sashiko", layer1Intensity: 0.6, layer2Intensity: 0.5, layer3Intensity: 0.35,
     layer4Intensity: 0.45, layer5Intensity: 0.2, layer6Intensity: 0.5, layer7Intensity: 0.25, layer8Intensity: 0.05,
     frames: true, pageBorder: true,
   },
   balanced: {
     petals: 12, complexity: 110, organic: 0.2, strokeWidth: 0.7,
-    styleMode: "hashiko", layer1Intensity: 0.8, layer2Intensity: 0.7, layer3Intensity: 0.65,
+    styleMode: "sashiko", layer1Intensity: 0.8, layer2Intensity: 0.7, layer3Intensity: 0.65,
     layer4Intensity: 0.65, layer5Intensity: 0.45, layer6Intensity: 0.7, layer7Intensity: 0.5, layer8Intensity: 0.25,
     frames: true, pageBorder: true,
   },
   detailed: {
     petals: 24, complexity: 220, organic: 0.35, strokeWidth: 0.45,
-    styleMode: "hashiko", layer1Intensity: 0.9, layer2Intensity: 0.95, layer3Intensity: 0.9,
+    styleMode: "sashiko", layer1Intensity: 0.9, layer2Intensity: 0.95, layer3Intensity: 0.9,
     layer4Intensity: 0.9, layer5Intensity: 0.85, layer6Intensity: 0.9, layer7Intensity: 0.8, layer8Intensity: 0.6,
     frames: true, pageBorder: true,
   },
   botanical: {
     petals: 14, complexity: 135, organic: 0.8, strokeWidth: 0.65,
-    styleMode: "hashiko", layer1Intensity: 0.7, layer2Intensity: 0.75, layer3Intensity: 0.85,
+    styleMode: "floral", layer1Intensity: 0.7, layer2Intensity: 0.75, layer3Intensity: 0.85,
     layer4Intensity: 0.55, layer5Intensity: 0.4, layer6Intensity: 0.7, layer7Intensity: 0.95, layer8Intensity: 0.3,
     frames: true, pageBorder: true,
   },
@@ -114,6 +114,8 @@ const state = getStateFromURL(DEFAULTS);
 if (typeof state.frames === "string") state.frames = state.frames === "true";
 if (typeof state.pageBorder === "string") state.pageBorder = state.pageBorder === "true";
 if (!STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
+
+if (state.styleMode === "hashiko") state.styleMode = "sashiko";
 
 if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
   throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
