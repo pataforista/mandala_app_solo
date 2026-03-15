@@ -7,6 +7,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 
 const historyMan = new StateHistory();
+let listenersBound = false;
 
 const stage = document.getElementById("stage");
 const presetEl = document.getElementById("preset");
@@ -16,6 +17,8 @@ const complexityEl = document.getElementById("complexity");
 const organicEl = document.getElementById("organic");
 
 const seedInputEl = document.getElementById("seed");
+const structurePresetEl = document.getElementById("structurePreset");
+const applyStructureBtn = document.getElementById("applyStructure");
 
 const strokeWidthEl = document.getElementById("strokeWidth");
 const framesEl = document.getElementById("frames");
@@ -67,6 +70,41 @@ const DEFAULTS = {
   layer7Intensity: 0.6,
   layer8Intensity: 0.3,
   seed: randomSeed32() >>> 0,
+  structurePreset: "custom",
+};
+
+const STRUCTURE_PRESETS = {
+  custom: null,
+  simple: {
+    petals: 10, complexity: 55, organic: 0.15, strokeWidth: 1.1,
+    styleMode: "hashiko", layer1Intensity: 0.6, layer2Intensity: 0.5, layer3Intensity: 0.35,
+    layer4Intensity: 0.45, layer5Intensity: 0.2, layer6Intensity: 0.5, layer7Intensity: 0.25, layer8Intensity: 0.05,
+    frames: true, pageBorder: true,
+  },
+  balanced: {
+    petals: 12, complexity: 110, organic: 0.2, strokeWidth: 0.7,
+    styleMode: "hashiko", layer1Intensity: 0.8, layer2Intensity: 0.7, layer3Intensity: 0.65,
+    layer4Intensity: 0.65, layer5Intensity: 0.45, layer6Intensity: 0.7, layer7Intensity: 0.5, layer8Intensity: 0.25,
+    frames: true, pageBorder: true,
+  },
+  detailed: {
+    petals: 24, complexity: 220, organic: 0.35, strokeWidth: 0.45,
+    styleMode: "hashiko", layer1Intensity: 0.9, layer2Intensity: 0.95, layer3Intensity: 0.9,
+    layer4Intensity: 0.9, layer5Intensity: 0.85, layer6Intensity: 0.9, layer7Intensity: 0.8, layer8Intensity: 0.6,
+    frames: true, pageBorder: true,
+  },
+  botanical: {
+    petals: 14, complexity: 135, organic: 0.8, strokeWidth: 0.65,
+    styleMode: "hashiko", layer1Intensity: 0.7, layer2Intensity: 0.75, layer3Intensity: 0.85,
+    layer4Intensity: 0.55, layer5Intensity: 0.4, layer6Intensity: 0.7, layer7Intensity: 0.95, layer8Intensity: 0.3,
+    frames: true, pageBorder: true,
+  },
+  geometric: {
+    petals: 18, complexity: 160, organic: 0.05, strokeWidth: 0.55,
+    styleMode: "geometric", layer1Intensity: 0.85, layer2Intensity: 0.8, layer3Intensity: 0.75,
+    layer4Intensity: 0.9, layer5Intensity: 0.6, layer6Intensity: 0.8, layer7Intensity: 0.0, layer8Intensity: 0.2,
+    frames: true, pageBorder: true,
+  },
 };
 
 const recentSeeds = [];
@@ -75,8 +113,9 @@ const state = getStateFromURL(DEFAULTS);
 
 if (typeof state.frames === "string") state.frames = state.frames === "true";
 if (typeof state.pageBorder === "string") state.pageBorder = state.pageBorder === "true";
+if (!STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
 
-if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl) {
+if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
   throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
 }
 
@@ -86,6 +125,19 @@ function clampInt(v, a, b) {
 
 function clampFloat(v, a, b) {
   return Math.max(a, Math.min(b, parseFloat(v) || 0));
+}
+
+
+function applyStructurePreset(presetKey) {
+  const preset = STRUCTURE_PRESETS[presetKey];
+  if (!preset) return false;
+
+  Object.entries(preset).forEach(([key, value]) => {
+    state[key] = value;
+  });
+
+  state.structurePreset = presetKey;
+  return true;
 }
 
 function getCurrentDoc() {
@@ -217,12 +269,16 @@ function bindUI() {
   layer7IntensityEl.value = String(state.layer7Intensity);
   layer8IntensityEl.value = String(state.layer8Intensity);
 
+  structurePresetEl.value = state.structurePreset;
   seedInputEl.value = String(state.seed);
 
   const update = () => {
     setStateToURL(state);
     render();
   };
+
+  if (listenersBound) return;
+  listenersBound = true;
 
   undoBtn.onclick = () => {
     const prev = historyMan.undo();
@@ -263,83 +319,126 @@ function bindUI() {
 
   presetEl.addEventListener("sl-change", () => {
     state.preset = presetEl.value;
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
     update();
   });
 
   petalsEl.addEventListener("sl-input", () => {
     state.petals = clampInt(petalsEl.value, 6, 96);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   petalsEl.addEventListener("sl-change", update);
 
   complexityEl.addEventListener("sl-input", () => {
     state.complexity = clampInt(complexityEl.value, 20, 320);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   complexityEl.addEventListener("sl-change", update);
 
   organicEl.addEventListener("sl-input", () => {
     state.organic = clampFloat(organicEl.value, 0, 1);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   organicEl.addEventListener("sl-change", update);
 
   strokeWidthEl.addEventListener("sl-input", () => {
     state.strokeWidth = clampFloat(strokeWidthEl.value, 0.1, 5.0);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   strokeWidthEl.addEventListener("sl-change", update);
 
   framesEl.addEventListener("sl-change", () => {
     state.frames = framesEl.checked;
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
     update();
   });
 
   pageBorderEl.addEventListener("sl-change", () => {
     state.pageBorder = pageBorderEl.checked;
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
     update();
   });
 
   styleModeEl.addEventListener("sl-change", () => {
     state.styleMode = styleModeEl.value;
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
     update();
   });
 
   layer1IntensityEl.addEventListener("sl-input", () => {
     state.layer1Intensity = clampFloat(layer1IntensityEl.value, 0, 1);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   layer1IntensityEl.addEventListener("sl-change", update);
 
   layer2IntensityEl.addEventListener("sl-input", () => {
     state.layer2Intensity = clampFloat(layer2IntensityEl.value, 0, 1);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   layer2IntensityEl.addEventListener("sl-change", update);
 
   layer3IntensityEl.addEventListener("sl-input", () => {
     state.layer3Intensity = clampFloat(layer3IntensityEl.value, 0, 1);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   layer3IntensityEl.addEventListener("sl-change", update);
 
   layer4IntensityEl.addEventListener("sl-input", () => {
     state.layer4Intensity = clampFloat(layer4IntensityEl.value, 0, 1);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   layer4IntensityEl.addEventListener("sl-change", update);
 
   layer5IntensityEl.addEventListener("sl-input", () => {
     state.layer5Intensity = clampFloat(layer5IntensityEl.value, 0, 1);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   layer5IntensityEl.addEventListener("sl-change", update);
 
   layer6IntensityEl.addEventListener("sl-input", () => {
     state.layer6Intensity = clampFloat(layer6IntensityEl.value, 0, 1);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   layer6IntensityEl.addEventListener("sl-change", update);
 
   layer7IntensityEl.addEventListener("sl-input", () => {
     state.layer7Intensity = clampFloat(layer7IntensityEl.value, 0, 1);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   layer7IntensityEl.addEventListener("sl-change", update);
 
   layer8IntensityEl.addEventListener("sl-input", () => {
     state.layer8Intensity = clampFloat(layer8IntensityEl.value, 0, 1);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
   });
   layer8IntensityEl.addEventListener("sl-change", update);
+
+  structurePresetEl.addEventListener("sl-change", () => {
+    state.structurePreset = structurePresetEl.value || "custom";
+  });
+
+  applyStructureBtn.addEventListener("click", () => {
+    if (applyStructurePreset(state.structurePreset)) {
+      bindUI();
+      update();
+    }
+  });
 
   regenBtn.addEventListener("click", () => {
     state.seed = randomSeed32() >>> 0;
