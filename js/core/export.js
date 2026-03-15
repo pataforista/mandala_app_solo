@@ -184,14 +184,45 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       doc.addImage(imageData, "PNG", x, y, w, h);
 
       if (quote) {
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "italic");
-        const splitText = doc.splitTextToSize(quote.frase, w * 0.8);
-        doc.text(splitText, x + w / 2, y + h - 15, { align: "center" });
+        const textWidth = w * 0.8;
+        const spacing = 3;
 
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.text(quote.id || "", x + w / 2, y + h - 5, { align: "center" });
+        // Decorative separator line (optional but elegant)
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.2);
+        doc.line(x + w * 0.1, y + h + 4, x + w * 0.9, y + h + 4);
+
+        // Main quote text - larger and elegant
+        doc.setFontSize(13);
+        doc.setFont("times", "italic");
+        doc.setTextColor(40, 40, 40);
+        const splitText = doc.splitTextToSize(quote.frase, textWidth);
+        const lineHeight = 5.5;
+        const textHeight = splitText.length * lineHeight;
+        let textY = y + h + 10;
+
+        doc.text(splitText, x + w / 2, textY, { align: "center", lineHeightFactor: 1.3 });
+        textY += textHeight + 3;
+
+        // Attribution line - elegant and smaller
+        doc.setFontSize(10);
+        doc.setFont("times", "normal");
+        doc.setTextColor(100, 100, 100);
+
+        // Build attribution: use linaje (tradition) and categoria (theme)
+        let attribution = "Centro de Salud Integral Taoísta";
+        if (quote.linaje) {
+          const linaje = quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1);
+          const categoria = quote.categoria
+            ? " • " + quote.categoria.charAt(0).toUpperCase() + quote.categoria.slice(1)
+            : "";
+          attribution = linaje + categoria;
+        }
+
+        doc.text("— " + attribution + " —", x + w / 2, textY + 2, { align: "center" });
+
+        // Reset text color
+        doc.setTextColor(0, 0, 0);
       }
     };
 
