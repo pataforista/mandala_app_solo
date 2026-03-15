@@ -5,30 +5,36 @@ export function downloadTextFile(filename, text) {
 }
 
 export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 300) {
-  const { Resvg, initWasm } = await import("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/wasm.js");
-
   try {
-    await initWasm("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/index_bg.wasm");
-  } catch (e) {
-    // Already initialized or failed
+    const { Resvg, initWasm } = await import("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/wasm.js");
+
+    try {
+      await initWasm("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/index_bg.wasm");
+    } catch (e) {
+      console.warn("WASM initialization failed, but continuing", e);
+    }
+
+    const pixelDensity = dpi / 25.4;
+    const wPx = Math.ceil(widthMm * pixelDensity);
+    const hPx = Math.ceil(heightMm * pixelDensity);
+
+    const resvg = new Resvg(svgString, {
+      fitTo: {
+        mode: 'width',
+        value: wPx,
+      },
+      background: '#ffffff'
+    });
+
+    const pngData = resvg.render();
+    const pngBuffer = pngData.asPng();
+    const blob = new Blob([pngBuffer], { type: "image/png" });
+    saveBlob(blob, filename);
+  } catch (error) {
+    console.error("PNG download failed:", error);
+    alert("❌ Error: No se pudo descargar PNG.\n\nIntenta de nuevo o usa SVG como alternativa.\n\nDetalles: " + (error.message || String(error)));
+    throw error;
   }
-
-  const pixelDensity = dpi / 25.4;
-  const wPx = Math.ceil(widthMm * pixelDensity);
-  const hPx = Math.ceil(heightMm * pixelDensity);
-
-  const resvg = new Resvg(svgString, {
-    fitTo: {
-      mode: 'width',
-      value: wPx,
-    },
-    background: '#ffffff'
-  });
-
-  const pngData = resvg.render();
-  const pngBuffer = pngData.asPng();
-  const blob = new Blob([pngBuffer], { type: "image/png" });
-  saveBlob(blob, filename);
 }
 
 /**
@@ -36,62 +42,74 @@ export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 
  * Uses jsPDF. For complex SVG, we flatten it and then render.
  */
 export async function downloadPdf(filename, svgEl, widthMm, heightMm) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({
-    orientation: widthMm > heightMm ? "landscape" : "portrait",
-    unit: "mm",
-    format: [widthMm, heightMm]
-  });
+  try {
+    if (!window.jspdf) {
+      throw new Error("jsPDF no está disponible. Verifica tu conexión.");
+    }
 
-  // Flatten SVG to remove <use> references for simpler PDF rendering
-  const flatSvg = flattenSvgElement(svgEl.cloneNode(true));
-
-  // High-fidelity vector export
-  // We use a simplified approach for now: render SVG to canvas at high scale, then put to PDF
-  // OR use svg2pdf if available. Since we only have jsPDF, we'll use a high-res raster fallback 
-  // embedded in a vector container, until we add svg2pdf.
-
-  // EXPERIMENT: Let's try to add svg2pdf.js dynamically
-  const svg2pdfUrl = "https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.min.js";
-  if (!window.svg2pdf) {
-    await new Promise(resolve => {
-      const s = document.createElement("script");
-      s.src = svg2pdfUrl;
-      s.onload = resolve;
-      document.head.appendChild(s);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: widthMm > heightMm ? "landscape" : "portrait",
+      unit: "mm",
+      format: [widthMm, heightMm]
     });
+
+    // Flatten SVG to remove <use> references for simpler PDF rendering
+    const flatSvg = flattenSvgElement(svgEl.cloneNode(true));
+
+    // Load svg2pdf.js dynamically if not already loaded
+    const svg2pdfUrl = "https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.min.js";
+    if (!window.svg2pdf) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = svg2pdfUrl;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error("No se pudo cargar svg2pdf.js desde CDN"));
+        document.head.appendChild(s);
+      });
+    }
+
+    await doc.svg(flatSvg, {
+      x: 0,
+      y: 0,
+      width: widthMm,
+      height: heightMm
+    });
+
+    doc.save(filename);
+  } catch (error) {
+    console.error("PDF download failed:", error);
+    alert("❌ Error: No se pudo descargar PDF.\n\n" + (error.message || "Intenta de nuevo más tarde."));
+    throw error;
   }
-
-  await doc.svg(flatSvg, {
-    x: 0,
-    y: 0,
-    width: widthMm,
-    height: heightMm
-  });
-
-  doc.save(filename);
 }
 
 /**
  * Batch PDF Export (Coloring Book) with multi-layout support
  */
 export async function downloadBatchPdf(filename, states, generateFn, widthMm, heightMm, layout = "classic", quotes = []) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({
-    orientation: widthMm > heightMm ? "landscape" : "portrait",
-    unit: "mm",
-    format: [widthMm, heightMm]
-  });
+  try {
+    if (!window.jspdf) {
+      throw new Error("jsPDF no está disponible. Verifica tu conexión.");
+    }
 
-  const svg2pdfUrl = "https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.min.js";
-  if (!window.svg2pdf) {
-    await new Promise(resolve => {
-      const s = document.createElement("script");
-      s.src = svg2pdfUrl;
-      s.onload = resolve;
-      document.head.appendChild(s);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: widthMm > heightMm ? "landscape" : "portrait",
+      unit: "mm",
+      format: [widthMm, heightMm]
     });
-  }
+
+    const svg2pdfUrl = "https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.min.js";
+    if (!window.svg2pdf) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = svg2pdfUrl;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error("No se pudo cargar svg2pdf.js desde CDN"));
+        document.head.appendChild(s);
+      });
+    }
 
   const margin = 12;
   const drawMandala = async (state, x, y, w, h, quote = null) => {
@@ -203,7 +221,12 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
     }
   }
 
-  doc.save(filename);
+    doc.save(filename);
+  } catch (error) {
+    console.error("Batch PDF download failed:", error);
+    alert("❌ Error: No se pudo descargar PDF de lote.\n\n" + (error.message || "Intenta de nuevo más tarde."));
+    throw error;
+  }
 }
 
 

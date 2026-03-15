@@ -580,26 +580,31 @@ function bindUI() {
   // Download menu handler
   const downloadMenu = document.getElementById("downloadMenu");
   if (downloadMenu) {
-    downloadMenu.addEventListener("sl-select", (event) => {
+    downloadMenu.addEventListener("sl-select", async (event) => {
       const item = event.detail.item;
       const id = item.id;
-      
-      if (id === "download") {
-        const svg = stage.querySelector("svg");
-        if (!svg) return;
-        const filename = `mandala_${state.preset}_seed_${state.seed}.svg`;
-        downloadTextFile(filename, svg.outerHTML);
-      } else if (id === "downloadPng") {
-        const svg = stage.querySelector("svg");
-        if (!svg) return;
-        const doc = getCurrentDoc();
-        const filename = `mandala_${state.preset}_seed_${state.seed}_300dpi.png`;
-        const { wMm, hMm } = doc.page;
-        downloadPng(filename, svg.outerHTML, wMm, hMm, 300);
-      } else if (id === "downloadPdf") {
-        downloadManualPdf();
-      } else if (id === "share") {
-        shareBtnHandler();
+
+      try {
+        if (id === "download") {
+          const svg = stage.querySelector("svg");
+          if (!svg) return;
+          const filename = `mandala_${state.preset}_seed_${state.seed}.svg`;
+          downloadTextFile(filename, svg.outerHTML);
+        } else if (id === "downloadPng") {
+          const svg = stage.querySelector("svg");
+          if (!svg) return;
+          const doc = getCurrentDoc();
+          const filename = `mandala_${state.preset}_seed_${state.seed}_300dpi.png`;
+          const { wMm, hMm } = doc.page;
+          await downloadPng(filename, svg.outerHTML, wMm, hMm, 300);
+        } else if (id === "downloadPdf") {
+          await downloadManualPdf();
+        } else if (id === "share") {
+          await shareBtnHandler();
+        }
+      } catch (error) {
+        console.error("Download error:", error);
+        // Error alerts are already shown in the download functions
       }
     });
   }
@@ -680,6 +685,10 @@ function bindUI() {
     try {
       // We use downloadBatchPdf even for single pages because it handles layouts
       await downloadBatchPdf(filename, batchOpts, generateMandalaLayers, wMm, hMm, layout, quotes);
+    } catch (error) {
+      console.error("PDF download error:", error);
+      // Error alert is shown in downloadBatchPdf
+      throw error;
     } finally {
       if (downloadPdfSidebar) {
         downloadPdfSidebar.loading = false;
