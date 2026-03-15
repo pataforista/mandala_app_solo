@@ -184,14 +184,18 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       doc.addImage(imageData, "PNG", x, y, w, h);
 
       if (quote) {
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "italic");
-        const splitText = doc.splitTextToSize(quote.frase, w * 0.8);
-        doc.text(splitText, x + w / 2, y + h - 15, { align: "center" });
+        // Main quote text - larger and better formatted
+        doc.setFontSize(14);
+        doc.setFont("times", "italic");
+        const splitText = doc.splitTextToSize(quote.frase, w * 0.85);
+        const quoteY = y + h - (splitText.length * 5 + 20);
+        doc.text(splitText, x + w / 2, quoteY, { align: "center" });
 
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.text(quote.id || "", x + w / 2, y + h - 5, { align: "center" });
+        // Attribution line - smaller, elegant
+        doc.setFontSize(10);
+        doc.setFont("times", "normal");
+        const author = quote.linaje ? quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1) : "Anónimo";
+        doc.text(author, x + w / 2, y + h - 8, { align: "center" });
       }
     };
 
