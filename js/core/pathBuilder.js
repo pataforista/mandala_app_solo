@@ -23,8 +23,8 @@ export class PathBuilder {
 }
 
 function fmt(n) {
-  // SVG con mm; 2-3 decimales es suficiente para impresión sin inflar el archivo
-  return (Math.round(n * 1000) / 1000).toString();
+  // SVG con mm; 2 decimales es suficiente para 300dpi print (0.01mm = 0.12px)
+  return (Math.round(n * 100) / 100).toString();
 }
 
 function esc(s) {

@@ -52,6 +52,9 @@ const closeGalleryBtn = document.getElementById("closeGallery");
 const seedText = document.getElementById("seedText");
 const pathsText = document.getElementById("pathsText");
 
+const kaleidoscopeEl = document.getElementById("kaleidoscope");
+const texturesEl = document.getElementById("textures");
+
 const DEFAULTS = {
   preset: "A4",
   petals: 12,
@@ -60,6 +63,8 @@ const DEFAULTS = {
   strokeWidth: 0.55,
   frames: true,
   pageBorder: true,
+  kaleidoscope: true,
+  textures: true,
   styleMode: "sashiko",
   layer1Intensity: 0.85,
   layer2Intensity: 0.75,
@@ -137,6 +142,8 @@ const state = getStateFromURL(DEFAULTS);
 
 if (typeof state.frames === "string") state.frames = state.frames === "true";
 if (typeof state.pageBorder === "string") state.pageBorder = state.pageBorder === "true";
+if (typeof state.kaleidoscope === "string") state.kaleidoscope = state.kaleidoscope === "true";
+if (typeof state.textures === "string") state.textures = state.textures === "true";
 if (!STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
 
 if (state.styleMode === "hashiko") state.styleMode = "sashiko";
@@ -187,6 +194,8 @@ function render() {
     organicLevel: state.organic,
     includeFrames: state.frames,
     pageBorder: state.pageBorder,
+    kaleidoscope: state.kaleidoscope,
+    textures: state.textures,
     styleMode: state.styleMode,
     layer1Intensity: state.layer1Intensity,
     layer2Intensity: state.layer2Intensity,
@@ -233,13 +242,27 @@ async function refreshGallery() {
       const card = document.createElement("div");
       card.style = "border: 1px solid #ddd; padding: 8px; border-radius: 8px; background: #fff; display: flex; flex-direction: column; gap: 8px;";
 
+      const thumbHtml = fav.thumbnail
+        ? `<div style="width:100%; aspect-ratio:1; overflow:hidden; border-radius:6px; background:#fafafa; display:flex; align-items:center; justify-content:center;">${fav.thumbnail}</div>`
+        : '';
+
       card.innerHTML = `
-        <div style="font-size: 0.8rem; color: #666;">Seed: ${fav.state.seed}</div>
+        ${thumbHtml}
+        <div style="font-size: 0.8rem; color: #666;">Seed: ${fav.state.seed} | ${fav.state.styleMode || '?'}</div>
         <div style="display: flex; gap: 4px;">
           <sl-button size="small" variant="primary" style="flex: 1;" class="load-fav">Cargar</sl-button>
           <sl-button size="small" variant="danger" class="delete-fav"><sl-icon name="trash"></sl-icon></sl-button>
         </div>
       `;
+
+      // Scale thumbnail SVG to fit card
+      const thumbSvg = card.querySelector("svg");
+      if (thumbSvg) {
+        thumbSvg.removeAttribute("width");
+        thumbSvg.removeAttribute("height");
+        thumbSvg.style.width = "100%";
+        thumbSvg.style.height = "auto";
+      }
 
       card.querySelector(".load-fav").onclick = () => {
         Object.assign(state, fav.state);
@@ -284,6 +307,8 @@ function bindUI() {
   strokeWidthEl.value = String(state.strokeWidth);
   framesEl.checked = state.frames;
   pageBorderEl.checked = state.pageBorder;
+  kaleidoscopeEl.checked = state.kaleidoscope;
+  texturesEl.checked = state.textures;
 
   styleModeEl.value = state.styleMode;
   layer1IntensityEl.value = String(state.layer1Intensity);
@@ -327,7 +352,9 @@ function bindUI() {
   };
 
   saveFavBtn.onclick = async () => {
-    await saveToFavorites(state);
+    const svgEl = stage.querySelector("svg");
+    const thumbnail = svgEl ? svgEl.outerHTML : null;
+    await saveToFavorites(state, thumbnail);
     alert("¡Guardado en favoritos!");
   };
 
@@ -389,6 +416,16 @@ function bindUI() {
     state.pageBorder = pageBorderEl.checked;
     state.structurePreset = "custom";
     structurePresetEl.value = "custom";
+    update();
+  });
+
+  kaleidoscopeEl.addEventListener("sl-change", () => {
+    state.kaleidoscope = kaleidoscopeEl.checked;
+    update();
+  });
+
+  texturesEl.addEventListener("sl-change", () => {
+    state.textures = texturesEl.checked;
     update();
   });
 
@@ -466,6 +503,21 @@ function bindUI() {
     }
   });
 
+  const prevSeedBtn = document.getElementById("prevSeed");
+  const nextSeedBtn = document.getElementById("nextSeed");
+
+  prevSeedBtn.addEventListener("click", () => {
+    state.seed = ((state.seed >>> 0) - 1) >>> 0;
+    seedInputEl.value = String(state.seed);
+    update();
+  });
+
+  nextSeedBtn.addEventListener("click", () => {
+    state.seed = ((state.seed >>> 0) + 1) >>> 0;
+    seedInputEl.value = String(state.seed);
+    update();
+  });
+
   regenBtn.addEventListener("click", () => {
     state.seed = randomSeed32() >>> 0;
     update();
@@ -497,21 +549,48 @@ function bindUI() {
   });
 
   const downloadBookBtn = document.getElementById("downloadBook");
+  const bookPageCountEl = document.getElementById("bookPageCount");
   downloadBookBtn.addEventListener("click", async () => {
     const doc = getCurrentDoc();
     const { wMm, hMm } = doc.page;
-    const count = 5; // Default batch size
-    const filename = `mandala_coloring_book_${state.seed}.pdf`;
+    const count = parseInt(bookPageCountEl.value, 10) || 10;
+    const filename = `mandala_coloring_book_${count}p_seed${state.seed}.pdf`;
 
-    // Create a list of 5 variations based on the current state but different seeds
-    const batchStates = Array.from({ length: count }, (_, i) => ({
-      ...state,
-      seed: (state.seed + i * 1234567) >>> 0
-    }));
+    // Build proper generator opts for each page
+    const buildOpts = (s) => ({
+      seed: s.seed,
+      petals: s.petals,
+      complexity: s.complexity,
+      strokeWidthMm: s.strokeWidth,
+      organicLevel: s.organic,
+      includeFrames: s.frames,
+      pageBorder: s.pageBorder,
+      kaleidoscope: s.kaleidoscope,
+      textures: s.textures,
+      styleMode: s.styleMode,
+      layer1Intensity: s.layer1Intensity,
+      layer2Intensity: s.layer2Intensity,
+      layer3Intensity: s.layer3Intensity,
+      layer4Intensity: s.layer4Intensity,
+      layer5Intensity: s.layer5Intensity,
+      layer6Intensity: s.layer6Intensity,
+      layer7Intensity: s.layer7Intensity,
+      layer8Intensity: s.layer8Intensity,
+    });
 
-    alert(`Generando un libro de ${count} mandalas... Por favor, espera.`);
+    const batchOpts = Array.from({ length: count }, (_, i) =>
+      buildOpts({ ...state, seed: (state.seed + i * 1234567) >>> 0 })
+    );
 
-    await downloadBatchPdf(filename, batchStates, generateMandalaLayers, wMm, hMm);
+    downloadBookBtn.loading = true;
+    downloadBookBtn.disabled = true;
+
+    try {
+      await downloadBatchPdf(filename, batchOpts, generateMandalaLayers, wMm, hMm);
+    } finally {
+      downloadBookBtn.loading = false;
+      downloadBookBtn.disabled = false;
+    }
   });
 
   shareBtn.addEventListener("click", async () => {
@@ -533,11 +612,38 @@ function bindUI() {
     }
   });
 
+  // Keyboard shortcuts for rapid production
   window.addEventListener("keydown", (e) => {
-    if (e.key.toLowerCase() !== "f") return;
-    const svg = stage.querySelector("svg");
-    if (!svg) return;
-    flattenSvgElement(svg);
+    // Ignore if typing in an input
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+
+    const key = e.key.toLowerCase();
+
+    if (key === "f") {
+      const svg = stage.querySelector("svg");
+      if (svg) flattenSvgElement(svg);
+    } else if (key === "arrowright" || key === "n") {
+      // Next seed
+      state.seed = ((state.seed >>> 0) + 1) >>> 0;
+      seedInputEl.value = String(state.seed);
+      update();
+    } else if (key === "arrowleft" || key === "p") {
+      // Previous seed
+      state.seed = ((state.seed >>> 0) - 1) >>> 0;
+      seedInputEl.value = String(state.seed);
+      update();
+    } else if (key === " " || key === "r") {
+      // Random seed
+      e.preventDefault();
+      state.seed = randomSeed32() >>> 0;
+      seedInputEl.value = String(state.seed);
+      update();
+    } else if (key === "s" && !e.ctrlKey && !e.metaKey) {
+      // Quick save to favorites
+      const svgEl = stage.querySelector("svg");
+      const thumbnail = svgEl ? svgEl.outerHTML : null;
+      saveToFavorites(state, thumbnail);
+    }
   });
 }
 

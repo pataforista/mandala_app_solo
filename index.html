@@ -174,6 +174,12 @@
             <sl-icon slot="prefix" name="book"></sl-icon>
             Libro
           </sl-button>
+          <sl-select id="bookPageCount" value="10" size="small" style="width: 80px;" help-text="Páginas">
+            <sl-option value="5">5</sl-option>
+            <sl-option value="10">10</sl-option>
+            <sl-option value="20">20</sl-option>
+            <sl-option value="50">50</sl-option>
+          </sl-select>
         </div>
       </div>
 
@@ -225,6 +231,10 @@
           </sl-button>
           <sl-input id="seed" type="number" label="Seed" size="small" style="width: 120px;" value="1"
             help-text="Semilla aleatoria"></sl-input>
+          <div style="display:flex; gap:2px; align-items:flex-end; padding-bottom:2px;">
+            <sl-icon-button id="prevSeed" name="chevron-left" label="Seed anterior" style="font-size:1.1rem;"></sl-icon-button>
+            <sl-icon-button id="nextSeed" name="chevron-right" label="Seed siguiente" style="font-size:1.1rem;"></sl-icon-button>
+          </div>
         </fieldset>
 
         <div style="display:flex; gap:20px; flex-wrap:wrap;">
@@ -313,9 +323,10 @@
         </sl-button>
       </div>
 
-      <div style="font-size:0.8rem; color:#666; margin-top:4px;">
-        <span class="meta">Seed: <b id="seedText">—</b></span> <span style="margin:0 6px;">|</span>
-        <span class="meta">Paths: <b id="pathsText">—</b></span>
+      <div style="font-size:0.8rem; color:#666; margin-top:4px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+        <span class="meta">Seed: <b id="seedText">—</b></span> <span style="margin:0 2px;">|</span>
+        <span class="meta">Paths: <b id="pathsText">—</b></span> <span style="margin:0 2px;">|</span>
+        <span style="color:#999; font-size:0.7rem;">Atajos: <b>&larr;&rarr;</b> seed &middot; <b>Space/R</b> random &middot; <b>S</b> favorito</span>
       </div>
     </div>
   </header>

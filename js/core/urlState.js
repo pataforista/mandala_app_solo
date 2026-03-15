@@ -1,6 +1,5 @@
 // js/core/urlState.js
-// URL state: reproducibilidad por seed + parámetros compartibles
-// Soporta: preset, petals, complexity, seed, mode, zPreset
+// URL state: reproducibilidad por seed + TODOS los parámetros compartibles
 
 export function randomSeed32() {
   const a = new Uint32Array(1);
@@ -8,33 +7,49 @@ export function randomSeed32() {
   return (a[0] >>> 0);
 }
 
+// All params that should be persisted in URL
+const INT_PARAMS = ["petals", "complexity", "seed"];
+const FLOAT_PARAMS = ["organic", "strokeWidth",
+  "layer1Intensity", "layer2Intensity", "layer3Intensity", "layer4Intensity",
+  "layer5Intensity", "layer6Intensity", "layer7Intensity", "layer8Intensity"];
+const STRING_PARAMS = ["preset", "styleMode", "structurePreset"];
+const BOOL_PARAMS = ["frames", "pageBorder", "kaleidoscope", "textures"];
+
 export function getStateFromURL(defaults) {
   try {
     const u = new URL(location.href);
+    const result = { ...defaults };
 
-    const preset = u.searchParams.get("preset") ?? defaults.preset;
-    const mode = u.searchParams.get("mode") ?? (defaults.mode ?? "mandala");
+    for (const k of STRING_PARAMS) {
+      const v = u.searchParams.get(k);
+      if (v != null) result[k] = String(v);
+    }
 
-    const petals = parseInt(u.searchParams.get("petals") ?? String(defaults.petals), 10);
-    const complexity = parseInt(u.searchParams.get("complexity") ?? String(defaults.complexity), 10);
-    const seed = parseInt(u.searchParams.get("seed") ?? String(defaults.seed), 10);
+    for (const k of INT_PARAMS) {
+      const v = u.searchParams.get(k);
+      if (v != null) {
+        const n = parseInt(v, 10);
+        if (k === "seed") result[k] = Number.isFinite(n) ? (n >>> 0) : defaults[k];
+        else result[k] = Number.isFinite(n) ? n : defaults[k];
+      }
+    }
 
-    const zPreset = u.searchParams.get("zPreset") ?? (defaults.zPreset ?? "editorial_premium");
-    const cellCount = parseInt(u.searchParams.get("cellCount") ?? String(defaults.cellCount), 10);
-    const minCellSizeMm = parseInt(u.searchParams.get("minCellSizeMm") ?? String(defaults.minCellSizeMm), 10);
+    for (const k of FLOAT_PARAMS) {
+      const v = u.searchParams.get(k);
+      if (v != null) {
+        const n = parseFloat(v);
+        if (Number.isFinite(n)) result[k] = n;
+      }
+    }
 
-    return {
-      preset: String(preset),
-      mode: normalizeMode(mode),
-      petals: safeInt(petals, defaults.petals),
-      complexity: safeInt(complexity, defaults.complexity),
-      seed: Number.isFinite(seed) ? (seed >>> 0) : (defaults.seed >>> 0),
-      zPreset: String(zPreset),
-      cellCount: safeInt(cellCount, defaults.cellCount),
-      minCellSizeMm: safeInt(minCellSizeMm, defaults.minCellSizeMm),
-    };
+    for (const k of BOOL_PARAMS) {
+      const v = u.searchParams.get(k);
+      if (v != null) result[k] = v === "true" || v === "1";
+    }
+
+    return result;
   } catch {
-    return { ...defaults, mode: defaults.mode ?? "mandala" };
+    return { ...defaults };
   }
 }
 
@@ -42,30 +57,26 @@ export function setStateToURL(state) {
   try {
     const u = new URL(location.href);
 
-    u.searchParams.set("preset", String(state.preset));
-    u.searchParams.set("mode", normalizeMode(state.mode));
+    for (const k of STRING_PARAMS) {
+      if (state[k] != null) u.searchParams.set(k, String(state[k]));
+    }
 
-    u.searchParams.set("petals", String(((state.petals ?? 12) | 0)));
-    u.searchParams.set("complexity", String(((state.complexity ?? 110) | 0)));
-    u.searchParams.set("seed", String(((state.seed ?? 0) >>> 0)));
+    for (const k of INT_PARAMS) {
+      if (state[k] != null) {
+        u.searchParams.set(k, String(k === "seed" ? (state[k] >>> 0) : (state[k] | 0)));
+      }
+    }
 
-    u.searchParams.set("zPreset", String(state.zPreset ?? "editorial_premium"));
-    u.searchParams.set("cellCount", String(((state.cellCount ?? 30) | 0)));
-    u.searchParams.set("minCellSizeMm", String(((state.minCellSizeMm ?? 14) | 0)));
+    for (const k of FLOAT_PARAMS) {
+      if (state[k] != null) u.searchParams.set(k, String(Math.round(state[k] * 1000) / 1000));
+    }
+
+    for (const k of BOOL_PARAMS) {
+      if (state[k] != null) u.searchParams.set(k, state[k] ? "true" : "false");
+    }
 
     history.replaceState({}, "", u.toString());
   } catch {
     // noop
   }
-}
-
-function safeInt(v, fallback) {
-  if (!Number.isFinite(v)) return fallback;
-  return v | 0;
-}
-
-function normalizeMode(mode) {
-  const m = String(mode || "").toLowerCase();
-  if (m === "zentangle") return "zentangle";
-  return "mandala";
 }
