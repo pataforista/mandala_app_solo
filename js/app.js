@@ -59,13 +59,13 @@ const DEFAULTS = {
   pageBorder: true,
   styleMode: "hashiko",
   layer1Intensity: 0.8,
-  layer2Intensity: 0.8,
+  layer2Intensity: 0.6,
   layer3Intensity: 0.7,
-  layer4Intensity: 0.8,
-  layer5Intensity: 0.6,
+  layer4Intensity: 0.5,
+  layer5Intensity: 0.4,
   layer6Intensity: 0.7,
-  layer7Intensity: 0.5,
-  layer8Intensity: 0.4,
+  layer7Intensity: 0.6,
+  layer8Intensity: 0.3,
   seed: randomSeed32() >>> 0,
 };
 
