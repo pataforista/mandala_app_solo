@@ -146,40 +146,54 @@
           </div>
         </div>
         <div style="display:flex; gap:8px;">
-          <sl-button id="openGallery" variant="default" pill size="small">
-            <sl-icon slot="prefix" name="grid"></sl-icon>
-            Galería
-          </sl-button>
           <sl-button id="saveFav" variant="warning" pill size="small">
             <sl-icon slot="prefix" name="heart"></sl-icon>
             Favorito
           </sl-button>
           <sl-button id="regen" pill size="small">
             <sl-icon slot="prefix" name="dice-5"></sl-icon>
-            Regenerar
-          </sl-button>
-          <sl-button id="download" variant="primary" pill size="small">
-            <sl-icon slot="prefix" name="download"></sl-icon>
-            SVG
-          </sl-button>
-          <sl-button id="downloadPng" variant="success" pill size="small">
-            <sl-icon slot="prefix" name="image"></sl-icon>
-            PNG
+            Aleatorio
           </sl-button>
           <sl-button id="downloadPdf" variant="danger" pill size="small">
             <sl-icon slot="prefix" name="file-pdf"></sl-icon>
             PDF
           </sl-button>
-          <sl-button id="downloadBook" variant="neutral" pill size="small">
-            <sl-icon slot="prefix" name="book"></sl-icon>
-            Libro
+          <sl-button id="downloadPng" variant="success" pill size="small">
+            <sl-icon slot="prefix" name="image"></sl-icon>
+            PNG
           </sl-button>
-          <sl-select id="bookPageCount" value="10" size="small" style="width: 80px;" help-text="Páginas">
-            <sl-option value="5">5</sl-option>
-            <sl-option value="10">10</sl-option>
-            <sl-option value="20">20</sl-option>
-            <sl-option value="50">50</sl-option>
-          </sl-select>
+          <sl-button id="download" variant="primary" pill size="small">
+            <sl-icon slot="prefix" name="download"></sl-icon>
+            SVG
+          </sl-button>
+          <sl-dropdown placement="bottom">
+            <sl-button slot="trigger" variant="neutral" pill size="small" caret>
+              <sl-icon slot="prefix" name="tools"></sl-icon>
+              Más
+            </sl-button>
+            <sl-menu>
+              <sl-menu-item id="openGallery">
+                <sl-icon slot="prefix" name="grid"></sl-icon>
+                Galería de Favoritos
+              </sl-menu-item>
+              <sl-divider></sl-divider>
+              <sl-menu-label>Generar Libro</sl-menu-label>
+              <sl-menu-item>
+                <div style="display:flex; gap:8px; align-items:center; width:100%;">
+                  <sl-select id="bookPageCount" value="10" size="small" style="width: 60px; flex:0;">
+                    <sl-option value="5">5</sl-option>
+                    <sl-option value="10">10</sl-option>
+                    <sl-option value="20">20</sl-option>
+                    <sl-option value="50">50</sl-option>
+                  </sl-select>
+                  <sl-button id="downloadBook" size="small" style="flex:1;">
+                    <sl-icon slot="prefix" name="book"></sl-icon>
+                    Descargar Libro
+                  </sl-button>
+                </div>
+              </sl-menu-item>
+            </sl-menu>
+          </sl-dropdown>
         </div>
       </div>
 
@@ -202,18 +216,34 @@
         <sl-button slot="footer" variant="primary" id="closeGallery">Cerrar</sl-button>
       </sl-drawer>
 
-      <div
-        style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; padding-top:8px; border-top:1px solid #eee;">
-
-        <!-- Grupo Base (Común) -->
+      <!-- SECTION 1: GENERACIÓN RÁPIDA -->
+      <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-end; padding-top:8px; border-top:1px solid #eee;">
         <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0; align-items: flex-end;">
-          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Base</legend>
+          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Generador</legend>
           <sl-select id="preset" label="Papel" size="small" style="width: 100px;">
             <sl-option value="A4">A4</sl-option>
             <sl-option value="LETTER">Letter</sl-option>
           </sl-select>
-          <sl-select id="structurePreset" label="Estructura" size="small" style="width: 180px;" value="custom"
-            help-text="Plantillas rápidas para empezar">
+          <sl-input id="seed" type="number" label="Seed" size="small" style="width: 120px;" value="1"
+            help-text="Semilla del diseño"></sl-input>
+          <div style="display:flex; gap:2px; align-items:flex-end; padding-bottom:2px;">
+            <sl-icon-button id="prevSeed" name="chevron-left" label="Seed anterior" style="font-size:1.1rem;"></sl-icon-button>
+            <sl-icon-button id="nextSeed" name="chevron-right" label="Seed siguiente" style="font-size:1.1rem;"></sl-icon-button>
+          </div>
+        </fieldset>
+
+        <sl-button id="share" variant="default" pill size="small">
+          <sl-icon slot="prefix" name="share"></sl-icon>
+          Compartir
+        </sl-button>
+      </div>
+
+      <!-- SECTION 2: ESTRUCTURA RÁPIDA -->
+      <div style="padding-top:12px; border-top:1px solid #eee;">
+        <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+          <span style="font-weight:bold; font-size:0.9rem;">Plantillas Rápidas:</span>
+          <sl-select id="structurePreset" size="small" style="width: 200px;" value="custom"
+            help-text="Aplica presets de configuración">
             <sl-option value="custom">Personalizada</sl-option>
             <sl-option value="simple">Simple para niños</sl-option>
             <sl-option value="balanced">Equilibrada para imprimir</sl-option>
@@ -229,99 +259,102 @@
             <sl-icon slot="prefix" name="stars"></sl-icon>
             Aplicar
           </sl-button>
-          <sl-input id="seed" type="number" label="Seed" size="small" style="width: 120px;" value="1"
-            help-text="Semilla aleatoria"></sl-input>
-          <div style="display:flex; gap:2px; align-items:flex-end; padding-bottom:2px;">
-            <sl-icon-button id="prevSeed" name="chevron-left" label="Seed anterior" style="font-size:1.1rem;"></sl-icon-button>
-            <sl-icon-button id="nextSeed" name="chevron-right" label="Seed siguiente" style="font-size:1.1rem;"></sl-icon-button>
-          </div>
-        </fieldset>
-
-        <div style="display:flex; gap:20px; flex-wrap:wrap;">
-          <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
-            <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Geometría Radial</legend>
-            <sl-range id="petals" label="Pétalos" min="6" max="96" step="1" value="12" size="small"
-              help-text="Número de segmentos radiales"></sl-range>
-            <sl-checkbox id="kaleidoscope" checked size="small" style="margin-top: 8px;">Kaleidoscopio</sl-checkbox>
-          </fieldset>
         </div>
+      </div>
 
-        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
-          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Estilo</legend>
+      <!-- SECTION 3: CONFIGURACIÓN PRINCIPAL -->
+      <div style="display:flex; gap:20px; flex-wrap:wrap; padding-top:12px; border-top:1px solid #eee;">
+
+        <!-- Geometría -->
+        <fieldset style="display:flex; flex-direction:column; gap:12px; border:none; padding:0; margin:0; min-width:200px;">
+          <legend style="font-weight:bold; font-size:0.85rem; color:#333;">📐 Geometría Radial</legend>
+          <sl-range id="petals" label="Pétalos" min="6" max="96" step="1" value="12" size="small"
+            help-text="Número de segmentos radiales"></sl-range>
+          <sl-checkbox id="kaleidoscope" checked size="small">Kaleidoscopio (simetría)</sl-checkbox>
+        </fieldset>
+
+        <!-- Estilo Visual -->
+        <fieldset style="display:flex; flex-direction:column; gap:12px; border:none; padding:0; margin:0; min-width:200px;">
+          <legend style="font-weight:bold; font-size:0.85rem; color:#333;">🎨 Estilo Visual</legend>
           <sl-range id="complexity" label="Complejidad" min="20" max="320" step="5" value="110" size="small"
-            help-text="Densidad de capas"></sl-range>
+            help-text="Densidad de detalles"></sl-range>
           <sl-range id="organic" label="Orgánico" min="0" max="1" step="0.05" value="0.2" size="small"
-            help-text="Geométrico vs Orgánico"></sl-range>
-          <sl-checkbox id="textures" checked size="small" style="margin-top: 8px;">Texturas Avanzadas</sl-checkbox>
+            help-text="0=Geométrico, 1=Orgánico"></sl-range>
+          <sl-checkbox id="textures" checked size="small">Texturas Avanzadas</sl-checkbox>
         </fieldset>
 
-        <!-- Grupo Trazo (Común) -->
-        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0;">
-          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">Trazo & Detalles</legend>
-          <sl-range id="strokeWidth" label="Grosor" min="0.1" max="5" step="0.1" value="0.6" size="small"
-            help-text="Peso de línea en mm"></sl-range>
-          <div style="display:flex; flex-direction:column; gap:4px;">
-            <sl-checkbox id="frames" checked size="small">Marcos</sl-checkbox>
-            <sl-checkbox id="pageBorder" checked size="small">Orla Pág.</sl-checkbox>
-          </div>
+        <!-- Trazo -->
+        <fieldset style="display:flex; flex-direction:column; gap:12px; border:none; padding:0; margin:0; min-width:200px;">
+          <legend style="font-weight:bold; font-size:0.85rem; color:#333;">✏️ Trazo & Marco</legend>
+          <sl-range id="strokeWidth" label="Grosor de línea" min="0.1" max="5" step="0.1" value="0.6" size="small"
+            help-text="Peso en mm"></sl-range>
+          <sl-checkbox id="frames" checked size="small">Marcos interiores</sl-checkbox>
+          <sl-checkbox id="pageBorder" checked size="small">Orla de página</sl-checkbox>
         </fieldset>
 
-        <!-- Grupo Estilo de Capas -->
-        <fieldset style="display:flex; gap:12px; border:none; padding:0; margin:0; background: #f0f9ff; padding: 8px; border-radius: 8px; border: 1px solid #bfdbfe;">
-          <legend style="font-weight:bold; font-size:0.85rem; margin-bottom:4px; color:#1e40af;">Estilo Mandala</legend>
-          <sl-select id="styleMode" value="sashiko" size="small" style="width: 190px;">
+        <!-- Estilo de Mandala -->
+        <fieldset style="display:flex; flex-direction:column; gap:12px; border:none; padding:0; margin:0; min-width:240px; background: #f0f9ff; padding: 10px; border-radius: 8px; border: 1px solid #bfdbfe;">
+          <legend style="font-weight:bold; font-size:0.85rem; color:#1e40af;">🌀 Estilo del Mandala</legend>
+          <sl-select id="styleMode" value="sashiko" size="small">
             <sl-option value="sashiko">Sashiko (Repetitivo)</sl-option>
-            <sl-option value="floral">Floral</sl-option>
-            <sl-option value="geometric">Geométrico</sl-option>
+            <sl-option value="floral">Floral (Botánico)</sl-option>
+            <sl-option value="geometric">Geométrico (Preciso)</sl-option>
             <sl-option value="islamico">Islámico / Zellige ✦</sl-option>
             <sl-option value="azteca">Azteca / Solar ☀</sl-option>
             <sl-option value="yantra">Yantra / Védico ◈</sl-option>
             <sl-option value="celtico">Céltico / Gótico ☘</sl-option>
           </sl-select>
         </fieldset>
-
-        <!-- Grupo Control de Capas -->
-        <fieldset style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; border:none; padding:0; margin:0; background: #fef3c7; padding: 8px; border-radius: 8px; border: 1px solid #fcd34d;">
-          <legend style="grid-column: 1/-1; font-weight:bold; font-size:0.85rem; margin-bottom:4px; color:#92400e;">Capas (Intensidad)</legend>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:0.75rem; color:#444;">1. Núcleo</label>
-            <sl-range id="layer1Intensity" min="0" max="1" step="0.1" value="0.8" size="small" help-text="Centro y simetría inicial"></sl-range>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:0.75rem; color:#444;">2. Pétalos Int.</label>
-            <sl-range id="layer2Intensity" min="0" max="1" step="0.1" value="0.8" size="small" help-text="Corola interna del mandala"></sl-range>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:0.75rem; color:#444;">3. Flores</label>
-            <sl-range id="layer3Intensity" min="0" max="1" step="0.1" value="0.7" size="small" help-text="Rosetas repetitivas (Sashiko/Floral)"></sl-range>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:0.75rem; color:#444;">4. Anillo Geom.</label>
-            <sl-range id="layer4Intensity" min="0" max="1" step="0.1" value="0.8" size="small" help-text="Anillo de conexión radial"></sl-range>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:0.75rem; color:#444;">5. Detalles Finos</label>
-            <sl-range id="layer5Intensity" min="0" max="1" step="0.1" value="0.6" size="small" help-text="Radios y puntos de luz"></sl-range>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:0.75rem; color:#444;">6. Borde Decor.</label>
-            <sl-range id="layer6Intensity" min="0" max="1" step="0.1" value="0.7" size="small" help-text="Corona exterior y remates"></sl-range>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:0.75rem; color:#444;">7. Hojas/Nat.</label>
-            <sl-range id="layer7Intensity" min="0" max="1" step="0.1" value="0.5" size="small" help-text="Hojas y tallos orgánicos"></sl-range>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <label style="font-size:0.75rem; color:#444;">8. Texturas</label>
-            <sl-range id="layer8Intensity" min="0" max="1" step="0.1" value="0.4" size="small" help-text="Textura de puntillismo final"></sl-range>
-          </div>
-        </fieldset>
-
-        <sl-button id="share" variant="default" pill size="small" style="margin-top:auto;">
-          <sl-icon slot="prefix" name="share"></sl-icon>
-          Compartir
-        </sl-button>
       </div>
+
+      <!-- SECTION 4: CONTROL FINO DE CAPAS -->
+      <sl-accordion style="margin-top:12px; border:1px solid #e7e5e4; border-radius:10px;">
+        <sl-accordion-item>
+          <span slot="summary" style="font-weight:bold; font-size:0.9rem;">🎛️ Control Fino de Capas (8 Intensidades)</span>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:16px; padding:16px; background: #fffef7;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:0.8rem; font-weight:600; color:#333;">1. Núcleo Central</label>
+              <sl-range id="layer1Intensity" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
+              <span style="font-size:0.7rem; color:#666;">Centro y simetría inicial</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:0.8rem; font-weight:600; color:#333;">2. Pétalos Interiores</label>
+              <sl-range id="layer2Intensity" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
+              <span style="font-size:0.7rem; color:#666;">Corola interna</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:0.8rem; font-weight:600; color:#333;">3. Flores & Rosetas</label>
+              <sl-range id="layer3Intensity" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
+              <span style="font-size:0.7rem; color:#666;">Patrones repetitivos</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:0.8rem; font-weight:600; color:#333;">4. Anillo Geométrico</label>
+              <sl-range id="layer4Intensity" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
+              <span style="font-size:0.7rem; color:#666;">Conexión radial</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:0.8rem; font-weight:600; color:#333;">5. Detalles Finos</label>
+              <sl-range id="layer5Intensity" min="0" max="1" step="0.05" value="0.6" size="small"></sl-range>
+              <span style="font-size:0.7rem; color:#666;">Radios y puntos de luz</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:0.8rem; font-weight:600; color:#333;">6. Borde Decorativo</label>
+              <sl-range id="layer6Intensity" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
+              <span style="font-size:0.7rem; color:#666;">Corona exterior</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:0.8rem; font-weight:600; color:#333;">7. Elementos Naturales</label>
+              <sl-range id="layer7Intensity" min="0" max="1" step="0.05" value="0.5" size="small"></sl-range>
+              <span style="font-size:0.7rem; color:#666;">Hojas y tallos orgánicos</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="font-size:0.8rem; font-weight:600; color:#333;">8. Texturas Finales</label>
+              <sl-range id="layer8Intensity" min="0" max="1" step="0.05" value="0.4" size="small"></sl-range>
+              <span style="font-size:0.7rem; color:#666;">Puntillismo y sombras</span>
+            </div>
+          </div>
+        </sl-accordion-item>
+      </sl-accordion>
 
       <div style="font-size:0.8rem; color:#666; margin-top:4px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
         <span class="meta">Seed: <b id="seedText">—</b></span> <span style="margin:0 2px;">|</span>
