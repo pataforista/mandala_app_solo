@@ -184,18 +184,37 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       doc.addImage(imageData, "PNG", x, y, w, h);
 
       if (quote) {
-        // Main quote text - larger and better formatted
-        doc.setFontSize(14);
-        doc.setFont("times", "italic");
-        const splitText = doc.splitTextToSize(quote.frase, w * 0.85);
-        const quoteY = y + h - (splitText.length * 5 + 20);
-        doc.text(splitText, x + w / 2, quoteY, { align: "center" });
+        const textWidth = w * 0.8;
+        const spacing = 3;
 
-        // Attribution line - smaller, elegant
+        // Decorative separator line (optional but elegant)
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.2);
+        doc.line(x + w * 0.1, y + h + 4, x + w * 0.9, y + h + 4);
+
+        // Main quote text - larger and elegant
+        doc.setFontSize(13);
+        doc.setFont("times", "italic");
+        doc.setTextColor(40, 40, 40);
+        const splitText = doc.splitTextToSize(quote.frase, textWidth);
+        const lineHeight = 5.5;
+        const textHeight = splitText.length * lineHeight;
+        let textY = y + h + 10;
+
+        doc.text(splitText, x + w / 2, textY, { align: "center", lineHeightFactor: 1.3 });
+        textY += textHeight + 3;
+
+        // Attribution line - elegant and smaller
         doc.setFontSize(10);
         doc.setFont("times", "normal");
-        const author = quote.linaje ? quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1) : "Anónimo";
-        doc.text(author, x + w / 2, y + h - 8, { align: "center" });
+        doc.setTextColor(100, 100, 100);
+        const author = quote.linaje
+          ? quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1)
+          : "Centro de Salud Integral Taoísta";
+        doc.text("— " + author + " —", x + w / 2, textY + 2, { align: "center" });
+
+        // Reset text color
+        doc.setTextColor(0, 0, 0);
       }
     };
 
