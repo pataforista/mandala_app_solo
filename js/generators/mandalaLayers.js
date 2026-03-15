@@ -218,6 +218,8 @@ export function generateMandalaLayers(doc, opts) {
     complexity = 110,
     includeFrames = true,
     pageBorder = true,
+    kaleidoscope = true,
+    textures = true,
   } = opts;
 
   const page = doc?.page ?? { wMm: 210, hMm: 297, marginMm: 10 };
@@ -229,6 +231,9 @@ export function generateMandalaLayers(doc, opts) {
   const paths = [];
 
   const style = styleMode === "hashiko" ? "sashiko" : styleMode;
+
+  // Complexity factor: scales density of sub-elements (0..1 from range 20..320)
+  const cFactor = _clamp((complexity - 20) / (320 - 20), 0, 1);
 
   const mainW = strokeWidthMm;
   const detailW = strokeWidthMm * 0.7;
@@ -308,50 +313,49 @@ export function generateMandalaLayers(doc, opts) {
 
     for (let i = 0; i < count; i++) {
       const aC = (i / count) * Math.PI * 2;
+      // Kaleidoscope: alternate petal scale for visual rhythm
+      const kScale = kaleidoscope && i % 2 === 1 ? 0.82 : 1.0;
+      const kROut = rIn + (rOut - rIn) * kScale;
 
       if (style === "islamico") {
         // Angular khatam petals with inner diamond
         const pIn = _p(rIn, aC, center);
-        const pOut = _p(rOut, aC, center);
-        const pML = _p(rIn + (rOut - rIn) * 0.55, aC - angStep * 0.35, center);
-        const pMR = _p(rIn + (rOut - rIn) * 0.55, aC + angStep * 0.35, center);
+        const pOut = _p(kROut, aC, center);
+        const pML = _p(rIn + (kROut - rIn) * 0.55, aC - angStep * 0.35, center);
+        const pMR = _p(rIn + (kROut - rIn) * 0.55, aC + angStep * 0.35, center);
         pb.moveTo(pIn.x, pIn.y).lineTo(pML.x, pML.y).lineTo(pOut.x, pOut.y)
           .lineTo(pMR.x, pMR.y).close();
-        // Inner diamond
         if (layer2Intensity > 0.4) {
-          const dC = _p(rIn + (rOut - rIn) * 0.45, aC, center);
-          addStar(pb, dC.x, dC.y, (rOut - rIn) * 0.18, (rOut - rIn) * 0.08, 4, aC);
+          const dC = _p(rIn + (kROut - rIn) * 0.45, aC, center);
+          addStar(pb, dC.x, dC.y, (kROut - rIn) * 0.18, (kROut - rIn) * 0.08, 4, aC);
         }
 
       } else if (style === "azteca") {
-        // Stepped trapezoidal petals with notch
         const pIn = _p(rIn, aC, center);
-        const pOut = _p(rOut, aC, center);
-        const pL = _p(rIn + (rOut - rIn) * 0.4, aC - angStep * 0.35, center);
-        const pR = _p(rIn + (rOut - rIn) * 0.4, aC + angStep * 0.35, center);
-        const pStL = _p(rIn + (rOut - rIn) * 0.7, aC - angStep * 0.2, center);
-        const pStR = _p(rIn + (rOut - rIn) * 0.7, aC + angStep * 0.2, center);
+        const pOut = _p(kROut, aC, center);
+        const pL = _p(rIn + (kROut - rIn) * 0.4, aC - angStep * 0.35, center);
+        const pR = _p(rIn + (kROut - rIn) * 0.4, aC + angStep * 0.35, center);
+        const pStL = _p(rIn + (kROut - rIn) * 0.7, aC - angStep * 0.2, center);
+        const pStR = _p(rIn + (kROut - rIn) * 0.7, aC + angStep * 0.2, center);
         pb.moveTo(pIn.x, pIn.y).lineTo(pL.x, pL.y).lineTo(pStL.x, pStL.y)
           .lineTo(pOut.x, pOut.y).lineTo(pStR.x, pStR.y).lineTo(pR.x, pR.y).close();
 
       } else if (style === "geometric") {
-        // Sharp geometric petal
         const pIn = _p(rIn, aC, center);
-        const pOut = _p(rOut, aC, center);
-        const pL = _p(rIn + (rOut - rIn) * 0.5, aC - angStep * 0.38, center);
-        const pR = _p(rIn + (rOut - rIn) * 0.5, aC + angStep * 0.38, center);
+        const pOut = _p(kROut, aC, center);
+        const pL = _p(rIn + (kROut - rIn) * 0.5, aC - angStep * 0.38, center);
+        const pR = _p(rIn + (kROut - rIn) * 0.5, aC + angStep * 0.38, center);
         pb.moveTo(pIn.x, pIn.y).lineTo(pL.x, pL.y).lineTo(pOut.x, pOut.y)
           .lineTo(pR.x, pR.y).close();
-        // Inner lines
-        const pM = _p(rIn + (rOut - rIn) * 0.55, aC, center);
+        const pM = _p(rIn + (kROut - rIn) * 0.55, aC, center);
         addCapsule(pb, pIn.x, pIn.y, pM.x, pM.y, fineW * 0.4);
 
       } else {
         // Compound organic petals (sashiko, floral, celtico, yantra)
-        addCompoundPetal(pb, center, rIn, rOut, aC, angStep,
-          layer2Intensity > 0.4,  // inner petal
-          layer2Intensity > 0.6,  // dot
-          layer2Intensity > 0.3,  // vein
+        addCompoundPetal(pb, center, rIn, kROut, aC, angStep,
+          layer2Intensity > 0.4,
+          layer2Intensity > 0.6,
+          layer2Intensity > 0.3,
           fineW);
       }
     }
@@ -392,16 +396,18 @@ export function generateMandalaLayers(doc, opts) {
     const rMid = R * 0.42;
     const fSize = R * 0.11 * layer3Intensity;
 
+    // Complexity scales element count per motif ring
+    const cMul = _lerp(0.6, 1.4, cFactor);
     const countMap = {
-      sashiko: Math.max(8, petals),
-      islamico: Math.max(8, petals),
-      azteca: Math.max(6, petals),
-      yantra: Math.max(6, petals),
-      celtico: Math.max(6, Math.round(petals * 0.75)),
-      floral: Math.max(6, Math.round(petals / 2)),
-      geometric: Math.max(6, Math.round(petals / 2)),
+      sashiko: Math.max(8, Math.round(petals * cMul)),
+      islamico: Math.max(8, Math.round(petals * cMul)),
+      azteca: Math.max(6, Math.round(petals * cMul)),
+      yantra: Math.max(6, Math.round(petals * cMul)),
+      celtico: Math.max(6, Math.round(petals * 0.75 * cMul)),
+      floral: Math.max(6, Math.round(petals / 2 * cMul)),
+      geometric: Math.max(6, Math.round(petals / 2 * cMul)),
     };
-    const count = countMap[style] ?? Math.max(6, Math.round(petals / 2));
+    const count = countMap[style] ?? Math.max(6, Math.round(petals / 2 * cMul));
 
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
@@ -599,7 +605,7 @@ export function generateMandalaLayers(doc, opts) {
     const pb = new PathBuilder();
     const r1 = R * 0.56;
     const r2 = r1 + R * 0.1 * layer4Intensity;
-    const count = petals * 2;
+    const count = Math.max(petals, Math.round(petals * 2 * _lerp(0.7, 1.3, cFactor)));
 
     // Inner ring
     addCircle(pb, center.x, center.y, r1, 80);
@@ -723,7 +729,7 @@ export function generateMandalaLayers(doc, opts) {
     const pb = new PathBuilder();
     const rStart = R * 0.7;
     const rEnd = rStart + R * 0.1 * layer5Intensity;
-    const count = petals * 4;
+    const count = Math.max(petals * 2, Math.round(petals * 4 * _lerp(0.6, 1.5, cFactor)));
 
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
@@ -1041,7 +1047,7 @@ export function generateMandalaLayers(doc, opts) {
   }
 
   // ==================== L8: TEXTURAS CULTURALES (Enhanced) ====================
-  if (layer8Intensity > 0.1) {
+  if (layer8Intensity > 0.1 && textures) {
     const pb = new PathBuilder();
 
     if (style === "sashiko") {
