@@ -2,6 +2,7 @@ import { getStateFromURL, setStateToURL, randomSeed32 } from "./core/urlState.js
 import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
 import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSvgElement } from "./core/export.js";
+import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
 import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
 import { StateHistory } from "./core/history.js";
@@ -535,21 +536,27 @@ function bindUI() {
       // Magic Shuffle: Randomize EVERYTHING with quality safeguards
       state.seed = randomSeed32() >>> 0;
       seedInputEl.value = String(state.seed);
+      const shuffleRng = mulberry32((state.seed ^ 0x9E3779B9) >>> 0);
       
       const styles = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
-      state.styleMode = styles[Math.floor(Math.random() * styles.length)];
+      state.styleMode = pick(shuffleRng, styles);
       
-      state.petals = 8 + Math.floor(Math.random() * 40); // 8 to 48 petals
-      state.complexity = 120 + Math.floor(Math.random() * 200); // 120 to 320 (no more too simple)
+      state.petals = rInt(shuffleRng, 4, 24) * 2; // 8 to 48 petals (pares para mejor simetría)
+      state.complexity = rInt(shuffleRng, 120, 320);
       
       // Ensure at least 4 layers have high intensity to avoid "empty" mandalas
       const layerCount = 8;
-      const intensities = Array.from({ length: layerCount }, () => 0.1 + Math.random() * 0.9);
+      const intensities = Array.from({ length: layerCount }, () => rFloat(shuffleRng, 0.1, 1.0));
       
-      // Pick 3-4 random layers to force high intensity
+      // Pick 4 random unique layers to force high intensity
+      const layerIndexes = Array.from({ length: layerCount }, (_, i) => i);
+      for (let i = layerIndexes.length - 1; i > 0; i--) {
+        const j = rInt(shuffleRng, 0, i);
+        [layerIndexes[i], layerIndexes[j]] = [layerIndexes[j], layerIndexes[i]];
+      }
       for (let i = 0; i < 4; i++) {
-        const idx = Math.floor(Math.random() * layerCount);
-        intensities[idx] = 0.6 + Math.random() * 0.4;
+        const idx = layerIndexes[i];
+        intensities[idx] = rFloat(shuffleRng, 0.6, 1.0);
       }
 
       state.layer1Intensity = intensities[0];
@@ -561,8 +568,8 @@ function bindUI() {
       state.layer7Intensity = intensities[6];
       state.layer8Intensity = intensities[7];
       
-      state.strokeWidthMm = 0.4 + Math.random() * 0.6; // Better default range
-      state.organicLevel = Math.random();
+      state.strokeWidth = rFloat(shuffleRng, 0.4, 1.0);
+      state.organic = rFloat(shuffleRng, 0.0, 1.0);
       
       state.structurePreset = "custom";
       bindUI();
@@ -635,8 +642,8 @@ function bindUI() {
       seed: s.seed,
       petals: s.petals,
       complexity: s.complexity,
-      strokeWidthMm: s.strokeWidthMm,
-      organicLevel: s.organicLevel,
+      strokeWidthMm: s.strokeWidth,
+      organicLevel: s.organic,
       includeFrames: s.frames,
       pageBorder: s.pageBorder,
       kaleidoscope: s.kaleidoscope,
@@ -658,8 +665,11 @@ function bindUI() {
     let quotes = [];
     if (layout === "inspirational" && typeof TAOISTA_DATASET !== "undefined") {
       const allCards = TAOISTA_DATASET.cards || [];
-      // Pick one random quote for this page
-      quotes = [allCards[Math.floor(Math.random() * allCards.length)]];
+      if (allCards.length > 0) {
+        // Quote selection deterministic for reproducible exports
+        const quoteRng = mulberry32((state.seed ^ 0xA511E9B3) >>> 0);
+        quotes = [allCards[rInt(quoteRng, 0, allCards.length - 1)]];
+      }
     }
 
     if (downloadPdfSidebar) {
