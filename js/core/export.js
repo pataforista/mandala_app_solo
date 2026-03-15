@@ -208,10 +208,18 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
         doc.setFontSize(10);
         doc.setFont("times", "normal");
         doc.setTextColor(100, 100, 100);
-        const author = quote.linaje
-          ? quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1)
-          : "Centro de Salud Integral Taoísta";
-        doc.text("— " + author + " —", x + w / 2, textY + 2, { align: "center" });
+
+        // Build attribution: use linaje (tradition) and categoria (theme)
+        let attribution = "Centro de Salud Integral Taoísta";
+        if (quote.linaje) {
+          const linaje = quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1);
+          const categoria = quote.categoria
+            ? " • " + quote.categoria.charAt(0).toUpperCase() + quote.categoria.slice(1)
+            : "";
+          attribution = linaje + categoria;
+        }
+
+        doc.text("— " + attribution + " —", x + w / 2, textY + 2, { align: "center" });
 
         // Reset text color
         doc.setTextColor(0, 0, 0);
