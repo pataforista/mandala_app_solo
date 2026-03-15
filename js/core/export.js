@@ -58,7 +58,7 @@ export async function downloadPdf(filename, svgEl, widthMm, heightMm) {
     const flatSvg = flattenSvgElement(svgEl.cloneNode(true));
 
     // Load svg2pdf.js dynamically if not already loaded
-    const svg2pdfUrl = "https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.min.js";
+    const svg2pdfUrl = "https://cdn.jsdelivr.net/npm/svg2pdf.js@2.3.0/dist/svg2pdf.umd.js";
     if (!window.svg2pdf) {
       await new Promise((resolve, reject) => {
         const s = document.createElement("script");
@@ -100,7 +100,7 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       format: [widthMm, heightMm]
     });
 
-    const svg2pdfUrl = "https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.min.js";
+    const svg2pdfUrl = "https://cdn.jsdelivr.net/npm/svg2pdf.js@2.3.0/dist/svg2pdf.umd.js";
     if (!window.svg2pdf) {
       await new Promise((resolve, reject) => {
         const s = document.createElement("script");
