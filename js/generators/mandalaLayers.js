@@ -804,8 +804,9 @@ export function generateMandalaLayers(doc, opts) {
   // ==================== L7: NATURAL / HOJAS / CULTURAL (Enhanced) ====================
   if (layer7Intensity > 0.05 && style !== "geometric") {
     const pb = new PathBuilder();
-    const rInner = R * 0.34;
-    const rOuter = rInner + R * 0.3 * layer7Intensity;
+    // Position L7 in the mid-ring zone (between L3 and L4), above L2/L3 content
+    const rInner = R * (R3 + 0.06);
+    const rOuter = rInner + R * 0.18 * layer7Intensity;
     const count = petals;
 
     for (let i = 0; i < count; i++) {
@@ -872,7 +873,8 @@ export function generateMandalaLayers(doc, opts) {
         // Rich organic leaf (sashiko / floral)
         const p1 = _p(rInner, a, center);
         const p2 = _p(rOuter, a, center);
-        const leafW = 0.45 * layer7Intensity;
+        // Scale leaf width by angular spacing so leaves don't overlap at high petal counts
+        const leafW = Math.min(0.45, (Math.PI / count) * 0.7) * layer7Intensity;
         const cp1 = _p(rInner + (rOuter - rInner) * 0.5, a - leafW, center);
         const cp2 = _p(rInner + (rOuter - rInner) * 0.5, a + leafW, center);
         // Leaf outline

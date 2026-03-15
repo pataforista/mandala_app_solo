@@ -1,4 +1,7 @@
 // js/core/export.js
+
+const RENDER_PX_PER_MM = 6; // ~152 DPI — good quality for fine mandala lines
+
 export function downloadTextFile(filename, text) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   saveBlob(blob, filename);
@@ -38,8 +41,54 @@ export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 
 }
 
 /**
- * PDF Export (Professional / Vector)
- * Uses jsPDF. For complex SVG, we flatten it and then render.
+ * Renders an SVG element to a PNG data URL using Canvas.
+ * @param {SVGElement} svgEl - The SVG element (must have width/height/viewBox set)
+ * @param {number} widthMm - Width in mm (for sizing the canvas)
+ * @param {number} heightMm - Height in mm
+ */
+async function svgElToDataUrl(svgEl, widthMm, heightMm) {
+  const wPx = Math.ceil(widthMm * RENDER_PX_PER_MM);
+  const hPx = Math.ceil(heightMm * RENDER_PX_PER_MM);
+
+  // Set pixel dimensions while keeping the viewBox in document units
+  const clone = svgEl.cloneNode(true);
+  clone.setAttribute("width", wPx);
+  clone.setAttribute("height", hPx);
+  // Ensure xmlns is set for serialization
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+  const svgString = new XMLSerializer().serializeToString(clone);
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = wPx;
+      canvas.height = hPx;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, wPx, hPx);
+      ctx.drawImage(img, 0, 0, wPx, hPx);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/png"));
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Error al renderizar SVG en canvas"));
+    };
+
+    img.src = url;
+  });
+}
+
+/**
+ * PDF Export (Professional / Raster via Canvas)
+ * Renders SVG to canvas and embeds as PNG in jsPDF — no svg2pdf required.
  */
 export async function downloadPdf(filename, svgEl, widthMm, heightMm) {
   try {
@@ -54,28 +103,9 @@ export async function downloadPdf(filename, svgEl, widthMm, heightMm) {
       format: [widthMm, heightMm]
     });
 
-    // Flatten SVG to remove <use> references for simpler PDF rendering
     const flatSvg = flattenSvgElement(svgEl.cloneNode(true));
-
-    // Load svg2pdf.js dynamically if not already loaded
-    const svg2pdfUrl = "https://cdn.jsdelivr.net/npm/svg2pdf.js@2.3.0/dist/svg2pdf.umd.js";
-    if (!window.svg2pdf) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = svg2pdfUrl;
-        s.onload = resolve;
-        s.onerror = () => reject(new Error("No se pudo cargar svg2pdf.js desde CDN"));
-        document.head.appendChild(s);
-      });
-    }
-
-    await doc.svg(flatSvg, {
-      x: 0,
-      y: 0,
-      width: widthMm,
-      height: heightMm
-    });
-
+    const dataUrl = await svgElToDataUrl(flatSvg, widthMm, heightMm);
+    doc.addImage(dataUrl, "PNG", 0, 0, widthMm, heightMm);
     doc.save(filename);
   } catch (error) {
     console.error("PDF download failed:", error);
@@ -85,7 +115,8 @@ export async function downloadPdf(filename, svgEl, widthMm, heightMm) {
 }
 
 /**
- * Batch PDF Export (Coloring Book) with multi-layout support
+ * Batch PDF Export (Coloring Book) with multi-layout support.
+ * Renders each mandala SVG to canvas and embeds as PNG — no svg2pdf required.
  */
 export async function downloadBatchPdf(filename, states, generateFn, widthMm, heightMm, layout = "classic", quotes = []) {
   try {
@@ -100,126 +131,100 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       format: [widthMm, heightMm]
     });
 
-    const svg2pdfUrl = "https://cdn.jsdelivr.net/npm/svg2pdf.js@2.3.0/dist/svg2pdf.umd.js";
-    if (!window.svg2pdf) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = svg2pdfUrl;
-        s.onload = resolve;
-        s.onerror = () => reject(new Error("No se pudo cargar svg2pdf.js desde CDN"));
-        document.head.appendChild(s);
-      });
-    }
+    const margin = 12;
 
-  const margin = 12;
-  const drawMandala = async (state, x, y, w, h, quote = null) => {
-    const docData = {
-      page: { wMm: w, hMm: h, marginMm: 5 },
-      defs: [],
-      body: []
+    const makeSvgEl = (state, w, h, mirrorX = false) => {
+      const docData = {
+        page: { wMm: w, hMm: h, marginMm: 5 },
+        defs: [],
+        body: []
+      };
+      generateFn(docData, state);
+
+      const finalSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      finalSvg.setAttribute("width", w);
+      finalSvg.setAttribute("height", h);
+      finalSvg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+      const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      docData.defs.forEach(d => defs.innerHTML += d);
+      finalSvg.appendChild(defs);
+
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      if (mirrorX) {
+        g.setAttribute("transform", `scale(-1, 1) translate(-${w}, 0)`);
+      }
+      docData.body.forEach(b => g.innerHTML += b);
+      finalSvg.appendChild(g);
+
+      return flattenSvgElement(finalSvg);
     };
-    generateFn(docData, state);
 
-    const finalSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    finalSvg.setAttribute("width", w);
-    finalSvg.setAttribute("height", h);
-    finalSvg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const drawMandala = async (state, x, y, w, h, quote = null, mirrorX = false) => {
+      const svgEl = makeSvgEl(state, w, h, mirrorX);
+      const dataUrl = await svgElToDataUrl(svgEl, w, h);
+      doc.addImage(dataUrl, "PNG", x, y, w, h);
 
-    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-    docData.defs.forEach(d => defs.innerHTML += d);
-    finalSvg.appendChild(defs);
+      if (quote) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "italic");
+        const splitText = doc.splitTextToSize(quote.frase, w * 0.8);
+        doc.text(splitText, x + w / 2, y + h - 15, { align: "center" });
 
-    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    docData.body.forEach(b => g.innerHTML += b);
-    finalSvg.appendChild(g);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.text(quote.id || "", x + w / 2, y + h - 5, { align: "center" });
+      }
+    };
 
-    const flatSvg = flattenSvgElement(finalSvg);
-
-    // If there's a quote, add it below or next to the mandala
-    if (quote) {
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "italic");
-      const splitText = doc.splitTextToSize(quote.frase, w * 0.8);
-      doc.text(splitText, x + w / 2, y + h - 15, { align: "center" });
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.text(quote.id || "", x + w / 2, y + h - 5, { align: "center" });
-    }
-
-    await doc.svg(flatSvg, { x, y, width: w, height: h });
-  };
-
-  const drawMirroredMandala = async (state, x, y, w, h) => {
-    const docData = { page: { wMm: w, hMm: h, marginMm: 5 }, defs: [], body: [] };
-    generateFn(docData, state);
-    const finalSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    finalSvg.setAttribute("width", w);
-    finalSvg.setAttribute("height", h);
-    finalSvg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-    docData.defs.forEach(d => defs.innerHTML += d);
-    finalSvg.appendChild(defs);
-    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    // Apply horizontal mirror transform
-    g.setAttribute("transform", `scale(-1, 1) translate(-${w}, 0)`);
-    docData.body.forEach(b => g.innerHTML += b);
-    finalSvg.appendChild(g);
-    const flatSvg = flattenSvgElement(finalSvg);
-    await doc.svg(flatSvg, { x, y, width: w, height: h });
-  };
-
-  if (layout === "classic" || layout === "inspirational") {
-    for (let i = 0; i < states.length; i++) {
-      if (i > 0) doc.addPage();
-      const quote = layout === "inspirational" ? (quotes[i % quotes.length] || null) : null;
-      const size = Math.min(widthMm, heightMm) - margin * 3.5;
-      const x = (widthMm - size) / 2;
-      const y = (heightMm - size) / 2 - (quote ? 12 : 0);
-      await drawMandala(states[i], x, y, size, size, quote);
-    }
-  } else if (layout === "duo" || layout === "mirror") {
-    const itemsPerPage = 2;
-    for (let i = 0; i < states.length; i += itemsPerPage) {
-      if (i > 0) doc.addPage();
-      const size = (heightMm - margin * 3) / 2.2;
-      for (let j = 0; j < itemsPerPage && (i + j) < states.length; j++) {
+    if (layout === "classic" || layout === "inspirational") {
+      for (let i = 0; i < states.length; i++) {
+        if (i > 0) doc.addPage();
+        const quote = layout === "inspirational" ? (quotes[i % quotes.length] || null) : null;
+        const size = Math.min(widthMm, heightMm) - margin * 3.5;
         const x = (widthMm - size) / 2;
-        const y = margin + j * (size + margin * 2);
-        if (layout === "mirror" && j === 1) {
-          await drawMirroredMandala(states[i + j], x, y, size, size);
-        } else {
+        const y = (heightMm - size) / 2 - (quote ? 12 : 0);
+        await drawMandala(states[i], x, y, size, size, quote);
+      }
+    } else if (layout === "duo" || layout === "mirror") {
+      const itemsPerPage = 2;
+      for (let i = 0; i < states.length; i += itemsPerPage) {
+        if (i > 0) doc.addPage();
+        const size = (heightMm - margin * 3) / 2.2;
+        for (let j = 0; j < itemsPerPage && (i + j) < states.length; j++) {
+          const x = (widthMm - size) / 2;
+          const y = margin + j * (size + margin * 2);
+          const mirrorX = layout === "mirror" && j === 1;
+          await drawMandala(states[i + j], x, y, size, size, null, mirrorX);
+        }
+      }
+    } else if (layout === "trio") {
+      const itemsPerPage = 3;
+      for (let i = 0; i < states.length; i += itemsPerPage) {
+        if (i > 0) doc.addPage();
+        const size = (heightMm - margin * 4) / 3.2;
+        for (let j = 0; j < itemsPerPage && (i + j) < states.length; j++) {
+          const x = (widthMm - size) / 2;
+          const y = margin + j * (size + margin);
+          await drawMandala(states[i + j], x, y, size, size);
+        }
+      }
+    } else if (layout === "collage") {
+      const itemsPerPage = 4;
+      for (let i = 0; i < states.length; i += itemsPerPage) {
+        if (i > 0) doc.addPage();
+        const size = (Math.min(widthMm, heightMm) - margin * 3) / 2;
+        const startX = (widthMm - size * 2 - margin) / 2;
+        const startY = (heightMm - size * 2 - margin) / 2;
+        for (let j = 0; j < itemsPerPage && (i + j) < states.length; j++) {
+          const col = j % 2;
+          const row = Math.floor(j / 2);
+          const x = startX + col * (size + margin);
+          const y = startY + row * (size + margin);
           await drawMandala(states[i + j], x, y, size, size);
         }
       }
     }
-  } else if (layout === "trio") {
-    const itemsPerPage = 3;
-    for (let i = 0; i < states.length; i += itemsPerPage) {
-      if (i > 0) doc.addPage();
-      const size = (heightMm - margin * 4) / 3.2;
-      for (let j = 0; j < itemsPerPage && (i + j) < states.length; j++) {
-        const x = (widthMm - size) / 2;
-        const y = margin + j * (size + margin);
-        await drawMandala(states[i + j], x, y, size, size);
-      }
-    }
-  } else if (layout === "collage") {
-    const itemsPerPage = 4;
-    for (let i = 0; i < states.length; i += itemsPerPage) {
-      if (i > 0) doc.addPage();
-      const size = (Math.min(widthMm, heightMm) - margin * 3) / 2;
-      const startX = (widthMm - size * 2 - margin) / 2;
-      const startY = (heightMm - size * 2 - margin) / 2;
-      for (let j = 0; j < itemsPerPage && (i + j) < states.length; j++) {
-        const col = j % 2;
-        const row = Math.floor(j / 2);
-        const x = startX + col * (size + margin);
-        const y = startY + row * (size + margin);
-        await drawMandala(states[i + j], x, y, size, size);
-      }
-    }
-  }
 
     doc.save(filename);
   } catch (error) {
