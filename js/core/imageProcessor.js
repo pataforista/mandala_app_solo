@@ -113,7 +113,6 @@ export class ImageProcessor {
   _gaussianKernel(sigma) {
     const size = Math.ceil(sigma * 3) * 2 + 1;
     const kernel = Array(size).fill(0).map(() => Array(size).fill(0));
-    const sum = 0;
 
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
@@ -189,13 +188,15 @@ export class ImageProcessor {
   }
 
   /**
-   * Thin edges using Zhang-Suen algorithm (simplified)
+   * Thin edges by eroding interior pixels of thick regions.
+   * Removes pixels with ≥5 ON-neighbors (interior of thick blobs)
+   * while preserving thin lines (≤4 neighbors) and endpoints.
    */
   _thinEdges(data, width, height) {
     const result = new Uint8ClampedArray(data);
     let changed = true;
     let iterations = 0;
-    const maxIterations = 20;
+    const maxIterations = 15;
 
     while (changed && iterations < maxIterations) {
       changed = false;
@@ -206,7 +207,7 @@ export class ImageProcessor {
           const idx = y * width + x;
           if (result[idx] === 0) continue;
 
-          // Count neighbors
+          // Count ON neighbors
           let neighbors = 0;
           for (let dy = -1; dy <= 1; dy++) {
             for (let dx = -1; dx <= 1; dx++) {
@@ -216,13 +217,11 @@ export class ImageProcessor {
             }
           }
 
-          // Thin if isolated or unnecessary
-          if (neighbors <= 2 && Math.random() < 0.5) {
-            // Check if removing this pixel would break connectivity
-            if (!this._breakesConnectivity(result, width, height, x, y)) {
-              result[idx] = 0;
-              changed = true;
-            }
+          // Remove interior pixels of thick edges (≥5 neighbors).
+          // Thin lines have ≤4 neighbors and are preserved.
+          if (neighbors >= 5 && !this._breakesConnectivity(result, width, height, x, y)) {
+            result[idx] = 0;
+            changed = true;
           }
         }
       }
@@ -232,19 +231,25 @@ export class ImageProcessor {
   }
 
   /**
-   * Check if removing a pixel breaks connectivity
+   * Check if removing a pixel breaks 8-connectivity using transition count
+   * (Zhang-Suen criterion: transitions > 1 means the pixel is a bridge).
    */
   _breakesConnectivity(data, width, height, px, py) {
-    // Simplified: check 8-neighborhood
-    let whiteNeighbors = 0;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if ((dx !== 0 || dy !== 0) && data[(py + dy) * width + (px + dx)] === 255) {
-          whiteNeighbors++;
-        }
-      }
+    const n = [
+      data[(py - 1) * width + px] === 255 ? 1 : 0,
+      data[(py - 1) * width + (px + 1)] === 255 ? 1 : 0,
+      data[py * width + (px + 1)] === 255 ? 1 : 0,
+      data[(py + 1) * width + (px + 1)] === 255 ? 1 : 0,
+      data[(py + 1) * width + px] === 255 ? 1 : 0,
+      data[(py + 1) * width + (px - 1)] === 255 ? 1 : 0,
+      data[py * width + (px - 1)] === 255 ? 1 : 0,
+      data[(py - 1) * width + (px - 1)] === 255 ? 1 : 0,
+    ];
+    let transitions = 0;
+    for (let i = 0; i < 8; i++) {
+      if (n[i] === 0 && n[(i + 1) % 8] === 1) transitions++;
     }
-    return whiteNeighbors <= 1;
+    return transitions > 1;
   }
 
   /**
