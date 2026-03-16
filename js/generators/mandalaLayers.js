@@ -196,30 +196,46 @@ function addLotusPetal(pb, center, rIn, rOut, angle, angSpread) {
     .quadTo(iCpR.x, iCpR.y, iBase.x, iBase.y);
 }
 
-/** Image Layer - places vectorized points with radial symmetry */
+/** Image Layer - places vectorized edge points with radial symmetry.
+ *  Consecutive points within connectThresh (normalized) are joined as polylines
+ *  so that edge contours render as continuous strokes. */
 function addImageLayer(pb, center, R, points, count, scale = 1.0, strokeWidth) {
   if (!points || points.length === 0) return;
-  
-  const radius = R * 0.95; // Use most of the available space
-  
+
+  const radius = R * 0.95;
+  // Max normalized distance to treat two consecutive points as connected.
+  // ~8px at 512px resolution covers same-edge neighbours after sampling.
+  const connectThreshSq = 0.016 * 0.016;
+
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
-    
+
+    let prevPoint = null;
+
     for (const p of points) {
-      // Points are normalized -0.5 to 0.5
-      // Scale and rotate
       const px = p.x * radius * scale;
       const py = p.y * radius * scale;
-      
+
       const rx = px * cosA - py * sinA;
       const ry = px * sinA + py * cosA;
-      
-      // Draw as a tiny segment or dot
-      const dotSize = strokeWidth * 0.8;
-      pb.moveTo(center.x + rx, center.y + ry);
-      pb.lineTo(center.x + rx + 0.1, center.y + ry + 0.1);
+
+      const nx = center.x + rx;
+      const ny = center.y + ry;
+
+      if (prevPoint === null) {
+        pb.moveTo(nx, ny);
+      } else {
+        const dx = p.x - prevPoint.x;
+        const dy = p.y - prevPoint.y;
+        if (dx * dx + dy * dy <= connectThreshSq) {
+          pb.lineTo(nx, ny);
+        } else {
+          pb.moveTo(nx, ny);
+        }
+      }
+      prevPoint = p;
     }
   }
 }
