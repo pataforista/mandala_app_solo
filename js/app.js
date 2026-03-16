@@ -7,8 +7,12 @@ import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
 import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
+import { ImageProcessor } from "./core/imageProcessor.js";
 
 const historyMan = new StateHistory();
+const imgProc = new ImageProcessor();
+let currentImage = null;
+let currentImagePoints = [];
 let listenersBound = false;
 
 const stage = document.getElementById("stage");
@@ -57,6 +61,15 @@ const pathsText = document.getElementById("pathsText");
 const kaleidoscopeEl = document.getElementById("kaleidoscope");
 const texturesEl = document.getElementById("textures");
 
+const imageThresholdEl = document.getElementById("imageThreshold");
+const imageZoomEl = document.getElementById("imageZoom");
+const imageScaleEl = document.getElementById("imageScale");
+const imageOffsetXEl = document.getElementById("imageOffsetX");
+const imageOffsetYEl = document.getElementById("imageOffsetY");
+const imageIntensityEl = document.getElementById("imageIntensity");
+const imageUploadEl = document.getElementById("imageUpload");
+const uploadBtn = document.getElementById("uploadBtn");
+
 const DEFAULTS = {
   preset: "A4",
   petals: 12,
@@ -78,6 +91,12 @@ const DEFAULTS = {
   layer8Intensity: 0.35,
   seed: randomSeed32() >>> 0,
   structurePreset: "custom",
+  imageThreshold: 128,
+  imageZoom: 1.0,
+  imageScale: 1.0,
+  imageOffsetX: 0,
+  imageOffsetY: 0,
+  imageIntensity: 1.0,
 };
 
 const STRUCTURE_PRESETS = {
@@ -207,6 +226,9 @@ function render() {
     layer6Intensity: state.layer6Intensity,
     layer7Intensity: state.layer7Intensity,
     layer8Intensity: state.layer8Intensity,
+    imagePoints: currentImagePoints,
+    imageScale: state.imageScale,
+    imageIntensity: state.imageIntensity,
   });
 
   const svgStr = renderDocToSvgString(doc);
@@ -324,6 +346,13 @@ function bindUI() {
 
   structurePresetEl.value = state.structurePreset;
   seedInputEl.value = String(state.seed);
+
+  imageThresholdEl.value = String(state.imageThreshold);
+  imageZoomEl.value = String(state.imageZoom);
+  imageScaleEl.value = String(state.imageScale);
+  imageOffsetXEl.value = String(state.imageOffsetX);
+  imageOffsetYEl.value = String(state.imageOffsetY);
+  imageIntensityEl.value = String(state.imageIntensity);
 
   const update = () => {
     setStateToURL(state);
@@ -494,6 +523,65 @@ function bindUI() {
   });
   layer8IntensityEl.addEventListener("sl-change", update);
 
+  const reprocessImage = () => {
+    if (currentImage) {
+      currentImagePoints = imgProc.process(currentImage, {
+        threshold: state.imageThreshold,
+        zoom: state.imageZoom,
+        offsetX: state.imageOffsetX,
+        offsetY: state.imageOffsetY
+      });
+      update();
+    }
+  };
+
+  imageThresholdEl.addEventListener("sl-input", () => {
+    state.imageThreshold = clampInt(imageThresholdEl.value, 10, 240);
+  });
+  imageThresholdEl.addEventListener("sl-change", reprocessImage);
+
+  imageZoomEl.addEventListener("sl-input", () => {
+    state.imageZoom = clampFloat(imageZoomEl.value, 0.1, 3.0);
+  });
+  imageZoomEl.addEventListener("sl-change", reprocessImage);
+
+  imageScaleEl.addEventListener("sl-input", () => {
+    state.imageScale = clampFloat(imageScaleEl.value, 0.5, 2.5);
+  });
+  imageScaleEl.addEventListener("sl-change", update);
+
+  imageOffsetXEl.addEventListener("sl-input", () => {
+    state.imageOffsetX = clampFloat(imageOffsetXEl.value, -100, 100);
+  });
+  imageOffsetXEl.addEventListener("sl-change", reprocessImage);
+
+  imageOffsetYEl.addEventListener("sl-input", () => {
+    state.imageOffsetY = clampFloat(imageOffsetYEl.value, -100, 100);
+  });
+  imageOffsetYEl.addEventListener("sl-change", reprocessImage);
+
+  imageIntensityEl.addEventListener("sl-input", () => {
+    state.imageIntensity = clampFloat(imageIntensityEl.value, 0, 1);
+  });
+  imageIntensityEl.addEventListener("sl-change", update);
+
+  uploadBtn.onclick = () => imageUploadEl.click();
+  imageUploadEl.onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          currentImage = img;
+          reprocessImage();
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   structurePresetEl.addEventListener("sl-change", () => {
     state.structurePreset = structurePresetEl.value || "custom";
   });
@@ -566,8 +654,18 @@ function bindUI() {
       state.layer5Intensity = intensities[4];
       state.layer6Intensity = intensities[5];
       state.layer7Intensity = intensities[6];
-      state.layer8Intensity = intensities[7];
+      state.imageIntensity = intensities[7];
       
+      // Randomize Image params if active
+      if (currentImage) {
+        state.imageThreshold = rInt(shuffleRng, 60, 180);
+        state.imageZoom = rFloat(shuffleRng, 0.5, 1.5);
+        state.imageScale = rFloat(shuffleRng, 0.8, 1.5);
+        state.imageOffsetX = rFloat(shuffleRng, -20, 20);
+        state.imageOffsetY = rFloat(shuffleRng, -20, 20);
+        reprocessImage();
+      }
+
       state.strokeWidth = rFloat(shuffleRng, 0.4, 1.0);
       state.organic = rFloat(shuffleRng, 0.0, 1.0);
       

@@ -169,6 +169,19 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       return finalSvg;
     };
 
+    // Load custom font if layout is inspirational
+    if (layout === "inspirational") {
+      try {
+        const response = await fetch("assets/sekaiwo/SekaiwoRegular.ttf");
+        const fontArrayBuffer = await response.arrayBuffer();
+        const fontBase64 = arrayBufferToBase64(fontArrayBuffer);
+        doc.addFileToVFS("SekaiwoRegular.ttf", fontBase64);
+        doc.addFont("SekaiwoRegular.ttf", "Sekaiwo", "normal");
+      } catch (e) {
+        console.warn("Could not load custom font, falling back to Times", e);
+      }
+    }
+
     /**
      * Draw a mandala on the PDF at specified position
      */
@@ -188,35 +201,37 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
         const spacing = 3;
 
         // Decorative separator line (optional but elegant)
-        doc.setDrawColor(180, 180, 180);
-        doc.setLineWidth(0.2);
-        doc.line(x + w * 0.1, y + h + 4, x + w * 0.9, y + h + 4);
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.15);
+        doc.line(x + w * 0.15, y + h + 5, x + w * 0.85, y + h + 5);
 
-        // Main quote text - larger and elegant
-        doc.setFontSize(13);
-        doc.setFont("times", "italic");
-        doc.setTextColor(40, 40, 40);
+        // Main quote text - using Sekaiwo font if loaded
+        const hasSekaiwo = doc.getFontList()["Sekaiwo"];
+        doc.setFont(hasSekaiwo ? "Sekaiwo" : "times", hasSekaiwo ? "normal" : "italic");
+        doc.setFontSize(hasSekaiwo ? 15 : 13);
+        doc.setTextColor(30, 30, 30);
+        
         const splitText = doc.splitTextToSize(quote.frase, textWidth);
-        const lineHeight = 5.5;
+        const lineHeight = hasSekaiwo ? 7 : 5.5;
         const textHeight = splitText.length * lineHeight;
-        let textY = y + h + 10;
+        let textY = y + h + 13;
 
-        doc.text(splitText, x + w / 2, textY, { align: "center", lineHeightFactor: 1.3 });
-        textY += textHeight + 3;
+        doc.text(splitText, x + w / 2, textY, { align: "center", lineHeightFactor: 1.2 });
+        textY += textHeight + 4;
 
         // Attribution line - elegant and smaller
         doc.setFontSize(10);
         doc.setFont("times", "normal");
-        doc.setTextColor(100, 100, 100);
+        doc.setTextColor(110, 110, 110);
 
-        // Build attribution: use linaje (tradition) and categoria (theme)
-        let attribution = "Centro de Salud Integral Taoísta";
-        if (quote.linaje) {
-          const linaje = quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1);
-          const categoria = quote.categoria
-            ? " • " + quote.categoria.charAt(0).toUpperCase() + quote.categoria.slice(1)
-            : "";
-          attribution = linaje + categoria;
+        // Use the new autor field or fallback
+        let attribution = quote.autor || "Centro de Salud Integral Taoísta";
+        if (!quote.autor && quote.linaje) {
+            const linaje = quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1);
+            const categoria = quote.categoria
+              ? " • " + quote.categoria.charAt(0).toUpperCase() + quote.categoria.slice(1)
+              : "";
+            attribution = linaje + categoria;
         }
 
         doc.text("— " + attribution + " —", x + w / 2, textY + 2, { align: "center" });
@@ -329,4 +344,14 @@ function stripIdsDeep(node) {
   if (node.hasAttribute("id")) node.removeAttribute("id");
   const all = node.querySelectorAll?.("[id]");
   if (all && all.length) all.forEach(el => el.removeAttribute("id"));
+}
+
+function arrayBufferToBase64(buffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
 }

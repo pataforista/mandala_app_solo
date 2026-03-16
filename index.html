@@ -15,6 +15,13 @@
   <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.1/cdn/shoelace.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
+    @font-face {
+      font-family: 'Sekaiwo';
+      src: url('assets/sekaiwo/SekaiwoRegular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
     :root {
       /* M3 Tonal Palettes (Approximate) */
       --m3-primary: #6750A4;
@@ -362,6 +369,25 @@
             <sl-range id="layer6Intensity" label="Capas 6" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
             <sl-range id="layer7Intensity" label="Capas 7" min="0" max="1" step="0.05" value="0.5" size="small"></sl-range>
             <sl-range id="layer8Intensity" label="Capas 8 (Borde)" min="0" max="1" step="0.05" value="0.4" size="small"></sl-range>
+          </div>
+        </sl-accordion-item>
+
+        <sl-accordion-item>
+          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Integración de Imagen</span>
+          <div class="control-group" style="padding: 12px 0;">
+            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+            <sl-button id="uploadBtn" variant="primary" size="small" pill style="width: 100%;">
+              <sl-icon slot="prefix" name="upload"></sl-icon>
+              Subir Foto/Líneas
+            </sl-button>
+            <sl-range id="imageThreshold" label="Sensibilidad (Bordes)" min="10" max="240" value="128"></sl-range>
+            <sl-range id="imageZoom" label="Zoom" min="0.1" max="3" step="0.05" value="1.0"></sl-range>
+            <sl-range id="imageScale" label="Escala en Mandala" min="0.5" max="2.5" step="0.1" value="1.0"></sl-range>
+            <div style="display: flex; gap: 8px;">
+               <sl-range id="imageOffsetX" label="X" min="-100" max="100" value="0" style="flex:1;"></sl-range>
+               <sl-range id="imageOffsetY" label="Y" min="-100" max="100" value="0" style="flex:1;"></sl-range>
+            </div>
+            <sl-range id="imageIntensity" label="Intensidad de Capa" min="0" max="1" step="0.05" value="1.0"></sl-range>
           </div>
         </sl-accordion-item>
       </sl-accordion>
