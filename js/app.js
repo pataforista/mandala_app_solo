@@ -194,6 +194,29 @@ function applyStructurePreset(presetKey) {
   return true;
 }
 
+function buildOpts(s) {
+  return {
+    seed: s.seed,
+    petals: s.petals,
+    complexity: s.complexity,
+    strokeWidthMm: s.strokeWidth,
+    organicLevel: s.organic,
+    includeFrames: s.frames,
+    pageBorder: s.pageBorder,
+    kaleidoscope: s.kaleidoscope,
+    textures: s.textures,
+    styleMode: s.styleMode,
+    layer1Intensity: s.layer1Intensity,
+    layer2Intensity: s.layer2Intensity,
+    layer3Intensity: s.layer3Intensity,
+    layer4Intensity: s.layer4Intensity,
+    layer5Intensity: s.layer5Intensity,
+    layer6Intensity: s.layer6Intensity,
+    layer7Intensity: s.layer7Intensity,
+    layer8Intensity: s.layer8Intensity,
+  };
+}
+
 function getCurrentDoc() {
   return createDoc({
     preset: state.preset,
@@ -741,26 +764,6 @@ function bindUI() {
     if (layout === "trio") count = 3;
 
     // 2. Build opts (all same design)
-    const buildOpts = (s) => ({
-      seed: s.seed,
-      petals: s.petals,
-      complexity: s.complexity,
-      strokeWidthMm: s.strokeWidth,
-      organicLevel: s.organic,
-      includeFrames: s.frames,
-      pageBorder: s.pageBorder,
-      kaleidoscope: s.kaleidoscope,
-      textures: s.textures,
-      styleMode: s.styleMode,
-      layer1Intensity: s.layer1Intensity,
-      layer2Intensity: s.layer2Intensity,
-      layer3Intensity: s.layer3Intensity,
-      layer4Intensity: s.layer4Intensity,
-      layer5Intensity: s.layer5Intensity,
-      layer6Intensity: s.layer6Intensity,
-      layer7Intensity: s.layer7Intensity,
-      layer8Intensity: s.layer8Intensity,
-    });
 
     const batchOpts = Array.from({ length: count }, () => buildOpts(state));
 
@@ -801,6 +804,113 @@ function bindUI() {
 
   if (shareBtn) {
     shareBtn.addEventListener("click", shareBtnHandler);
+  }
+
+  // === Book Builder ===
+  const openBookBuilderBtn = document.getElementById("openBookBuilder");
+  const bookBuilderDialog = document.getElementById("bookBuilderDialog");
+  const bookProgressDialog = document.getElementById("bookProgressDialog");
+  const cancelBookBtn = document.getElementById("cancelBookBtn");
+  const generateBookBtn = document.getElementById("generateBookBtn");
+  const bookTitleEl = document.getElementById("bookTitle");
+  const bookPagesEl = document.getElementById("bookPages");
+  const bookStyleVarietyEl = document.getElementById("bookStyleVariety");
+  const bookLayoutSel = document.getElementById("bookLayoutSel");
+  const bookIncludeCoverEl = document.getElementById("bookIncludeCover");
+  const bookPageNumbersEl = document.getElementById("bookPageNumbers");
+  const bookQualityEl = document.getElementById("bookQuality");
+  const bookProgressTextEl = document.getElementById("bookProgressText");
+  const bookProgressBarEl = document.getElementById("bookProgressBar");
+  const bookProgressPctEl = document.getElementById("bookProgressPercent");
+
+  if (bookPagesEl) {
+    bookPagesEl.addEventListener("sl-input", () => {
+      bookPagesEl.label = `Páginas: ${bookPagesEl.value}`;
+    });
+  }
+
+  if (openBookBuilderBtn && bookBuilderDialog) {
+    openBookBuilderBtn.onclick = () => bookBuilderDialog.show();
+  }
+
+  if (cancelBookBtn && bookBuilderDialog) {
+    cancelBookBtn.onclick = () => bookBuilderDialog.hide();
+  }
+
+  if (generateBookBtn && bookBuilderDialog && bookProgressDialog) {
+    generateBookBtn.onclick = async () => {
+      const numPages = parseInt(bookPagesEl.value, 10) || 20;
+      const bookTitle = bookTitleEl.value.trim() || "Mandalas para Colorear";
+      const styleVariety = bookStyleVarietyEl.value || "current";
+      const bookLayout = bookLayoutSel.value || "classic";
+      const includeCover = bookIncludeCoverEl.checked;
+      const withPageNumbers = bookPageNumbersEl.checked;
+      const dpi = bookQualityEl.value === "high" ? 300 : 150;
+
+      const perPage = { classic: 1, duo: 2, mirror: 2, trio: 3, collage: 4 };
+      const mandalaCount = numPages * (perPage[bookLayout] || 1);
+
+      const bookRng = mulberry32((state.seed ^ 0xBEEF1234) >>> 0);
+      const styles = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
+      const presetKeys = Object.keys(STRUCTURE_PRESETS).filter(k => k !== "custom");
+
+      const batchStates = [];
+      for (let i = 0; i < mandalaCount; i++) {
+        const s = { ...state, seed: ((state.seed + i + 1) >>> 0) };
+        if (styleVariety === "mix") {
+          const pKey = presetKeys[rInt(bookRng, 0, presetKeys.length - 1)];
+          Object.assign(s, STRUCTURE_PRESETS[pKey] || {});
+          s.seed = ((state.seed + i + 1) >>> 0);
+        } else if (styleVariety === "random") {
+          s.styleMode = styles[rInt(bookRng, 0, styles.length - 1)];
+          s.petals = rInt(bookRng, 4, 20) * 2;
+          s.complexity = rInt(bookRng, 80, 280);
+          s.strokeWidth = rFloat(bookRng, 0.4, 1.0);
+          s.organic = rFloat(bookRng, 0.0, 0.8);
+          const lays = Array.from({ length: 8 }, () => rFloat(bookRng, 0.3, 1.0));
+          [0, 1, 2, 3].forEach(j => { lays[j] = Math.max(lays[j], 0.6); });
+          s.layer1Intensity = lays[0]; s.layer2Intensity = lays[1];
+          s.layer3Intensity = lays[2]; s.layer4Intensity = lays[3];
+          s.layer5Intensity = lays[4]; s.layer6Intensity = lays[5];
+          s.layer7Intensity = lays[6]; s.layer8Intensity = lays[7];
+        }
+        batchStates.push(buildOpts(s));
+      }
+
+      bookBuilderDialog.hide();
+
+      bookProgressBarEl.value = 0;
+      bookProgressPctEl.textContent = "0%";
+      bookProgressTextEl.textContent = "Iniciando generación...";
+      bookProgressDialog.show();
+
+      const doc = getCurrentDoc();
+      const { wMm, hMm } = doc.page;
+      const filename = `libro_mandalas_${numPages}pags_s${state.seed}.pdf`;
+
+      try {
+        await downloadBatchPdf(
+          filename, batchStates, generateMandalaLayers, wMm, hMm, bookLayout, [],
+          {
+            dpi,
+            coverPage: includeCover ? { title: bookTitle, coverState: buildOpts(state) } : null,
+            pageNumbers: withPageNumbers,
+            onProgress: (cur, tot, lbl) => {
+              const pct = tot > 0 ? Math.round((cur / tot) * 100) : 0;
+              bookProgressBarEl.value = pct;
+              bookProgressPctEl.textContent = pct + "%";
+              bookProgressTextEl.textContent = lbl || `Mandala ${cur} de ${tot}`;
+            },
+          }
+        );
+        bookProgressDialog.hide();
+        alert(`✅ ¡Libro listo! ${numPages} páginas · semilla ${state.seed}`);
+      } catch (err) {
+        bookProgressDialog.hide();
+        console.error("Book generation error:", err);
+        alert("❌ Error al generar el libro: " + (err.message || "Intenta de nuevo"));
+      }
+    };
   }
 
   // Keyboard shortcuts for rapid production
