@@ -217,10 +217,12 @@ function addHeartPetal(pb, center, rIn, rOut, angle, angStep) {
   const iR = _p(iLobeR, angle + angStep * 0.19, center);
   const ic1 = _p(iLobeR + span * 0.05, angle - angStep * 0.30, center);
   const ic2 = _p(iLobeR + span * 0.05, angle + angStep * 0.30, center);
-  pb.moveTo(_p(rIn + span * 0.28, angle, center).x, _p(rIn + span * 0.28, angle, center).y)
+  const iBase = _p(rIn + span * 0.28, angle, center);
+  const iApex = _p(rOut - span * 0.18, angle, center);
+  pb.moveTo(iBase.x, iBase.y)
     .quadTo(ic1.x, ic1.y, iL.x, iL.y)
-    .quadTo(_p(rOut - span * 0.18, angle, center).x, _p(rOut - span * 0.18, angle, center).y, iR.x, iR.y)
-    .quadTo(ic2.x, ic2.y, _p(rIn + span * 0.28, angle, center).x, _p(rIn + span * 0.28, angle, center).y).close();
+    .quadTo(iApex.x, iApex.y, iR.x, iR.y)
+    .quadTo(ic2.x, ic2.y, iBase.x, iBase.y).close();
 }
 
 /** Fleur-de-lis petal: narrow central spike with two side bead ornaments */

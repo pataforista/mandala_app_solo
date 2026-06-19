@@ -762,6 +762,7 @@ function bindUI() {
     let count = 1;
     if (layout === "duo" || layout === "mirror") count = 2;
     if (layout === "trio") count = 3;
+    if (layout === "collage") count = 4;
 
     // 2. Build opts (all same design)
 
