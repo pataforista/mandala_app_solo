@@ -328,6 +328,25 @@
         <sl-accordion-item open>
           <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="aspect-ratio"></sl-icon> Geometría</span>
           <div class="control-group" style="padding: 12px 0;">
+            <sl-select id="generatorType" label="Tipo de Motor" size="small" value="layers">
+              <sl-option value="layers">Modular (8 Capas)</sl-option>
+              <sl-option value="radial">Radial (Editorial)</sl-option>
+            </sl-select>
+            <sl-select id="layoutMode" label="Modo Lienzo" size="small" value="single">
+              <sl-option value="single">Individual</sl-option>
+              <sl-option value="grid2x2">Collage 2×2</sl-option>
+              <sl-option value="grid3x3">Collage 3×3</sl-option>
+            </sl-select>
+            <sl-select id="previewQuality" label="Calidad de Vista Previa" size="small" value="high">
+              <sl-option value="low">Baja (Rápido)</sl-option>
+              <sl-option value="medium">Media</sl-option>
+              <sl-option value="high">Alta (Detallado)</sl-option>
+            </sl-select>
+            <sl-select id="pngDpi" label="Resolución PNG" size="small" value="300">
+              <sl-option value="150">150 DPI</sl-option>
+              <sl-option value="300">300 DPI</sl-option>
+              <sl-option value="600">600 DPI</sl-option>
+            </sl-select>
             <sl-select id="preset" label="Formato de Papel" size="small" value="A4">
               <sl-option value="A4">A4</sl-option>
               <sl-option value="LETTER">Carta</sl-option>
@@ -343,6 +362,7 @@
               <sl-option value="celtico">Céltico</sl-option>
             </sl-select>
             <sl-checkbox id="kaleidoscope" checked>Simetría (Kaleidoscopio)</sl-checkbox>
+            <sl-checkbox id="spiroEnabled" style="display: none;">Espirógrafo (Spirograph)</sl-checkbox>
           </div>
         </sl-accordion-item>
 
@@ -358,9 +378,16 @@
           </div>
         </sl-accordion-item>
 
-        <sl-accordion-item>
+        <sl-accordion-item id="layersAccordionItem">
           <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="layers"></sl-icon> Capas (8)</span>
           <div class="control-group" style="padding: 12px 0;">
+            <sl-select id="layerPreset" label="Perfil de Capas" size="small" value="custom">
+              <sl-option value="custom">Personalizado</sl-option>
+              <sl-option value="equilibrado">Equilibrado</sl-option>
+              <sl-option value="centro">Centro</sl-option>
+              <sl-option value="borde">Borde</sl-option>
+              <sl-option value="alterno">Alterno</sl-option>
+            </sl-select>
             <sl-range id="layer1Intensity" label="Capas 1 (Centro)" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
             <sl-range id="layer2Intensity" label="Capas 2" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
             <sl-range id="layer3Intensity" label="Capas 3" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
@@ -372,14 +399,17 @@
           </div>
         </sl-accordion-item>
 
-        <sl-accordion-item>
+        <sl-accordion-item id="imageAccordionItem">
           <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Integración de Imagen</span>
           <div class="control-group" style="padding: 12px 0;">
             <input type="file" id="imageUpload" accept="image/*" style="display: none;">
-            <sl-button id="uploadBtn" variant="primary" size="small" pill style="width: 100%;">
-              <sl-icon slot="prefix" name="upload"></sl-icon>
-              Subir Foto/Líneas
-            </sl-button>
+            <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+              <sl-button id="uploadBtn" variant="primary" size="small" pill style="flex: 1;">
+                <sl-icon slot="prefix" name="upload"></sl-icon>
+                Subir Foto/Líneas
+              </sl-button>
+              <sl-spinner id="imageSpinner" style="display: none; font-size: 1.2rem;"></sl-spinner>
+            </div>
             <sl-range id="imageThreshold" label="Sensibilidad (Bordes)" min="10" max="240" value="128"></sl-range>
             <sl-range id="imageZoom" label="Zoom" min="0.1" max="3" step="0.05" value="1.0"></sl-range>
             <sl-range id="imageScale" label="Escala en Mandala" min="0.5" max="2.5" step="0.1" value="1.0"></sl-range>
@@ -444,6 +474,15 @@
     </div>
     <sl-button slot="footer" variant="primary" id="closeGallery">Cerrar</sl-button>
   </sl-drawer>
+
+  <!-- Progress Dialog for Exports -->
+  <sl-dialog id="progressDialog" label="Exportando PDF..." no-header style="--width: 320px;">
+    <div style="display: flex; flex-direction: column; gap: 16px; align-items: center; padding: 16px 0;">
+      <sl-spinner style="font-size: 2.5rem; --track-width: 4px;"></sl-spinner>
+      <div id="progressStatus" style="font-weight: 500; font-family: var(--app-font-body); text-align: center;">Procesando páginas...</div>
+      <sl-progress-bar id="progressBar" value="0" style="width: 100%;"></sl-progress-bar>
+    </div>
+  </sl-dialog>
 
   <script type="module" src="./js/app.js"></script>
 </body>

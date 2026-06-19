@@ -1,5 +1,6 @@
 import { mulberry32, rFloat } from "../core/prng.js";
 import { PathBuilder } from "../core/pathBuilder.js";
+import { lerp, clamp, fmt, polar, polarW, getWobblePhases } from "../core/geometry.js";
 
 /**
  * Mandala Radial (Book / Coloring) — Editorial
@@ -231,23 +232,12 @@ export function generateMandalaRadial(doc, opts) {
   }
 
   // --- Helpers for natural look ---
-  // Use full seed bits for phase offsets to maximize variety across seeds
-  const _wPhase1 = ((seed ^ (seed >>> 16)) & 0xFFFF) * 9.587e-5;  // 0..6.28
-  const _wPhase2 = (((seed >>> 8) ^ (seed >>> 24)) & 0xFFFF) * 9.587e-5;
-  function _wobble(val, intensity = 1.0) {
-    if (organicLevel < 0.05) return val;
-    const noise = Math.sin(val * 17.3 + _wPhase1) * 0.5 + Math.cos(val * 11.7 + _wPhase2) * 0.3;
-    return val + noise * organicLevel * intensity * 0.8;
-  }
-
-  function _polarW(r, theta, intensity = 0.5) {
-    const tw = _wobble(theta, intensity);
-    const rw = _wobble(r, intensity * 0.2);
-    return {
-      x: rw * Math.cos(tw),
-      y: rw * Math.sin(tw)
-    };
-  }
+  const { wPhase1, wPhase2 } = getWobblePhases(seed);
+  const _polarW = (r, theta, intensity = 0.5) => polarW(r, theta, intensity, organicLevel, wPhase1, wPhase2);
+  const _polar0 = (r, theta) => polar(r, theta);
+  const _lerp = (a, b, t) => lerp(a, b, t);
+  const _clamp = (v, min, max) => clamp(v, min, max);
+  const _fmt = (n) => fmt(n);
 
 
 
@@ -276,14 +266,14 @@ export function generateMandalaRadial(doc, opts) {
 
     // factor de seguridad de área: mayor cuando densidad alta o petals alto
     let areaFactor = 1.0;
-    if (ring.density === “high”) areaFactor += 0.20;
+    if (ring.density === "high") areaFactor += 0.20;
     areaFactor += 0.30 * petalsPenalty;
 
-    // el anillo “frame” tolera un poco más subdiv (pero sin slivers)
-    if (ring.role === “frame”) areaFactor = Math.max(0.90, areaFactor - 0.10);
+    // el anillo "frame" tolera un poco más subdiv (pero sin slivers)
+    if (ring.role === "frame") areaFactor = Math.max(0.90, areaFactor - 0.10);
 
-    // “rest” no subdivide por diseño (pero por si acaso)
-    if (ring.role === “rest”) return false;
+    // "rest" no subdivide por diseño (pero por si acaso)
+    if (ring.role === "rest") return false;
 
     // chequeos
     if (area < minCellAreaMm2 * areaFactor) return false;
@@ -1158,14 +1148,14 @@ if (includeFrames) {
     const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82);
     const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), mainStroke * 2.2, computedRadius * 0.020);
 
+    const pbBeads = new PathBuilder();
     for (let i = 0; i < beadCount; i++) {
       const a = (i * 2 * Math.PI) / beadCount;
       const bx = cx + beadRingR * Math.cos(a);
       const by = cy + beadRingR * Math.sin(a);
-      doc.body.push(
-        `<circle cx="${_fmt(bx)}" cy="${_fmt(by)}" r="${_fmt(beadR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(outerRingStrokes.detail)}" />`
-      );
+      addCirclePoly(pbBeads, bx, by, beadR, 8);
     }
+    doc.body.push(pbBeads.toPath({ stroke, strokeWidthMm: outerRingStrokes.detail, fill: "none" }));
   }
 
   // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
@@ -1174,14 +1164,14 @@ if (includeFrames) {
     const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), mainStroke * 2.6, computedRadius * 0.060);
     const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
 
+    const pbScallop = new PathBuilder();
     for (let i = 0; i < scallopCount; i++) {
       const a = (i * 2 * Math.PI) / scallopCount;
       const sx = cx + scallopCenterR * Math.cos(a);
       const sy = cy + scallopCenterR * Math.sin(a);
-      doc.body.push(
-        `<circle cx="${_fmt(sx)}" cy="${_fmt(sy)}" r="${_fmt(scallopR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(outerRingStrokes.main)}" />`
-      );
+      addCirclePoly(pbScallop, sx, sy, scallopR, 12);
     }
+    doc.body.push(pbScallop.toPath({ stroke, strokeWidthMm: outerRingStrokes.main, fill: "none" }));
   }
   doc.body.push(
     `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduClearR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(Math.max(minStrokeMm, outerRingStrokes.main * 0.7))}" />`
@@ -1241,10 +1231,4 @@ if (spiroEnabled) {
 }
 }
 
-// --- Helpers ---
-function _polar0(r, theta) {
-  return { x: r * Math.cos(theta), y: r * Math.sin(theta) };
-}
-function _lerp(a, b, t) { return a + (b - a) * t; }
-function _clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-function _fmt(n) { return (Math.round(n * 1000) / 1000).toString(); }
+

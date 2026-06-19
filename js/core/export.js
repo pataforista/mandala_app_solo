@@ -10,7 +10,7 @@ export function downloadTextFile(filename, text) {
 /**
  * Convert SVG string to canvas image data URL
  */
-function svgStringToImageData(svgString, widthPx, heightPx) {
+export function svgStringToImageData(svgString, widthPx, heightPx) {
   return new Promise((resolve, reject) => {
     try {
       const img = new Image();

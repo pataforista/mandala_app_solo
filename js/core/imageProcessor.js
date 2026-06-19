@@ -1,60 +1,137 @@
-
+// js/core/imageProcessor.js
 /**
  * Image Processing Module for Mandala Studio
  * Handles Edge Detection (Sobel), Thinning, and Vectorization
- * Optimized for better line extraction and detail preservation
+ * Uses a Web Worker to run CPU-intensive logic off the main thread.
+ * Falls back to synchronous execution if Web Workers are not supported or fail.
  */
 
 export class ImageProcessor {
   constructor() {
     this.canvas = document.createElement('canvas');
     this.ctx = this.canvas.getContext('2d');
+    this.worker = null;
+    this.pendingResolve = null;
+    this.pendingReject = null;
+    this.lastSyncArgs = null;
+
+    try {
+      // Instantiate worker relative to this file
+      this.worker = new Worker(new URL('./imageWorker.js', import.meta.url));
+      
+      this.worker.onmessage = (e) => {
+        if (e.data.status === 'success') {
+          if (this.pendingResolve) {
+            this.pendingResolve(e.data.points);
+            this.pendingResolve = null;
+            this.pendingReject = null;
+          }
+        } else {
+          console.error("Worker processing failed, falling back to sync:", e.data.error);
+          this._fallbackSyncAndResolve();
+        }
+      };
+
+      this.worker.onerror = (err) => {
+        console.error("Worker error, falling back to sync:", err);
+        this._fallbackSyncAndResolve();
+      };
+    } catch (e) {
+      console.warn("Could not load Image Web Worker, using synchronous fallback:", e);
+    }
   }
 
   /**
-   * Process an image to extract edge points with preprocessing
+   * Process an image asynchronously (runs in Web Worker, falls back to main thread on error)
    * @param {HTMLImageElement} img
    * @param {Object} opts { threshold, zoom, offsetX, offsetY, samples }
-   * @returns {Array} List of {x, y} points
+   * @returns {Promise<Array>} List of {x, y} points
    */
-  process(img, opts = {}) {
-    const {
-      threshold = 128,
-      zoom = 1.0,
-      offsetX = 0,
-      offsetY = 0,
-      samples = 2
-    } = opts;
+  processAsync(img, opts = {}) {
+    return new Promise((resolve, reject) => {
+      // Cancel previous pending process if user updates input rapidly
+      if (this.pendingResolve) {
+        this.pendingResolve([]);
+      }
+      this.pendingResolve = resolve;
+      this.pendingReject = reject;
 
-    const targetDim = 512;
-    this.canvas.width = targetDim;
-    this.canvas.height = targetDim;
+      const {
+        threshold = 128,
+        zoom = 1.0,
+        offsetX = 0,
+        offsetY = 0,
+        samples = 2
+      } = opts;
 
-    this.ctx.clearRect(0, 0, targetDim, targetDim);
+      const targetDim = 512;
+      this.canvas.width = targetDim;
+      this.canvas.height = targetDim;
 
-    const w = img.width * zoom;
-    const h = img.height * zoom;
-    const x = (targetDim - w) / 2 + offsetX;
-    const y = (targetDim - h) / 2 + offsetY;
+      this.ctx.clearRect(0, 0, targetDim, targetDim);
 
-    this.ctx.drawImage(img, x, y, w, h);
+      const w = img.width * zoom;
+      const h = img.height * zoom;
+      const x = (targetDim - w) / 2 + offsetX;
+      const y = (targetDim - h) / 2 + offsetY;
 
-    const imageData = this.ctx.getImageData(0, 0, targetDim, targetDim);
-    const data = imageData.data;
+      this.ctx.drawImage(img, x, y, w, h);
 
-    // Preprocessing pipeline
-    let grayscale = this._toGrayscale(data, targetDim, targetDim);
-    grayscale = this._gaussianBlur(grayscale, targetDim, targetDim, 1.5);
+      const imageData = this.ctx.getImageData(0, 0, targetDim, targetDim);
 
-    const edges = this._applySobel(grayscale, targetDim, targetDim, threshold);
-    const thinned = this._thinEdges(edges, targetDim, targetDim);
+      // Save sync fallback inputs
+      this.lastSyncArgs = {
+        imageData,
+        threshold,
+        samples
+      };
 
-    return this._vectorizeOptimized(thinned, targetDim, targetDim, samples);
+      if (this.worker) {
+        this.worker.postMessage({
+          pixelData: imageData.data,
+          width: targetDim,
+          height: targetDim,
+          threshold,
+          samples
+        });
+      } else {
+        this._fallbackSyncAndResolve();
+      }
+    });
   }
 
   /**
-   * Convert RGBA to grayscale
+   * Synchronous fallback processing
    */
+  _fallbackSyncAndResolve() {
+    if (this.pendingResolve && this.lastSyncArgs) {
+      try {
+        const { imageData, threshold, samples } = this.lastSyncArgs;
+        const points = this._processSync(imageData, threshold, samples);
+        this.pendingResolve(points);
+      } catch (err) {
+        console.error("Synchronous image processing fallback failed:", err);
+        this.pendingResolve([]);
+      }
+      this.pendingResolve = null;
+      this.pendingReject = null;
+    }
+  }
+
+  _processSync(imageData, threshold, samples) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+
+    let grayscale = this._toGrayscale(data, width, height);
+    grayscale = this._gaussianBlur(grayscale, width, height, 1.5);
+
+    const edges = this._applySobel(grayscale, width, height, threshold);
+    const thinned = this._thinEdges(edges, width, height);
+
+    return this._vectorizeOptimized(thinned, width, height, samples);
+  }
+
   _toGrayscale(data, width, height) {
     const grayscale = new Uint8ClampedArray(width * height);
     for (let i = 0; i < data.length; i += 4) {
@@ -63,9 +140,6 @@ export class ImageProcessor {
     return grayscale;
   }
 
-  /**
-   * Apply Gaussian blur for noise reduction
-   */
   _gaussianBlur(data, width, height, sigma = 1.0) {
     const kernel = this._gaussianKernel(sigma);
     const result = new Uint8ClampedArray(width * height);
@@ -107,9 +181,6 @@ export class ImageProcessor {
     return result;
   }
 
-  /**
-   * Generate Gaussian kernel
-   */
   _gaussianKernel(sigma) {
     const size = Math.ceil(sigma * 3) * 2 + 1;
     const kernel = Array(size).fill(0).map(() => Array(size).fill(0));
@@ -123,7 +194,6 @@ export class ImageProcessor {
       }
     }
 
-    // Normalize
     let total = kernel.flat().reduce((a, b) => a + b, 0);
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
@@ -134,17 +204,12 @@ export class ImageProcessor {
     return kernel;
   }
 
-  /**
-   * Apply optimized Sobel edge detection
-   */
   _applySobel(grayscale, width, height, threshold) {
     const result = new Uint8ClampedArray(width * height);
     const gx = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
     const gy = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
-    let maxMag = 0;
     const magnitudes = new Float32Array(width * height);
 
-    // Compute magnitudes
     for (let y = 1; y < height - 1; y++) {
       for (let x = 1; x < width - 1; x++) {
         let sumX = 0, sumY = 0;
@@ -155,20 +220,16 @@ export class ImageProcessor {
             sumY += val * gy[(ky + 1) * 3 + (kx + 1)];
           }
         }
-        const mag = Math.sqrt(sumX * sumX + sumY * sumY);
-        magnitudes[y * width + x] = mag;
-        maxMag = Math.max(maxMag, mag);
+        magnitudes[y * width + x] = Math.sqrt(sumX * sumX + sumY * sumY);
       }
     }
 
-    // Non-maximum suppression for thinner edges
     for (let y = 1; y < height - 1; y++) {
       for (let x = 1; x < width - 1; x++) {
         const idx = y * width + x;
         const mag = magnitudes[idx];
 
         if (mag > threshold) {
-          // Simple non-max suppression: compare with neighbors
           let isMax = true;
           for (let dy = -1; dy <= 1; dy++) {
             for (let dx = -1; dx <= 1; dx++) {
@@ -187,11 +248,6 @@ export class ImageProcessor {
     return result;
   }
 
-  /**
-   * Thin edges by eroding interior pixels of thick regions.
-   * Removes pixels with ≥5 ON-neighbors (interior of thick blobs)
-   * while preserving thin lines (≤4 neighbors) and endpoints.
-   */
   _thinEdges(data, width, height) {
     const result = new Uint8ClampedArray(data);
     let changed = true;
@@ -207,7 +263,6 @@ export class ImageProcessor {
           const idx = y * width + x;
           if (result[idx] === 0) continue;
 
-          // Count ON neighbors
           let neighbors = 0;
           for (let dy = -1; dy <= 1; dy++) {
             for (let dx = -1; dx <= 1; dx++) {
@@ -217,9 +272,7 @@ export class ImageProcessor {
             }
           }
 
-          // Remove interior pixels of thick edges (≥5 neighbors).
-          // Thin lines have ≤4 neighbors and are preserved.
-          if (neighbors >= 5 && !this._breakesConnectivity(result, width, height, x, y)) {
+          if (neighbors >= 5 && !this._breaksConnectivity(result, width, height, x, y)) {
             result[idx] = 0;
             changed = true;
           }
@@ -230,11 +283,7 @@ export class ImageProcessor {
     return result;
   }
 
-  /**
-   * Check if removing a pixel breaks 8-connectivity using transition count
-   * (Zhang-Suen criterion: transitions > 1 means the pixel is a bridge).
-   */
-  _breakesConnectivity(data, width, height, px, py) {
+  _breaksConnectivity(data, width, height, px, py) {
     const n = [
       data[(py - 1) * width + px] === 255 ? 1 : 0,
       data[(py - 1) * width + (px + 1)] === 255 ? 1 : 0,
@@ -252,14 +301,10 @@ export class ImageProcessor {
     return transitions > 1;
   }
 
-  /**
-   * Vectorize edges with smart sampling and noise reduction
-   */
   _vectorizeOptimized(data, width, height, step) {
     const points = [];
     const visited = new Set();
 
-    // Find all edge pixels
     const edgePixels = [];
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
@@ -269,14 +314,12 @@ export class ImageProcessor {
       }
     }
 
-    // Cluster and sample points adaptively
     for (let i = 0; i < edgePixels.length; i += Math.max(1, step)) {
       const pixel = edgePixels[i];
       const key = `${pixel.x},${pixel.y}`;
 
       if (!visited.has(key)) {
         visited.add(key);
-        // Normalize coordinates to -0.5 to 0.5
         points.push({
           x: (pixel.x / width) - 0.5,
           y: (pixel.y / height) - 0.5
@@ -284,13 +327,9 @@ export class ImageProcessor {
       }
     }
 
-    // Remove near-duplicate points
     return this._reduceRedundantPoints(points, 0.005);
   }
 
-  /**
-   * Remove points that are too close together
-   */
   _reduceRedundantPoints(points, minDistance) {
     if (points.length === 0) return points;
 

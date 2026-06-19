@@ -8,12 +8,12 @@ export function randomSeed32() {
 }
 
 // All params that should be persisted in URL
-const INT_PARAMS = ["petals", "complexity", "seed"];
+const INT_PARAMS = ["petals", "complexity", "seed", "pngDpi"];
 const FLOAT_PARAMS = ["organic", "strokeWidth",
   "layer1Intensity", "layer2Intensity", "layer3Intensity", "layer4Intensity",
   "layer5Intensity", "layer6Intensity", "layer7Intensity", "layer8Intensity"];
-const STRING_PARAMS = ["preset", "styleMode", "structurePreset"];
-const BOOL_PARAMS = ["frames", "pageBorder", "kaleidoscope", "textures"];
+const STRING_PARAMS = ["preset", "styleMode", "structurePreset", "generatorType", "previewQuality", "layoutMode", "layerPreset"];
+const BOOL_PARAMS = ["frames", "pageBorder", "kaleidoscope", "textures", "spiroEnabled"];
 
 export function getStateFromURL(defaults) {
   try {
