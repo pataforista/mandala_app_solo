@@ -196,6 +196,94 @@ function addLotusPetal(pb, center, rIn, rOut, angle, angSpread) {
     .quadTo(iCpR.x, iCpR.y, iBase.x, iBase.y);
 }
 
+/** Heart petal: two rounded lobes meeting at a pointed outer tip */
+function addHeartPetal(pb, center, rIn, rOut, angle, angStep) {
+  const span = rOut - rIn;
+  const tip = _p(rOut, angle, center);
+  const base = _p(rIn + span * 0.18, angle, center);
+  const lobeR = rIn + span * 0.6;
+  const lh = angStep * 0.22;
+  const lobeL = _p(lobeR, angle - lh, center);
+  const lobeRgt = _p(lobeR, angle + lh, center);
+  const c1 = _p(lobeR + span * 0.1, angle - angStep * 0.34, center);
+  const c2 = _p(lobeR + span * 0.1, angle + angStep * 0.34, center);
+  pb.moveTo(base.x, base.y)
+    .quadTo(c1.x, c1.y, lobeL.x, lobeL.y)
+    .quadTo(tip.x, tip.y, lobeRgt.x, lobeRgt.y)
+    .quadTo(c2.x, c2.y, base.x, base.y).close();
+  // Inner echo for coloring depth
+  const iLobeR = rIn + span * 0.47;
+  const iL = _p(iLobeR, angle - angStep * 0.19, center);
+  const iR = _p(iLobeR, angle + angStep * 0.19, center);
+  const ic1 = _p(iLobeR + span * 0.05, angle - angStep * 0.30, center);
+  const ic2 = _p(iLobeR + span * 0.05, angle + angStep * 0.30, center);
+  const iBase = _p(rIn + span * 0.28, angle, center);
+  const iApex = _p(rOut - span * 0.18, angle, center);
+  pb.moveTo(iBase.x, iBase.y)
+    .quadTo(ic1.x, ic1.y, iL.x, iL.y)
+    .quadTo(iApex.x, iApex.y, iR.x, iR.y)
+    .quadTo(ic2.x, ic2.y, iBase.x, iBase.y).close();
+}
+
+/** Fleur-de-lis petal: narrow central spike with two side bead ornaments */
+function addFleurPetal(pb, center, rIn, rOut, angle, angStep, fineStroke) {
+  const span = rOut - rIn;
+  const pIn = _p(rIn, angle, center);
+  const pOut = _p(rOut, angle, center);
+  const midR = rIn + span * 0.72;
+  pb.moveTo(pIn.x, pIn.y)
+    .quadTo(_p(midR, angle - angStep * 0.22, center).x, _p(midR, angle - angStep * 0.22, center).y, pOut.x, pOut.y)
+    .quadTo(_p(midR, angle + angStep * 0.22, center).x, _p(midR, angle + angStep * 0.22, center).y, pIn.x, pIn.y)
+    .close();
+  const beadR = Math.max(span * 0.08, fineStroke * 2);
+  const beadMid = rIn + span * 0.34;
+  addCircle(pb, _p(beadMid, angle - angStep * 0.27, center).x, _p(beadMid, angle - angStep * 0.27, center).y, beadR, 12);
+  addCircle(pb, _p(beadMid, angle + angStep * 0.27, center).x, _p(beadMid, angle + angStep * 0.27, center).y, beadR, 12);
+  addCircle(pb, _p(rIn + span * 0.1, angle, center).x, _p(rIn + span * 0.1, angle, center).y, beadR * 0.75, 10);
+}
+
+/** Peacock feather: wide teardrop body with concentric eye and lateral veins */
+function addPeacockPetal(pb, center, rIn, rOut, angle, angStep, fineStroke) {
+  const span = rOut - rIn;
+  const pIn = _p(rIn, angle, center);
+  const pOut = _p(rOut, angle, center);
+  const midR = rIn + span * 0.6;
+  pb.moveTo(pIn.x, pIn.y)
+    .cubicTo(
+      _p(rIn + span * 0.2, angle - angStep * 0.1, center).x, _p(rIn + span * 0.2, angle - angStep * 0.1, center).y,
+      _p(midR, angle - angStep * 0.4, center).x, _p(midR, angle - angStep * 0.4, center).y,
+      pOut.x, pOut.y)
+    .cubicTo(
+      _p(midR, angle + angStep * 0.4, center).x, _p(midR, angle + angStep * 0.4, center).y,
+      _p(rIn + span * 0.2, angle + angStep * 0.1, center).x, _p(rIn + span * 0.2, angle + angStep * 0.1, center).y,
+      pIn.x, pIn.y)
+    .close();
+  const eyeRad = span * 0.14;
+  const pEye = _p(rIn + span * 0.74, angle, center);
+  addCircle(pb, pEye.x, pEye.y, eyeRad, 12);
+  addCircle(pb, pEye.x, pEye.y, eyeRad * 0.45, 8);
+  for (const v of [-1, 1]) {
+    const va = angle + v * angStep * 0.24;
+    addCapsule(pb, _p(rIn + span * 0.3, va, center).x, _p(rIn + span * 0.3, va, center).y,
+               _p(rIn + span * 0.62, va, center).x, _p(rIn + span * 0.62, va, center).y, fineStroke * 0.4);
+  }
+}
+
+/** Spear petal: narrow pointed tribal shape with central vein and cross-notch */
+function addSpearPetal(pb, center, rIn, rOut, angle, angStep, fineStroke) {
+  const span = rOut - rIn;
+  const pIn = _p(rIn, angle, center);
+  const pTip = _p(rOut, angle, center);
+  const pL = _p(rIn + span * 0.5, angle - angStep * 0.2, center);
+  const pR = _p(rIn + span * 0.5, angle + angStep * 0.2, center);
+  pb.moveTo(pIn.x, pIn.y).lineTo(pL.x, pL.y).lineTo(pTip.x, pTip.y).lineTo(pR.x, pR.y).close();
+  const pM = _p(rIn + span * 0.68, angle, center);
+  addCapsule(pb, pIn.x, pIn.y, pM.x, pM.y, fineStroke * 0.35);
+  addCapsule(pb, _p(rIn + span * 0.42, angle - angStep * 0.18, center).x, _p(rIn + span * 0.42, angle - angStep * 0.18, center).y,
+             _p(rIn + span * 0.42, angle + angStep * 0.18, center).x, _p(rIn + span * 0.42, angle + angStep * 0.18, center).y,
+             fineStroke * 0.3);
+}
+
 /** Image Layer - places vectorized edge points with radial symmetry.
  *  Consecutive points within connectThresh (normalized) are joined as polylines
  *  so that edge contours render as continuous strokes. */
@@ -298,6 +386,14 @@ export function generateMandalaLayers(doc, opts) {
   const R7 = rJitter(0.92); // L7 radius limit
   const R8 = rJitter(1.0);  // L8 radius limit
 
+  // Seeded shape variants — picked once per seed, consistent every render
+  const PETAL_V = ["compound", "compound", "compound", "heart", "fleur", "peacock", "spear", "lotus"];
+  const pv1 = Math.floor(rng() * PETAL_V.length);
+  const petalVariant = PETAL_V[pv1];
+  const altPetalV = PETAL_V[(pv1 + 1 + Math.floor(rng() * (PETAL_V.length - 1))) % PETAL_V.length];
+  const CORE_V = ["standard", "standard", "sunburst", "star_multi", "nested_geo"];
+  const coreVariant = CORE_V[Math.floor(rng() * CORE_V.length)];
+
   // Helper: push a PathBuilder as a path element
   const pushPath = (pb, w = detailW) => {
     const p = pb.toPath({ stroke, strokeWidthMm: w });
@@ -316,51 +412,81 @@ export function generateMandalaLayers(doc, opts) {
     const pb = new PathBuilder();
     const rCore = R * R1 * layer1Intensity;
 
-    // Bindu central - make it slightly bolder
+    // Bindu central dot (always present)
     addCircle(pb, center.x, center.y, rCore * 0.14, 12);
 
-    // Seed of life pattern (6 overlapping circles)
-    if (layer1Intensity > 0.3) {
-      const seedR = rCore * 0.38;
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        addSmoothCircle(pb, center.x + Math.cos(a) * seedR, center.y + Math.sin(a) * seedR, seedR, 12);
+    if (coreVariant === "sunburst") {
+      // Radiating spokes of two lengths
+      const spokeCount = Math.max(petals, 12);
+      for (let i = 0; i < spokeCount; i++) {
+        const a = (i / spokeCount) * Math.PI * 2;
+        pb.moveTo(_p(rCore * 0.15, a, center).x, _p(rCore * 0.15, a, center).y)
+          .lineTo(_p(rCore * 0.88, a, center).x, _p(rCore * 0.88, a, center).y);
       }
-      addSmoothCircle(pb, center.x, center.y, seedR, 12);
+      if (layer1Intensity > 0.5) {
+        for (let i = 0; i < spokeCount; i++) {
+          const a = ((i + 0.5) / spokeCount) * Math.PI * 2;
+          pb.moveTo(_p(rCore * 0.2, a, center).x, _p(rCore * 0.2, a, center).y)
+            .lineTo(_p(rCore * 0.52, a, center).x, _p(rCore * 0.52, a, center).y);
+        }
+      }
+      addCircle(pb, center.x, center.y, rCore * 0.88, 48);
+
+    } else if (coreVariant === "star_multi") {
+      // Overlapping multi-pointed stars
+      addStar(pb, center.x, center.y, rCore * 0.82, rCore * 0.35, 8, 0);
+      addStar(pb, center.x, center.y, rCore * 0.5, rCore * 0.2, 6, Math.PI / 6);
+      addCircle(pb, center.x, center.y, rCore * 0.19, 10);
+      if (layer1Intensity > 0.5) {
+        addStar(pb, center.x, center.y, rCore * 0.27, rCore * 0.11, 4, Math.PI / 4);
+      }
+      addCircle(pb, center.x, center.y, rCore, 32);
+
+    } else if (coreVariant === "nested_geo") {
+      // Concentric nested polygons (sides depend on style)
+      const sides = style === "islamico" ? 8 : style === "yantra" ? 3 : style === "azteca" ? 4 : 6;
+      const levels = layer1Intensity > 0.5 ? 4 : 3;
+      for (let l = 0; l < levels; l++) {
+        addPoly(pb, center.x, center.y, rCore * (0.2 + l * 0.18), sides, l % 2 === 0 ? 0 : Math.PI / sides);
+      }
+      addCircle(pb, center.x, center.y, rCore, 32);
+
+    } else {
+      // Standard: seed of life + protection ring + mini petals
+      if (layer1Intensity > 0.3) {
+        const seedR = rCore * 0.38;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          addSmoothCircle(pb, center.x + Math.cos(a) * seedR, center.y + Math.sin(a) * seedR, seedR, 12);
+        }
+        addSmoothCircle(pb, center.x, center.y, seedR, 12);
+      }
+      if (layer1Intensity > 0.5) {
+        addCircle(pb, center.x, center.y, rCore * 0.55, 20);
+        const miniCount = Math.max(8, petals);
+        for (let i = 0; i < miniCount; i++) {
+          const a = (i / miniCount) * Math.PI * 2;
+          const tipR = rCore * 0.82;
+          const baseR = rCore * 0.58;
+          pb.moveTo(_p(baseR, a, center).x, _p(baseR, a, center).y)
+            .quadTo(_p(baseR + (tipR - baseR) * 0.5, a - 0.18, center).x, _p(baseR + (tipR - baseR) * 0.5, a - 0.18, center).y,
+                    _p(tipR, a, center).x, _p(tipR, a, center).y)
+            .quadTo(_p(baseR + (tipR - baseR) * 0.5, a + 0.18, center).x, _p(baseR + (tipR - baseR) * 0.5, a + 0.18, center).y,
+                    _p(baseR, a, center).x, _p(baseR, a, center).y);
+        }
+      }
+      addCircle(pb, center.x, center.y, rCore, 32);
     }
 
-    // Inner protection ring with small petals
-    if (layer1Intensity > 0.5) {
-      addCircle(pb, center.x, center.y, rCore * 0.55, 20);
-      // Mini petal ring
-      const miniCount = Math.max(8, petals);
-      for (let i = 0; i < miniCount; i++) {
-        const a = (i / miniCount) * Math.PI * 2;
-        const tipR = rCore * 0.82;
-        const baseR = rCore * 0.58;
-        const tip = _p(tipR, a, center);
-        const base = _p(baseR, a, center);
-        const cpL = _p(baseR + (tipR - baseR) * 0.5, a - 0.18, center);
-        const cpR = _p(baseR + (tipR - baseR) * 0.5, a + 0.18, center);
-        pb.moveTo(base.x, base.y)
-          .quadTo(cpL.x, cpL.y, tip.x, tip.y)
-          .quadTo(cpR.x, cpR.y, base.x, base.y);
-      }
-    }
-
-    // Outer core ring
-    addCircle(pb, center.x, center.y, rCore, 32);
-
-    // Pearl ring around core
+    // Pearl ring (all variants)
     if (layer1Intensity > 0.6) {
       addPearlRing(pb, center.x, center.y, rCore * 1.08, Math.max(12, petals), rCore * 0.05);
     }
 
-    // Yantra: interlocked triangles
+    // Yantra always gets interlocked triangles on top
     if (style === "yantra" && layer1Intensity > 0.5) {
       addPoly(pb, center.x, center.y, rCore * 0.8, 3, -Math.PI / 2);
       addPoly(pb, center.x, center.y, rCore * 0.8, 3, Math.PI / 2);
-      // Nested smaller pair
       addPoly(pb, center.x, center.y, rCore * 0.5, 3, -Math.PI / 2);
       addPoly(pb, center.x, center.y, rCore * 0.5, 3, Math.PI / 2);
     }
@@ -416,12 +542,22 @@ export function generateMandalaLayers(doc, opts) {
         addCapsule(pb, pIn.x, pIn.y, pM.x, pM.y, fineW * 0.4);
 
       } else {
-        // Compound organic petals (sashiko, floral, celtico, yantra)
-        addCompoundPetal(pb, center, rIn, kROut, aC, angStep,
-          layer2Intensity > 0.4,
-          layer2Intensity > 0.6,
-          layer2Intensity > 0.3,
-          fineW);
+        // Kaleidoscope alternates between two seeded petal shapes for visual rhythm
+        const vType = kaleidoscope && i % 2 === 1 ? altPetalV : petalVariant;
+        if (vType === "heart") {
+          addHeartPetal(pb, center, rIn, kROut, aC, angStep);
+        } else if (vType === "fleur") {
+          addFleurPetal(pb, center, rIn, kROut, aC, angStep, fineW);
+        } else if (vType === "peacock") {
+          addPeacockPetal(pb, center, rIn, kROut, aC, angStep, fineW);
+        } else if (vType === "spear") {
+          addSpearPetal(pb, center, rIn, kROut, aC, angStep, fineW);
+        } else if (vType === "lotus") {
+          addLotusPetal(pb, center, rIn, kROut, aC, angStep * 0.9);
+        } else {
+          addCompoundPetal(pb, center, rIn, kROut, aC, angStep,
+            layer2Intensity > 0.4, layer2Intensity > 0.6, layer2Intensity > 0.3, fineW);
+        }
       }
     }
 

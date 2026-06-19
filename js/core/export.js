@@ -121,13 +121,16 @@ export async function downloadPdf(filename, svgString, widthMm, heightMm) {
 
 /**
  * Batch PDF Export (multiple mandalas per PDF)
+ * options: { dpi, coverPage: { title, coverState } | null, pageNumbers, onProgress }
  */
-export async function downloadBatchPdf(filename, states, generateFn, widthMm, heightMm, layout = "classic", quotes = []) {
+export async function downloadBatchPdf(filename, states, generateFn, widthMm, heightMm, layout = "classic", quotes = [], options = {}) {
   try {
-    // Check if jsPDF is loaded
     if (!window.jspdf || !window.jspdf.jsPDF) {
       throw new Error("jsPDF no está cargado correctamente");
     }
+
+    const { onProgress = null, coverPage = null, pageNumbers = false } = options;
+    const dpi = options.dpi ?? 150;
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({
@@ -137,17 +140,9 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
     });
 
     const margin = 12;
-    const dpi = 150; // Lower DPI for batch PDFs to reduce file size
 
-    /**
-     * Create SVG element for a given state
-     */
     const makeSvgEl = (state, w, h, mirrorX = false) => {
-      const docData = {
-        page: { wMm: w, hMm: h, marginMm: 5 },
-        defs: [],
-        body: []
-      };
+      const docData = { page: { wMm: w, hMm: h, marginMm: 5 }, defs: [], body: [] };
       generateFn(docData, state);
 
       const finalSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -160,17 +155,15 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       finalSvg.appendChild(defs);
 
       const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      if (mirrorX) {
-        g.setAttribute("transform", `scale(-1, 1) translate(-${w}, 0)`);
-      }
+      if (mirrorX) g.setAttribute("transform", `scale(-1, 1) translate(-${w}, 0)`);
       docData.body.forEach(b => g.innerHTML += b);
       finalSvg.appendChild(g);
 
       return finalSvg;
     };
 
-    // Load custom font if layout is inspirational
-    if (layout === "inspirational") {
+    // Load custom font when needed for text rendering
+    if (layout === "inspirational" || coverPage) {
       try {
         const response = await fetch("assets/sekaiwo/SekaiwoRegular.ttf");
         const fontArrayBuffer = await response.arrayBuffer();
@@ -182,9 +175,6 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       }
     }
 
-    /**
-     * Draw a mandala on the PDF at specified position
-     */
     const drawMandala = async (state, x, y, w, h, quote = null, mirrorX = false) => {
       const svgEl = makeSvgEl(state, w, h, mirrorX);
       const svgString = new XMLSerializer().serializeToString(svgEl);
@@ -198,19 +188,15 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
 
       if (quote) {
         const textWidth = w * 0.8;
-        const spacing = 3;
-
-        // Decorative separator line (optional but elegant)
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.15);
         doc.line(x + w * 0.15, y + h + 5, x + w * 0.85, y + h + 5);
 
-        // Main quote text - using Sekaiwo font if loaded
         const hasSekaiwo = doc.getFontList()["Sekaiwo"];
         doc.setFont(hasSekaiwo ? "Sekaiwo" : "times", hasSekaiwo ? "normal" : "italic");
         doc.setFontSize(hasSekaiwo ? 15 : 13);
         doc.setTextColor(30, 30, 30);
-        
+
         const splitText = doc.splitTextToSize(quote.frase, textWidth);
         const lineHeight = hasSekaiwo ? 7 : 5.5;
         const textHeight = splitText.length * lineHeight;
@@ -219,29 +205,71 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
         doc.text(splitText, x + w / 2, textY, { align: "center", lineHeightFactor: 1.2 });
         textY += textHeight + 4;
 
-        // Attribution line - elegant and smaller
         doc.setFontSize(10);
         doc.setFont("times", "normal");
         doc.setTextColor(110, 110, 110);
 
-        // Use the new autor field or fallback
         let attribution = quote.autor || "Centro de Salud Integral Taoísta";
         if (!quote.autor && quote.linaje) {
-            const linaje = quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1);
-            const categoria = quote.categoria
-              ? " • " + quote.categoria.charAt(0).toUpperCase() + quote.categoria.slice(1)
-              : "";
-            attribution = linaje + categoria;
+          const linaje = quote.linaje.charAt(0).toUpperCase() + quote.linaje.slice(1);
+          const categoria = quote.categoria
+            ? " • " + quote.categoria.charAt(0).toUpperCase() + quote.categoria.slice(1)
+            : "";
+          attribution = linaje + categoria;
         }
 
         doc.text("— " + attribution + " —", x + w / 2, textY + 2, { align: "center" });
-
-        // Reset text color
         doc.setTextColor(0, 0, 0);
       }
     };
 
-    // Handle different layouts
+    const yieldUI = () => new Promise(r => setTimeout(r, 0));
+
+    const addPageNum = (num) => {
+      if (!pageNumbers) return;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(160, 160, 160);
+      doc.text(String(num), widthMm / 2, heightMm - 4, { align: "center" });
+      doc.setTextColor(0, 0, 0);
+    };
+
+    let rendered = 0;
+    let contentPage = 0;
+
+    const report = async (label) => {
+      if (!onProgress) return;
+      onProgress(rendered, states.length, label);
+      await yieldUI();
+    };
+
+    // === Cover page ===
+    if (coverPage) {
+      const { title = "Mandalas para Colorear", coverState } = coverPage;
+      const cs = coverState || states[0];
+      const ms = Math.min(widthMm, heightMm) * 0.68;
+      const mx = (widthMm - ms) / 2;
+      const my = margin + 10;
+
+      await drawMandala(cs, mx, my, ms, ms);
+
+      const hasSekaiwo = doc.getFontList()["Sekaiwo"];
+      doc.setFont(hasSekaiwo ? "Sekaiwo" : "times", "normal");
+      doc.setFontSize(hasSekaiwo ? 22 : 20);
+      doc.setTextColor(30, 30, 30);
+
+      const ty = my + ms + 14;
+      doc.setDrawColor(170, 170, 170);
+      doc.setLineWidth(0.25);
+      doc.line(widthMm * 0.2, ty - 7, widthMm * 0.8, ty - 7);
+      doc.text(title, widthMm / 2, ty, { align: "center" });
+      doc.setTextColor(0, 0, 0);
+
+      doc.addPage();
+      if (onProgress) { onProgress(0, states.length, "Portada lista..."); await yieldUI(); }
+    }
+
+    // === Content pages ===
     if (layout === "classic" || layout === "inspirational") {
       for (let i = 0; i < states.length; i++) {
         if (i > 0) doc.addPage();
@@ -250,6 +278,10 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
         const x = (widthMm - size) / 2;
         const y = (heightMm - size) / 2 - (quote ? 12 : 0);
         await drawMandala(states[i], x, y, size, size, quote);
+        rendered++;
+        contentPage++;
+        addPageNum(contentPage);
+        await report(`Página ${contentPage}`);
       }
     } else if (layout === "duo" || layout === "mirror") {
       const itemsPerPage = 2;
@@ -261,7 +293,11 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
           const y = margin + j * (size + margin * 2);
           const mirrorX = layout === "mirror" && j === 1;
           await drawMandala(states[i + j], x, y, size, size, null, mirrorX);
+          rendered++;
+          await report(`Mandala ${rendered} de ${states.length}`);
         }
+        contentPage++;
+        addPageNum(contentPage);
       }
     } else if (layout === "trio") {
       const itemsPerPage = 3;
@@ -272,7 +308,11 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
           const x = (widthMm - size) / 2;
           const y = margin + j * (size + margin);
           await drawMandala(states[i + j], x, y, size, size);
+          rendered++;
+          await report(`Mandala ${rendered} de ${states.length}`);
         }
+        contentPage++;
+        addPageNum(contentPage);
       }
     } else if (layout === "collage") {
       const itemsPerPage = 4;
@@ -287,7 +327,11 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
           const x = startX + col * (size + margin);
           const y = startY + row * (size + margin);
           await drawMandala(states[i + j], x, y, size, size);
+          rendered++;
+          await report(`Mandala ${rendered} de ${states.length}`);
         }
+        contentPage++;
+        addPageNum(contentPage);
       }
     }
 

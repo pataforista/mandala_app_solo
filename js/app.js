@@ -194,6 +194,29 @@ function applyStructurePreset(presetKey) {
   return true;
 }
 
+function buildOpts(s) {
+  return {
+    seed: s.seed,
+    petals: s.petals,
+    complexity: s.complexity,
+    strokeWidthMm: s.strokeWidth,
+    organicLevel: s.organic,
+    includeFrames: s.frames,
+    pageBorder: s.pageBorder,
+    kaleidoscope: s.kaleidoscope,
+    textures: s.textures,
+    styleMode: s.styleMode,
+    layer1Intensity: s.layer1Intensity,
+    layer2Intensity: s.layer2Intensity,
+    layer3Intensity: s.layer3Intensity,
+    layer4Intensity: s.layer4Intensity,
+    layer5Intensity: s.layer5Intensity,
+    layer6Intensity: s.layer6Intensity,
+    layer7Intensity: s.layer7Intensity,
+    layer8Intensity: s.layer8Intensity,
+  };
+}
+
 function getCurrentDoc() {
   return createDoc({
     preset: state.preset,
@@ -739,28 +762,9 @@ function bindUI() {
     let count = 1;
     if (layout === "duo" || layout === "mirror") count = 2;
     if (layout === "trio") count = 3;
+    if (layout === "collage") count = 4;
 
     // 2. Build opts (all same design)
-    const buildOpts = (s) => ({
-      seed: s.seed,
-      petals: s.petals,
-      complexity: s.complexity,
-      strokeWidthMm: s.strokeWidth,
-      organicLevel: s.organic,
-      includeFrames: s.frames,
-      pageBorder: s.pageBorder,
-      kaleidoscope: s.kaleidoscope,
-      textures: s.textures,
-      styleMode: s.styleMode,
-      layer1Intensity: s.layer1Intensity,
-      layer2Intensity: s.layer2Intensity,
-      layer3Intensity: s.layer3Intensity,
-      layer4Intensity: s.layer4Intensity,
-      layer5Intensity: s.layer5Intensity,
-      layer6Intensity: s.layer6Intensity,
-      layer7Intensity: s.layer7Intensity,
-      layer8Intensity: s.layer8Intensity,
-    });
 
     const batchOpts = Array.from({ length: count }, () => buildOpts(state));
 
