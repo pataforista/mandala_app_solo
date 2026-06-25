@@ -160,6 +160,17 @@ const STRUCTURE_PRESETS = {
     layer4Intensity: 0.85, layer5Intensity: 0.55, layer6Intensity: 0.8, layer7Intensity: 0.75, layer8Intensity: 0.4,
     frames: true, pageBorder: true,
   },
+  // --- Plantillas del generador Radial editorial ---
+  radialFloral: {
+    generatorType: "radial",
+    petals: 12, complexity: 110, organic: 0.6, strokeWidth: 0.6,
+    frames: true, pageBorder: true, kaleidoscope: true, textures: true,
+  },
+  radialGeo: {
+    generatorType: "radial",
+    petals: 16, complexity: 78, organic: 0.08, strokeWidth: 0.55,
+    frames: true, pageBorder: true, kaleidoscope: true, textures: true,
+  },
 };
 
 const recentSeeds = [];
@@ -202,6 +213,9 @@ function applyStructurePreset(presetKey) {
   Object.entries(preset).forEach(([key, value]) => {
     state[key] = value;
   });
+
+  // Cada plantilla declara su generador; si no lo hace, es de Capas.
+  state.generatorType = preset.generatorType === "radial" ? "radial" : "layers";
 
   state.structurePreset = presetKey;
   return true;
@@ -673,10 +687,18 @@ function bindUI() {
       
       const styles = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
       state.styleMode = pick(shuffleRng, styles);
-      
-      state.petals = rInt(shuffleRng, 4, 24) * 2; // 8 to 48 petals (pares para mejor simetría)
-      state.complexity = rInt(shuffleRng, 120, 320);
-      
+
+      // Alterna también el generador. El radial se mantiene en rangos
+      // moderados de pétalos/complejidad para que el resultado sea coloreable.
+      state.generatorType = shuffleRng() < 0.3 ? "radial" : "layers";
+      if (state.generatorType === "radial") {
+        state.petals = rInt(shuffleRng, 4, 12) * 2;  // 8..24 pétalos
+        state.complexity = rInt(shuffleRng, 60, 170);
+      } else {
+        state.petals = rInt(shuffleRng, 4, 24) * 2;  // 8..48 pétalos
+        state.complexity = rInt(shuffleRng, 120, 320);
+      }
+
       // Ensure at least 4 layers have high intensity to avoid "empty" mandalas
       const layerCount = 8;
       const intensities = Array.from({ length: layerCount }, () => rFloat(shuffleRng, 0.1, 1.0));
