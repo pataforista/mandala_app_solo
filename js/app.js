@@ -33,6 +33,12 @@ const pageBorderEl = document.getElementById("pageBorder");
 
 const generatorTypeEl = document.getElementById("generatorType");
 const layersPanelEl = document.getElementById("layersPanel");
+const spiroPanelEl = document.getElementById("spiroPanel");
+const spiroEnabledEl = document.getElementById("spiroEnabled");
+const spiroModeEl = document.getElementById("spiroMode");
+const spiroREl = document.getElementById("spiroR");
+const spirorEl = document.getElementById("spiror");
+const spiroDistanceEl = document.getElementById("spiroDistance");
 
 const styleModeEl = document.getElementById("styleMode");
 const layer1IntensityEl = document.getElementById("layer1Intensity");
@@ -102,6 +108,12 @@ const DEFAULTS = {
   imageOffsetX: 0,
   imageOffsetY: 0,
   imageIntensity: 1.0,
+  // Espirógrafo (solo generador radial)
+  spiroEnabled: false,
+  spiroMode: "hypo",
+  spiroR: 60,
+  spiror: 25,
+  spiroDistance: 30,
 };
 
 const STRUCTURE_PRESETS = {
@@ -171,6 +183,13 @@ const STRUCTURE_PRESETS = {
     petals: 16, complexity: 78, organic: 0.08, strokeWidth: 0.55,
     frames: true, pageBorder: true, kaleidoscope: true, textures: true,
   },
+  radialSpiro: {
+    generatorType: "radial",
+    // Base ligera para que el entramado del espirógrafo sea el protagonista.
+    petals: 10, complexity: 55, organic: 0.1, strokeWidth: 0.5,
+    frames: true, pageBorder: true, kaleidoscope: true, textures: true,
+    spiroEnabled: true, spiroMode: "hypo", spiroR: 70, spiror: 21, spiroDistance: 32,
+  },
 };
 
 const recentSeeds = [];
@@ -186,11 +205,16 @@ if (!STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
 if (state.styleMode === "hashiko") state.styleMode = "sashiko";
 
 if (state.generatorType !== "radial") state.generatorType = "layers";
+if (typeof state.spiroEnabled === "string") state.spiroEnabled = state.spiroEnabled === "true";
+if (state.spiroMode !== "epi") state.spiroMode = "hypo";
 
-// Muestra/oculta el panel de Capas: solo aplica al generador de capas.
+// Muestra/oculta paneles según el generador activo:
+// - "Capas (8)" solo aplica al generador de capas.
+// - "Espirógrafo" solo aplica al generador radial.
 function updateGeneratorVisibility() {
   const isRadial = state.generatorType === "radial";
   if (layersPanelEl) layersPanelEl.style.display = isRadial ? "none" : "";
+  if (spiroPanelEl) spiroPanelEl.style.display = isRadial ? "" : "none";
 }
 
 if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
@@ -216,6 +240,8 @@ function applyStructurePreset(presetKey) {
 
   // Cada plantilla declara su generador; si no lo hace, es de Capas.
   state.generatorType = preset.generatorType === "radial" ? "radial" : "layers";
+  // El espirógrafo solo se activa si la plantilla lo pide explícitamente.
+  state.spiroEnabled = !!preset.spiroEnabled;
 
   state.structurePreset = presetKey;
   return true;
@@ -245,6 +271,13 @@ function buildOpts(s) {
     layer6Intensity: s.layer6Intensity,
     layer7Intensity: s.layer7Intensity,
     layer8Intensity: s.layer8Intensity,
+    // Espirógrafo (lo lee el generador radial; el de capas lo ignora)
+    spiroEnabled: !!s.spiroEnabled,
+    spiroMode: s.spiroMode === "epi" ? "epi" : "hypo",
+    spiroR: s.spiroR,
+    spiror: s.spiror,
+    spiroDistance: s.spiroDistance,
+    spiroResolution: 500,
   };
 }
 
@@ -383,6 +416,11 @@ function bindUI() {
   texturesEl.checked = state.textures;
 
   generatorTypeEl.value = state.generatorType;
+  spiroEnabledEl.checked = state.spiroEnabled;
+  spiroModeEl.value = state.spiroMode;
+  spiroREl.value = String(state.spiroR);
+  spirorEl.value = String(state.spiror);
+  spiroDistanceEl.value = String(state.spiroDistance);
   updateGeneratorVisibility();
 
   styleModeEl.value = state.styleMode;
@@ -518,6 +556,41 @@ function bindUI() {
     updateGeneratorVisibility();
     update();
   });
+
+  spiroEnabledEl.addEventListener("sl-change", () => {
+    state.spiroEnabled = spiroEnabledEl.checked;
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+    update();
+  });
+
+  spiroModeEl.addEventListener("sl-change", () => {
+    state.spiroMode = spiroModeEl.value === "epi" ? "epi" : "hypo";
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+    update();
+  });
+
+  spiroREl.addEventListener("sl-input", () => {
+    state.spiroR = clampInt(spiroREl.value, 20, 100);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+  });
+  spiroREl.addEventListener("sl-change", update);
+
+  spirorEl.addEventListener("sl-input", () => {
+    state.spiror = clampInt(spirorEl.value, 5, 60);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+  });
+  spirorEl.addEventListener("sl-change", update);
+
+  spiroDistanceEl.addEventListener("sl-input", () => {
+    state.spiroDistance = clampInt(spiroDistanceEl.value, 5, 70);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+  });
+  spiroDistanceEl.addEventListener("sl-change", update);
 
   styleModeEl.addEventListener("sl-change", () => {
     state.styleMode = styleModeEl.value;

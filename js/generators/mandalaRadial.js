@@ -1227,19 +1227,25 @@ if (pageBorder) {
 
 // --- PHASE 4: Spirograph Layer ---
 if (spiroEnabled) {
-  const pbSpiro = new PathBuilder();
-  addSpirograph(pbSpiro, spiroR, spiror, spiroDistance, spiroResolution, spiroMode);
+  // La forma del espirógrafo depende solo de las razones R:r:d; escalamos
+  // R/r/d de forma uniforme para que el alcance máximo encaje en la página.
+  // Así los controles definen la figura y el resultado siempre cae dentro
+  // del marco (no se sale ni se satura), independientemente de los valores.
+  const rawReach = (spiroMode === "epi")
+    ? (spiroR + spiror + spiroDistance)
+    : (Math.abs(spiroR - spiror) + spiroDistance);
+  const fit = rawReach > 1e-6 ? (computedRadius * 0.95) / rawReach : 1;
 
-  // Hierarchical Spirograph weight based on its max reach
-  const maxSpiroR = (spiroMode === "epi") ? (spiroR + spiror + spiroDistance) : (spiroR - spiror + spiroDistance);
-  const spiroStrokes = getStrokesForRadius(maxSpiroR, "secondary");
+  const pbSpiro = new PathBuilder();
+  addSpirograph(pbSpiro, spiroR * fit, spiror * fit, spiroDistance * fit, spiroResolution, spiroMode);
+
+  const spiroStrokes = getStrokesForRadius(computedRadius * 0.95, "secondary");
 
   doc.body.push(
     pbSpiro.toPath({
       stroke,
       strokeWidthMm: spiroStrokes.detail,
       fill: "none",
-      opacity: 0.8
     })
   );
 }

@@ -319,6 +319,7 @@
           <sl-option value="islamico">Islámica</sl-option>
           <sl-option value="radialFloral">Radial floral</sl-option>
           <sl-option value="radialGeo">Radial geométrico</sl-option>
+          <sl-option value="radialSpiro">Radial espirógrafo</sl-option>
         </sl-select>
         <sl-button id="applyStructure" variant="secondary" size="small" pill style="width: 100%;">Aplicar Plantilla</sl-button>
       </div>
@@ -375,6 +376,21 @@
             <sl-range id="layer6Intensity" label="Capas 6" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
             <sl-range id="layer7Intensity" label="Capas 7" min="0" max="1" step="0.05" value="0.5" size="small"></sl-range>
             <sl-range id="layer8Intensity" label="Capas 8 (Borde)" min="0" max="1" step="0.05" value="0.4" size="small"></sl-range>
+          </div>
+        </sl-accordion-item>
+
+        <sl-accordion-item id="spiroPanel" style="display:none;">
+          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="hurricane"></sl-icon> Espirógrafo (Radial)</span>
+          <div class="control-group" style="padding: 12px 0;">
+            <sl-checkbox id="spiroEnabled">Activar espirógrafo</sl-checkbox>
+            <sl-select id="spiroMode" label="Modo" size="small" value="hypo">
+              <sl-option value="hypo">Interno (hipotrocoide)</sl-option>
+              <sl-option value="epi">Externo (epitrocoide)</sl-option>
+            </sl-select>
+            <sl-range id="spiroR" label="Radio fijo (R)" min="20" max="100" step="1" value="60" size="small"></sl-range>
+            <sl-range id="spiror" label="Radio rodante (r)" min="5" max="60" step="1" value="25" size="small"></sl-range>
+            <sl-range id="spiroDistance" label="Distancia de pluma (d)" min="5" max="70" step="1" value="30" size="small"></sl-range>
+            <small style="color: var(--m3-on-surface-variant);">La figura se escala sola para encajar en la página: los controles definen la forma (número de lazos y picos), no el tamaño.</small>
           </div>
         </sl-accordion-item>
 
