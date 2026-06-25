@@ -5,6 +5,7 @@ import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSv
 import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
 import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
+import { generateMandalaRadial } from "./generators/mandalaRadial.js";
 import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
@@ -29,6 +30,16 @@ const applyStructureBtn = document.getElementById("applyStructure");
 const strokeWidthEl = document.getElementById("strokeWidth");
 const framesEl = document.getElementById("frames");
 const pageBorderEl = document.getElementById("pageBorder");
+
+const generatorTypeEl = document.getElementById("generatorType");
+const layersPanelEl = document.getElementById("layersPanel");
+const spiroPanelEl = document.getElementById("spiroPanel");
+const spiroEnabledEl = document.getElementById("spiroEnabled");
+const spiroModeEl = document.getElementById("spiroMode");
+const spiroREl = document.getElementById("spiroR");
+const spirorEl = document.getElementById("spiror");
+const spiroDistanceEl = document.getElementById("spiroDistance");
+const randomSpiroEl = document.getElementById("randomSpiro");
 
 const styleModeEl = document.getElementById("styleMode");
 const layer1IntensityEl = document.getElementById("layer1Intensity");
@@ -72,6 +83,7 @@ const uploadBtn = document.getElementById("uploadBtn");
 
 const DEFAULTS = {
   preset: "A4",
+  generatorType: "layers",
   petals: 12,
   complexity: 130,
   organic: 0.25,
@@ -97,6 +109,12 @@ const DEFAULTS = {
   imageOffsetX: 0,
   imageOffsetY: 0,
   imageIntensity: 1.0,
+  // Espirógrafo (solo generador radial)
+  spiroEnabled: false,
+  spiroMode: "hypo",
+  spiroR: 60,
+  spiror: 25,
+  spiroDistance: 30,
 };
 
 const STRUCTURE_PRESETS = {
@@ -155,6 +173,24 @@ const STRUCTURE_PRESETS = {
     layer4Intensity: 0.85, layer5Intensity: 0.55, layer6Intensity: 0.8, layer7Intensity: 0.75, layer8Intensity: 0.4,
     frames: true, pageBorder: true,
   },
+  // --- Plantillas del generador Radial editorial ---
+  radialFloral: {
+    generatorType: "radial",
+    petals: 12, complexity: 110, organic: 0.6, strokeWidth: 0.6,
+    frames: true, pageBorder: true, kaleidoscope: true, textures: true,
+  },
+  radialGeo: {
+    generatorType: "radial",
+    petals: 16, complexity: 78, organic: 0.08, strokeWidth: 0.55,
+    frames: true, pageBorder: true, kaleidoscope: true, textures: true,
+  },
+  radialSpiro: {
+    generatorType: "radial",
+    // Base ligera para que el entramado del espirógrafo sea el protagonista.
+    petals: 10, complexity: 55, organic: 0.1, strokeWidth: 0.5,
+    frames: true, pageBorder: true, kaleidoscope: true, textures: true,
+    spiroEnabled: true, spiroMode: "hypo", spiroR: 70, spiror: 21, spiroDistance: 32,
+  },
 };
 
 const recentSeeds = [];
@@ -168,6 +204,19 @@ if (typeof state.textures === "string") state.textures = state.textures === "tru
 if (!STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
 
 if (state.styleMode === "hashiko") state.styleMode = "sashiko";
+
+if (state.generatorType !== "radial") state.generatorType = "layers";
+if (typeof state.spiroEnabled === "string") state.spiroEnabled = state.spiroEnabled === "true";
+if (state.spiroMode !== "epi") state.spiroMode = "hypo";
+
+// Muestra/oculta paneles según el generador activo:
+// - "Capas (8)" solo aplica al generador de capas.
+// - "Espirógrafo" solo aplica al generador radial.
+function updateGeneratorVisibility() {
+  const isRadial = state.generatorType === "radial";
+  if (layersPanelEl) layersPanelEl.style.display = isRadial ? "none" : "";
+  if (spiroPanelEl) spiroPanelEl.style.display = isRadial ? "" : "none";
+}
 
 if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
   throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
@@ -190,12 +239,29 @@ function applyStructurePreset(presetKey) {
     state[key] = value;
   });
 
+  // Cada plantilla declara su generador; si no lo hace, es de Capas.
+  state.generatorType = preset.generatorType === "radial" ? "radial" : "layers";
+  // El espirógrafo solo se activa si la plantilla lo pide explícitamente.
+  state.spiroEnabled = !!preset.spiroEnabled;
+
   state.structurePreset = presetKey;
   return true;
 }
 
+// Sortea parámetros del espirógrafo con rangos que producen figuras ricas
+// (la forma sale de las razones R:r:d; el generador la auto-escala a la página).
+function randomizeSpiro(rng) {
+  state.spiroMode = rng() < 0.5 ? "hypo" : "epi";
+  const r = rInt(rng, 13, 30);
+  state.spiror = r;
+  state.spiroR = rInt(rng, 42, 96);
+  state.spiroDistance = rInt(rng, Math.max(5, Math.round(r * 0.55)), Math.round(r * 1.45));
+}
+
 function buildOpts(s) {
   return {
+    // Generador activo: el dispatcher (runGenerator) elige según este campo.
+    generatorType: s.generatorType || "layers",
     seed: s.seed,
     petals: s.petals,
     complexity: s.complexity,
@@ -204,7 +270,9 @@ function buildOpts(s) {
     includeFrames: s.frames,
     pageBorder: s.pageBorder,
     kaleidoscope: s.kaleidoscope,
+    // "textures" lo lee el generador de capas; "showTextures" el radial.
     textures: s.textures,
+    showTextures: s.textures,
     styleMode: s.styleMode,
     layer1Intensity: s.layer1Intensity,
     layer2Intensity: s.layer2Intensity,
@@ -214,7 +282,25 @@ function buildOpts(s) {
     layer6Intensity: s.layer6Intensity,
     layer7Intensity: s.layer7Intensity,
     layer8Intensity: s.layer8Intensity,
+    // Espirógrafo (lo lee el generador radial; el de capas lo ignora)
+    spiroEnabled: !!s.spiroEnabled,
+    spiroMode: s.spiroMode === "epi" ? "epi" : "hypo",
+    spiroR: s.spiroR,
+    spiror: s.spiror,
+    spiroDistance: s.spiroDistance,
+    spiroResolution: 500,
   };
+}
+
+// Despacha al generador correcto según opts.generatorType.
+// Ambos generadores comparten la firma (doc, opts) y leen solo los campos
+// que les corresponden, así que un único objeto de opts sirve para los dos.
+function runGenerator(doc, opts) {
+  if (opts && opts.generatorType === "radial") {
+    generateMandalaRadial(doc, opts);
+  } else {
+    generateMandalaLayers(doc, opts);
+  }
 }
 
 function getCurrentDoc() {
@@ -230,25 +316,8 @@ function render() {
 
   const doc = getCurrentDoc();
 
-  generateMandalaLayers(doc, {
-    seed: state.seed,
-    petals: state.petals,
-    complexity: state.complexity,
-    strokeWidthMm: state.strokeWidth,
-    organicLevel: state.organic,
-    includeFrames: state.frames,
-    pageBorder: state.pageBorder,
-    kaleidoscope: state.kaleidoscope,
-    textures: state.textures,
-    styleMode: state.styleMode,
-    layer1Intensity: state.layer1Intensity,
-    layer2Intensity: state.layer2Intensity,
-    layer3Intensity: state.layer3Intensity,
-    layer4Intensity: state.layer4Intensity,
-    layer5Intensity: state.layer5Intensity,
-    layer6Intensity: state.layer6Intensity,
-    layer7Intensity: state.layer7Intensity,
-    layer8Intensity: state.layer8Intensity,
+  runGenerator(doc, {
+    ...buildOpts(state),
     imagePoints: currentImagePoints,
     imageScale: state.imageScale,
     imageIntensity: state.imageIntensity,
@@ -356,6 +425,14 @@ function bindUI() {
   pageBorderEl.checked = state.pageBorder;
   kaleidoscopeEl.checked = state.kaleidoscope;
   texturesEl.checked = state.textures;
+
+  generatorTypeEl.value = state.generatorType;
+  spiroEnabledEl.checked = state.spiroEnabled;
+  spiroModeEl.value = state.spiroMode;
+  spiroREl.value = String(state.spiroR);
+  spirorEl.value = String(state.spiror);
+  spiroDistanceEl.value = String(state.spiroDistance);
+  updateGeneratorVisibility();
 
   styleModeEl.value = state.styleMode;
   layer1IntensityEl.value = String(state.layer1Intensity);
@@ -482,6 +559,61 @@ function bindUI() {
     state.textures = texturesEl.checked;
     update();
   });
+
+  generatorTypeEl.addEventListener("sl-change", () => {
+    state.generatorType = generatorTypeEl.value === "radial" ? "radial" : "layers";
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+    updateGeneratorVisibility();
+    update();
+  });
+
+  spiroEnabledEl.addEventListener("sl-change", () => {
+    state.spiroEnabled = spiroEnabledEl.checked;
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+    update();
+  });
+
+  spiroModeEl.addEventListener("sl-change", () => {
+    state.spiroMode = spiroModeEl.value === "epi" ? "epi" : "hypo";
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+    update();
+  });
+
+  spiroREl.addEventListener("sl-input", () => {
+    state.spiroR = clampInt(spiroREl.value, 20, 100);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+  });
+  spiroREl.addEventListener("sl-change", update);
+
+  spirorEl.addEventListener("sl-input", () => {
+    state.spiror = clampInt(spirorEl.value, 5, 60);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+  });
+  spirorEl.addEventListener("sl-change", update);
+
+  spiroDistanceEl.addEventListener("sl-input", () => {
+    state.spiroDistance = clampInt(spiroDistanceEl.value, 5, 70);
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+  });
+  spiroDistanceEl.addEventListener("sl-change", update);
+
+  if (randomSpiroEl) {
+    randomSpiroEl.addEventListener("click", () => {
+      const spiroRng = mulberry32((randomSeed32() ^ 0x5BD1E995) >>> 0);
+      state.spiroEnabled = true;
+      randomizeSpiro(spiroRng);
+      state.structurePreset = "custom";
+      structurePresetEl.value = "custom";
+      bindUI();
+      update();
+    });
+  }
 
   styleModeEl.addEventListener("sl-change", () => {
     state.styleMode = styleModeEl.value;
@@ -651,10 +783,22 @@ function bindUI() {
       
       const styles = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
       state.styleMode = pick(shuffleRng, styles);
-      
-      state.petals = rInt(shuffleRng, 4, 24) * 2; // 8 to 48 petals (pares para mejor simetría)
-      state.complexity = rInt(shuffleRng, 120, 320);
-      
+
+      // Alterna también el generador. El radial se mantiene en rangos
+      // moderados de pétalos/complejidad para que el resultado sea coloreable.
+      state.generatorType = shuffleRng() < 0.3 ? "radial" : "layers";
+      if (state.generatorType === "radial") {
+        state.petals = rInt(shuffleRng, 4, 12) * 2;  // 8..24 pétalos
+        state.complexity = rInt(shuffleRng, 60, 170);
+        // A veces corona el radial con un espirógrafo aleatorio
+        state.spiroEnabled = shuffleRng() < 0.55;
+        if (state.spiroEnabled) randomizeSpiro(shuffleRng);
+      } else {
+        state.petals = rInt(shuffleRng, 4, 24) * 2;  // 8..48 pétalos
+        state.complexity = rInt(shuffleRng, 120, 320);
+        state.spiroEnabled = false;
+      }
+
       // Ensure at least 4 layers have high intensity to avoid "empty" mandalas
       const layerCount = 8;
       const intensities = Array.from({ length: layerCount }, () => rFloat(shuffleRng, 0.1, 1.0));
@@ -786,7 +930,7 @@ function bindUI() {
 
     try {
       // We use downloadBatchPdf even for single pages because it handles layouts
-      await downloadBatchPdf(filename, batchOpts, generateMandalaLayers, wMm, hMm, layout, quotes);
+      await downloadBatchPdf(filename, batchOpts, runGenerator, wMm, hMm, layout, quotes);
       alert("✅ PDF descargado correctamente");
     } catch (error) {
       console.error("PDF download error:", error);
