@@ -12,7 +12,7 @@ const INT_PARAMS = ["petals", "complexity", "seed"];
 const FLOAT_PARAMS = ["organic", "strokeWidth",
   "layer1Intensity", "layer2Intensity", "layer3Intensity", "layer4Intensity",
   "layer5Intensity", "layer6Intensity", "layer7Intensity", "layer8Intensity"];
-const STRING_PARAMS = ["preset", "styleMode", "structurePreset"];
+const STRING_PARAMS = ["preset", "styleMode", "structurePreset", "generatorType"];
 const BOOL_PARAMS = ["frames", "pageBorder", "kaleidoscope", "textures"];
 
 export function getStateFromURL(defaults) {

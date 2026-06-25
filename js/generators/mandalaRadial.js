@@ -979,15 +979,19 @@ export function generateMandalaRadial(doc, opts) {
   }
 
   // --- SPOKES (radios) corregidos: mm -> rad y clamp al wedge ---
-  const spokeCount = _clamp(Math.round(petals * _lerp(0.6, 1.2, cN)), 10, 72);
+  // Mantener los radios escasos y confinados a un anillo intermedio:
+  // si arrancan junto al núcleo y cruzan todo el radio saturan el centro
+  // (efecto "abanico" negro) y la pieza deja de ser coloreable.
+  const spokeCount = _clamp(Math.round(petals * _lerp(0.3, 0.6, cN)), 6, 24);
   const targetSpokeWmm = computedRadius * _lerp(0.010, 0.018, cN);
 
   for (let i = 0; i < spokeCount; i++) {
-    // Less spokes if organic
-    if (rng() > _lerp(0.6, 0.3, organicLevel)) continue;
+    // Menos radios cuanto más orgánico, y de base ya son un acento esporádico
+    if (rng() > _lerp(0.35, 0.18, organicLevel)) continue;
 
-    const rA = Math.max(binduR * 1.05, computedRadius * 0.12);
-    const rB = computedRadius * (0.55 + 0.40 * rng());
+    // Confinados a un anillo intermedio (no tocan el núcleo ni el marco)
+    const rA = Math.max(binduClearR * 1.1, computedRadius * 0.22);
+    const rB = computedRadius * (0.42 + 0.22 * rng());
     if (rB <= rA) continue;
 
     const halfAngA = Math.atan2(targetSpokeWmm / 2, rA);

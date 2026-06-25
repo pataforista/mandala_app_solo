@@ -5,6 +5,7 @@ import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSv
 import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
 import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
+import { generateMandalaRadial } from "./generators/mandalaRadial.js";
 import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
@@ -29,6 +30,9 @@ const applyStructureBtn = document.getElementById("applyStructure");
 const strokeWidthEl = document.getElementById("strokeWidth");
 const framesEl = document.getElementById("frames");
 const pageBorderEl = document.getElementById("pageBorder");
+
+const generatorTypeEl = document.getElementById("generatorType");
+const layersPanelEl = document.getElementById("layersPanel");
 
 const styleModeEl = document.getElementById("styleMode");
 const layer1IntensityEl = document.getElementById("layer1Intensity");
@@ -72,6 +76,7 @@ const uploadBtn = document.getElementById("uploadBtn");
 
 const DEFAULTS = {
   preset: "A4",
+  generatorType: "layers",
   petals: 12,
   complexity: 130,
   organic: 0.25,
@@ -169,6 +174,14 @@ if (!STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
 
 if (state.styleMode === "hashiko") state.styleMode = "sashiko";
 
+if (state.generatorType !== "radial") state.generatorType = "layers";
+
+// Muestra/oculta el panel de Capas: solo aplica al generador de capas.
+function updateGeneratorVisibility() {
+  const isRadial = state.generatorType === "radial";
+  if (layersPanelEl) layersPanelEl.style.display = isRadial ? "none" : "";
+}
+
 if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
   throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
 }
@@ -196,6 +209,8 @@ function applyStructurePreset(presetKey) {
 
 function buildOpts(s) {
   return {
+    // Generador activo: el dispatcher (runGenerator) elige según este campo.
+    generatorType: s.generatorType || "layers",
     seed: s.seed,
     petals: s.petals,
     complexity: s.complexity,
@@ -204,7 +219,9 @@ function buildOpts(s) {
     includeFrames: s.frames,
     pageBorder: s.pageBorder,
     kaleidoscope: s.kaleidoscope,
+    // "textures" lo lee el generador de capas; "showTextures" el radial.
     textures: s.textures,
+    showTextures: s.textures,
     styleMode: s.styleMode,
     layer1Intensity: s.layer1Intensity,
     layer2Intensity: s.layer2Intensity,
@@ -215,6 +232,17 @@ function buildOpts(s) {
     layer7Intensity: s.layer7Intensity,
     layer8Intensity: s.layer8Intensity,
   };
+}
+
+// Despacha al generador correcto según opts.generatorType.
+// Ambos generadores comparten la firma (doc, opts) y leen solo los campos
+// que les corresponden, así que un único objeto de opts sirve para los dos.
+function runGenerator(doc, opts) {
+  if (opts && opts.generatorType === "radial") {
+    generateMandalaRadial(doc, opts);
+  } else {
+    generateMandalaLayers(doc, opts);
+  }
 }
 
 function getCurrentDoc() {
@@ -230,25 +258,8 @@ function render() {
 
   const doc = getCurrentDoc();
 
-  generateMandalaLayers(doc, {
-    seed: state.seed,
-    petals: state.petals,
-    complexity: state.complexity,
-    strokeWidthMm: state.strokeWidth,
-    organicLevel: state.organic,
-    includeFrames: state.frames,
-    pageBorder: state.pageBorder,
-    kaleidoscope: state.kaleidoscope,
-    textures: state.textures,
-    styleMode: state.styleMode,
-    layer1Intensity: state.layer1Intensity,
-    layer2Intensity: state.layer2Intensity,
-    layer3Intensity: state.layer3Intensity,
-    layer4Intensity: state.layer4Intensity,
-    layer5Intensity: state.layer5Intensity,
-    layer6Intensity: state.layer6Intensity,
-    layer7Intensity: state.layer7Intensity,
-    layer8Intensity: state.layer8Intensity,
+  runGenerator(doc, {
+    ...buildOpts(state),
     imagePoints: currentImagePoints,
     imageScale: state.imageScale,
     imageIntensity: state.imageIntensity,
@@ -356,6 +367,9 @@ function bindUI() {
   pageBorderEl.checked = state.pageBorder;
   kaleidoscopeEl.checked = state.kaleidoscope;
   texturesEl.checked = state.textures;
+
+  generatorTypeEl.value = state.generatorType;
+  updateGeneratorVisibility();
 
   styleModeEl.value = state.styleMode;
   layer1IntensityEl.value = String(state.layer1Intensity);
@@ -480,6 +494,14 @@ function bindUI() {
 
   texturesEl.addEventListener("sl-change", () => {
     state.textures = texturesEl.checked;
+    update();
+  });
+
+  generatorTypeEl.addEventListener("sl-change", () => {
+    state.generatorType = generatorTypeEl.value === "radial" ? "radial" : "layers";
+    state.structurePreset = "custom";
+    structurePresetEl.value = "custom";
+    updateGeneratorVisibility();
     update();
   });
 
@@ -786,7 +808,7 @@ function bindUI() {
 
     try {
       // We use downloadBatchPdf even for single pages because it handles layouts
-      await downloadBatchPdf(filename, batchOpts, generateMandalaLayers, wMm, hMm, layout, quotes);
+      await downloadBatchPdf(filename, batchOpts, runGenerator, wMm, hMm, layout, quotes);
       alert("✅ PDF descargado correctamente");
     } catch (error) {
       console.error("PDF download error:", error);
