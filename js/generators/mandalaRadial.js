@@ -276,14 +276,14 @@ export function generateMandalaRadial(doc, opts) {
 
     // factor de seguridad de área: mayor cuando densidad alta o petals alto
     let areaFactor = 1.0;
-    if (ring.density === “high”) areaFactor += 0.20;
+    if (ring.density === "high") areaFactor += 0.20;
     areaFactor += 0.30 * petalsPenalty;
 
-    // el anillo “frame” tolera un poco más subdiv (pero sin slivers)
-    if (ring.role === “frame”) areaFactor = Math.max(0.90, areaFactor - 0.10);
+    // el anillo "frame" tolera un poco más subdiv (pero sin slivers)
+    if (ring.role === "frame") areaFactor = Math.max(0.90, areaFactor - 0.10);
 
-    // “rest” no subdivide por diseño (pero por si acaso)
-    if (ring.role === “rest”) return false;
+    // "rest" no subdivide por diseño (pero por si acaso)
+    if (ring.role === "rest") return false;
 
     // chequeos
     if (area < minCellAreaMm2 * areaFactor) return false;
@@ -322,18 +322,18 @@ export function generateMandalaRadial(doc, opts) {
   }
 
   // --- PHASE 2: Textural Fills ---
-  function _addStippling(pb, cx, cy, radius, count = 5) {
+  function _addStippling(pb, cx, cy, radius, count = 5, fineW = strokeBase * 0.4) {
     if (complexity < 100) return;
     for (let i = 0; i < count; i++) {
       const r = rFloat(rng, radius * 0.2, radius * 0.9);
       const a = rFloat(rng, 0, Math.PI * 2);
       const px = cx + r * Math.cos(a);
       const py = cy + r * Math.sin(a);
-      addCirclePoly(pb, px, py, fineStroke * 0.6, 6);
+      addCirclePoly(pb, px, py, fineW * 0.6, 6);
     }
   }
 
-  function _addHatching(pb, p1, p2, p3, p4, density = 4) {
+  function _addHatching(pb, p1, p2, p3, p4, density = 4, fineW = strokeBase * 0.4) {
     if (complexity < 140) return;
     for (let i = 1; i < density; i++) {
       const t = i / density;
@@ -341,7 +341,7 @@ export function generateMandalaRadial(doc, opts) {
       const startY = _lerp(p1.y, p2.y, t);
       const endX = _lerp(p4.x, p3.x, t);
       const endY = _lerp(p4.y, p3.y, t);
-      addCapsule(pb, startX, startY, endX, endY, fineStroke * 0.5);
+      addCapsule(pb, startX, startY, endX, endY, fineW * 0.5);
     }
   }
 
@@ -547,7 +547,7 @@ export function generateMandalaRadial(doc, opts) {
 
         // Fine detail: eye texturing
         if (complexity > 180) {
-          _addStippling(pbFine, pEye.x, pEye.y, eyeRad * 0.4, 3);
+          _addStippling(pbFine, pEye.x, pEye.y, eyeRad * 0.4, 3, fineStroke);
         }
 
         // Radiating veins
@@ -638,7 +638,7 @@ export function generateMandalaRadial(doc, opts) {
 
         // Texture: internal hatching
         if (showTextures && complexity > 120 && ring.allowDetail) {
-          _addHatching(pbFine, pIn, cp1, pOut, cp2, 3);
+          _addHatching(pbFine, pIn, cp1, pOut, cp2, 3, fineStroke);
         }
 
         // Small internal curl
@@ -732,7 +732,7 @@ export function generateMandalaRadial(doc, opts) {
             const hp2 = _polar0(baseR, thetaC + localStep * 0.1);
             const hp3 = _polar0(tipR, thetaC + localStep * 0.05);
             const hp4 = _polar0(tipR, thetaC - localStep * 0.05);
-            _addHatching(pbFine, hp1, hp2, hp3, hp4, 4);
+            _addHatching(pbFine, hp1, hp2, hp3, hp4, 4, fineStroke);
           }
 
 
@@ -1156,7 +1156,7 @@ if (includeFrames) {
     const beadRingR = binduClearR * _clamp(rFloat(rng, 0.72, 0.88), 0.66, 0.92);
     const beadDensity = _lerp(2.4, 1.3, organicLevel);
     const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82);
-    const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), mainStroke * 2.2, computedRadius * 0.020);
+    const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), outerRingStrokes.main * 2.2, computedRadius * 0.020);
 
     for (let i = 0; i < beadCount; i++) {
       const a = (i * 2 * Math.PI) / beadCount;
@@ -1171,7 +1171,7 @@ if (includeFrames) {
   // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
   if (rng() < _lerp(0.88, 0.55, harmony)) {
     const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56);
-    const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), mainStroke * 2.6, computedRadius * 0.060);
+    const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), outerRingStrokes.main * 2.6, computedRadius * 0.060);
     const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
 
     for (let i = 0; i < scallopCount; i++) {
@@ -1209,7 +1209,7 @@ if (pageBorder) {
   addCirclePoly(pbB, x0, y1, cornerR, 12);
 
   doc.body.push(
-    pbB.toPath({ stroke, strokeWidthMm: mainStroke * 0.8, fill: "none" })
+    pbB.toPath({ stroke, strokeWidthMm: outerRingStrokes.main * 0.8, fill: "none" })
   );
 
   // Hairline detail inside border
