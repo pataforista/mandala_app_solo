@@ -39,6 +39,7 @@ const spiroModeEl = document.getElementById("spiroMode");
 const spiroREl = document.getElementById("spiroR");
 const spirorEl = document.getElementById("spiror");
 const spiroDistanceEl = document.getElementById("spiroDistance");
+const randomSpiroEl = document.getElementById("randomSpiro");
 
 const styleModeEl = document.getElementById("styleMode");
 const layer1IntensityEl = document.getElementById("layer1Intensity");
@@ -245,6 +246,16 @@ function applyStructurePreset(presetKey) {
 
   state.structurePreset = presetKey;
   return true;
+}
+
+// Sortea parámetros del espirógrafo con rangos que producen figuras ricas
+// (la forma sale de las razones R:r:d; el generador la auto-escala a la página).
+function randomizeSpiro(rng) {
+  state.spiroMode = rng() < 0.5 ? "hypo" : "epi";
+  const r = rInt(rng, 13, 30);
+  state.spiror = r;
+  state.spiroR = rInt(rng, 42, 96);
+  state.spiroDistance = rInt(rng, Math.max(5, Math.round(r * 0.55)), Math.round(r * 1.45));
 }
 
 function buildOpts(s) {
@@ -592,6 +603,18 @@ function bindUI() {
   });
   spiroDistanceEl.addEventListener("sl-change", update);
 
+  if (randomSpiroEl) {
+    randomSpiroEl.addEventListener("click", () => {
+      const spiroRng = mulberry32((randomSeed32() ^ 0x5BD1E995) >>> 0);
+      state.spiroEnabled = true;
+      randomizeSpiro(spiroRng);
+      state.structurePreset = "custom";
+      structurePresetEl.value = "custom";
+      bindUI();
+      update();
+    });
+  }
+
   styleModeEl.addEventListener("sl-change", () => {
     state.styleMode = styleModeEl.value;
     state.structurePreset = "custom";
@@ -767,9 +790,13 @@ function bindUI() {
       if (state.generatorType === "radial") {
         state.petals = rInt(shuffleRng, 4, 12) * 2;  // 8..24 pétalos
         state.complexity = rInt(shuffleRng, 60, 170);
+        // A veces corona el radial con un espirógrafo aleatorio
+        state.spiroEnabled = shuffleRng() < 0.55;
+        if (state.spiroEnabled) randomizeSpiro(shuffleRng);
       } else {
         state.petals = rInt(shuffleRng, 4, 24) * 2;  // 8..48 pétalos
         state.complexity = rInt(shuffleRng, 120, 320);
+        state.spiroEnabled = false;
       }
 
       // Ensure at least 4 layers have high intensity to avoid "empty" mandalas
