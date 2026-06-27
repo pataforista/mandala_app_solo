@@ -409,32 +409,6 @@ export function generateMandalaRadial(doc, opts) {
       .close();
   }
 
-  // --- Curvas más orgánicas: cubicTo compatible ---
-  // Si PathBuilder no soporta cubicTo, aproximamos con 2 cuadráticas.
-  function cubicToCompat(pb, c1x, c1y, c2x, c2y, x, y) {
-    if (typeof pb.cubicTo === "function") {
-      pb.cubicTo(c1x, c1y, c2x, c2y, x, y);
-      return;
-    }
-    // Aproximación: cubic -> 2 quads (split t=0.5).
-    const x0 = pb._x, y0 = pb._y;
-    if (!Number.isFinite(x0) || !Number.isFinite(y0)) {
-      pb.quadTo((c1x + c2x) * 0.5, (c1y + c2y) * 0.5, x, y);
-      return;
-    }
-    const p01x = (x0 + c1x) * 0.5, p01y = (y0 + c1y) * 0.5;
-    const p12x = (c1x + c2x) * 0.5, p12y = (c1y + c2y) * 0.5;
-    const p23x = (c2x + x) * 0.5, p23y = (c2y + y) * 0.5;
-
-    const p012x = (p01x + p12x) * 0.5, p012y = (p01y + p12y) * 0.5;
-    const p123x = (p12x + p23x) * 0.5, p123y = (p12y + p23y) * 0.5;
-
-    const p0123x = (p012x + p123x) * 0.5, p0123y = (p012y + p123y) * 0.5;
-
-    pb.quadTo(p012x, p012y, p0123x, p0123y);
-    pb.quadTo(p123x, p123y, x, y);
-  }
-
   // --- PHASE 4: Spirograph (Hypotrochoid / Epitrochoid) ---
   function addSpirograph(pb, R, r, d, steps, mode = "hypo") {
     const step = (Math.PI * 2 * 10) / steps; // 10 loops for complexity
@@ -534,8 +508,8 @@ export function generateMandalaRadial(doc, opts) {
         const c2R = _polarW(ring.start + span * 0.2, thetaC + localStep * 0.1, wobI);
 
         pbMain.moveTo(pIn.x, pIn.y);
-        cubicToCompat(pbMain, c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
-        cubicToCompat(pbMain, c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
+        pbMain.cubicTo(c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
+        pbMain.cubicTo(c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
         pbMain.close();
 
         // Eye of the feather
@@ -685,8 +659,8 @@ export function generateMandalaRadial(doc, opts) {
         const c2R = _polar0(waistR, thetaC + localStep * 0.18 * widthFactor);
 
         pbMain.moveTo(pIn.x, pIn.y);
-        cubicToCompat(pbMain, c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
-        cubicToCompat(pbMain, c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
+        pbMain.cubicTo(c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
+        pbMain.cubicTo(c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
         pbMain.close();
 
         // Contorno interno (muy típico en los ejemplos): “pétalo dentro de pétalo”

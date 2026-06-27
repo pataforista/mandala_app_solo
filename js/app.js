@@ -821,10 +821,11 @@ function bindUI() {
       state.layer5Intensity = intensities[4];
       state.layer6Intensity = intensities[5];
       state.layer7Intensity = intensities[6];
-      state.imageIntensity = intensities[7];
-      
-      // Randomize Image params if active
+      state.layer8Intensity = intensities[7];
+
+      // Randomize Image params if active (imageIntensity only matters with an image)
       if (currentImage) {
+        state.imageIntensity = rFloat(shuffleRng, 0.6, 1.0);
         state.imageThreshold = rInt(shuffleRng, 60, 180);
         state.imageZoom = rFloat(shuffleRng, 0.5, 1.5);
         state.imageScale = rFloat(shuffleRng, 0.8, 1.5);
