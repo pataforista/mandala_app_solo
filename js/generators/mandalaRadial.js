@@ -312,18 +312,18 @@ export function generateMandalaRadial(doc, opts) {
   }
 
   // --- PHASE 2: Textural Fills ---
-  function _addStippling(pb, cx, cy, radius, count = 5) {
+  function _addStippling(pb, cx, cy, radius, count = 5, fineW = strokeBase * 0.4) {
     if (complexity < 100) return;
     for (let i = 0; i < count; i++) {
       const r = rFloat(rng, radius * 0.2, radius * 0.9);
       const a = rFloat(rng, 0, Math.PI * 2);
       const px = cx + r * Math.cos(a);
       const py = cy + r * Math.sin(a);
-      addCirclePoly(pb, px, py, fineStroke * 0.6, 6);
+      addCirclePoly(pb, px, py, fineW * 0.6, 6);
     }
   }
 
-  function _addHatching(pb, p1, p2, p3, p4, density = 4) {
+  function _addHatching(pb, p1, p2, p3, p4, density = 4, fineW = strokeBase * 0.4) {
     if (complexity < 140) return;
     for (let i = 1; i < density; i++) {
       const t = i / density;
@@ -331,7 +331,7 @@ export function generateMandalaRadial(doc, opts) {
       const startY = _lerp(p1.y, p2.y, t);
       const endX = _lerp(p4.x, p3.x, t);
       const endY = _lerp(p4.y, p3.y, t);
-      addCapsule(pb, startX, startY, endX, endY, fineStroke * 0.5);
+      addCapsule(pb, startX, startY, endX, endY, fineW * 0.5);
     }
   }
 
@@ -397,32 +397,6 @@ export function generateMandalaRadial(doc, opts) {
       .lineTo(b2x, b2y)
       .lineTo(a2x, a2y)
       .close();
-  }
-
-  // --- Curvas más orgánicas: cubicTo compatible ---
-  // Si PathBuilder no soporta cubicTo, aproximamos con 2 cuadráticas.
-  function cubicToCompat(pb, c1x, c1y, c2x, c2y, x, y) {
-    if (typeof pb.cubicTo === "function") {
-      pb.cubicTo(c1x, c1y, c2x, c2y, x, y);
-      return;
-    }
-    // Aproximación: cubic -> 2 quads (split t=0.5).
-    const x0 = pb._x, y0 = pb._y;
-    if (!Number.isFinite(x0) || !Number.isFinite(y0)) {
-      pb.quadTo((c1x + c2x) * 0.5, (c1y + c2y) * 0.5, x, y);
-      return;
-    }
-    const p01x = (x0 + c1x) * 0.5, p01y = (y0 + c1y) * 0.5;
-    const p12x = (c1x + c2x) * 0.5, p12y = (c1y + c2y) * 0.5;
-    const p23x = (c2x + x) * 0.5, p23y = (c2y + y) * 0.5;
-
-    const p012x = (p01x + p12x) * 0.5, p012y = (p01y + p12y) * 0.5;
-    const p123x = (p12x + p23x) * 0.5, p123y = (p12y + p23y) * 0.5;
-
-    const p0123x = (p012x + p123x) * 0.5, p0123y = (p012y + p123y) * 0.5;
-
-    pb.quadTo(p012x, p012y, p0123x, p0123y);
-    pb.quadTo(p123x, p123y, x, y);
   }
 
   // --- PHASE 4: Spirograph (Hypotrochoid / Epitrochoid) ---
@@ -524,8 +498,8 @@ export function generateMandalaRadial(doc, opts) {
         const c2R = _polarW(ring.start + span * 0.2, thetaC + localStep * 0.1, wobI);
 
         pbMain.moveTo(pIn.x, pIn.y);
-        cubicToCompat(pbMain, c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
-        cubicToCompat(pbMain, c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
+        pbMain.cubicTo(c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
+        pbMain.cubicTo(c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
         pbMain.close();
 
         // Eye of the feather
@@ -537,7 +511,7 @@ export function generateMandalaRadial(doc, opts) {
 
         // Fine detail: eye texturing
         if (complexity > 180) {
-          _addStippling(pbFine, pEye.x, pEye.y, eyeRad * 0.4, 3);
+          _addStippling(pbFine, pEye.x, pEye.y, eyeRad * 0.4, 3, fineStroke);
         }
 
         // Radiating veins
@@ -628,7 +602,7 @@ export function generateMandalaRadial(doc, opts) {
 
         // Texture: internal hatching
         if (showTextures && complexity > 120 && ring.allowDetail) {
-          _addHatching(pbFine, pIn, cp1, pOut, cp2, 3);
+          _addHatching(pbFine, pIn, cp1, pOut, cp2, 3, fineStroke);
         }
 
         // Small internal curl
@@ -675,8 +649,8 @@ export function generateMandalaRadial(doc, opts) {
         const c2R = _polar0(waistR, thetaC + localStep * 0.18 * widthFactor);
 
         pbMain.moveTo(pIn.x, pIn.y);
-        cubicToCompat(pbMain, c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
-        cubicToCompat(pbMain, c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
+        pbMain.cubicTo(c1L.x, c1L.y, c2L.x, c2L.y, pOut.x, pOut.y);
+        pbMain.cubicTo(c1R.x, c1R.y, c2R.x, c2R.y, pIn.x, pIn.y);
         pbMain.close();
 
         // Contorno interno (muy típico en los ejemplos): “pétalo dentro de pétalo”
@@ -722,7 +696,7 @@ export function generateMandalaRadial(doc, opts) {
             const hp2 = _polar0(baseR, thetaC + localStep * 0.1);
             const hp3 = _polar0(tipR, thetaC + localStep * 0.05);
             const hp4 = _polar0(tipR, thetaC - localStep * 0.05);
-            _addHatching(pbFine, hp1, hp2, hp3, hp4, 4);
+            _addHatching(pbFine, hp1, hp2, hp3, hp4, 4, fineStroke);
           }
 
 
@@ -969,15 +943,19 @@ export function generateMandalaRadial(doc, opts) {
   }
 
   // --- SPOKES (radios) corregidos: mm -> rad y clamp al wedge ---
-  const spokeCount = _clamp(Math.round(petals * _lerp(0.6, 1.2, cN)), 10, 72);
+  // Mantener los radios escasos y confinados a un anillo intermedio:
+  // si arrancan junto al núcleo y cruzan todo el radio saturan el centro
+  // (efecto "abanico" negro) y la pieza deja de ser coloreable.
+  const spokeCount = _clamp(Math.round(petals * _lerp(0.3, 0.6, cN)), 6, 24);
   const targetSpokeWmm = computedRadius * _lerp(0.010, 0.018, cN);
 
   for (let i = 0; i < spokeCount; i++) {
-    // Less spokes if organic
-    if (rng() > _lerp(0.6, 0.3, organicLevel)) continue;
+    // Menos radios cuanto más orgánico, y de base ya son un acento esporádico
+    if (rng() > _lerp(0.35, 0.18, organicLevel)) continue;
 
-    const rA = Math.max(binduR * 1.05, computedRadius * 0.12);
-    const rB = computedRadius * (0.55 + 0.40 * rng());
+    // Confinados a un anillo intermedio (no tocan el núcleo ni el marco)
+    const rA = Math.max(binduClearR * 1.1, computedRadius * 0.22);
+    const rB = computedRadius * (0.42 + 0.22 * rng());
     if (rB <= rA) continue;
 
     const halfAngA = Math.atan2(targetSpokeWmm / 2, rA);
@@ -1146,7 +1124,7 @@ if (includeFrames) {
     const beadRingR = binduClearR * _clamp(rFloat(rng, 0.72, 0.88), 0.66, 0.92);
     const beadDensity = _lerp(2.4, 1.3, organicLevel);
     const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82);
-    const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), mainStroke * 2.2, computedRadius * 0.020);
+    const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), outerRingStrokes.main * 2.2, computedRadius * 0.020);
 
     const pbBeads = new PathBuilder();
     for (let i = 0; i < beadCount; i++) {
@@ -1161,7 +1139,7 @@ if (includeFrames) {
   // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
   if (rng() < _lerp(0.88, 0.55, harmony)) {
     const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56);
-    const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), mainStroke * 2.6, computedRadius * 0.060);
+    const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), outerRingStrokes.main * 2.6, computedRadius * 0.060);
     const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
 
     const pbScallop = new PathBuilder();
@@ -1199,7 +1177,7 @@ if (pageBorder) {
   addCirclePoly(pbB, x0, y1, cornerR, 12);
 
   doc.body.push(
-    pbB.toPath({ stroke, strokeWidthMm: mainStroke * 0.8, fill: "none" })
+    pbB.toPath({ stroke, strokeWidthMm: outerRingStrokes.main * 0.8, fill: "none" })
   );
 
   // Hairline detail inside border
@@ -1213,19 +1191,25 @@ if (pageBorder) {
 
 // --- PHASE 4: Spirograph Layer ---
 if (spiroEnabled) {
-  const pbSpiro = new PathBuilder();
-  addSpirograph(pbSpiro, spiroR, spiror, spiroDistance, spiroResolution, spiroMode);
+  // La forma del espirógrafo depende solo de las razones R:r:d; escalamos
+  // R/r/d de forma uniforme para que el alcance máximo encaje en la página.
+  // Así los controles definen la figura y el resultado siempre cae dentro
+  // del marco (no se sale ni se satura), independientemente de los valores.
+  const rawReach = (spiroMode === "epi")
+    ? (spiroR + spiror + spiroDistance)
+    : (Math.abs(spiroR - spiror) + spiroDistance);
+  const fit = rawReach > 1e-6 ? (computedRadius * 0.95) / rawReach : 1;
 
-  // Hierarchical Spirograph weight based on its max reach
-  const maxSpiroR = (spiroMode === "epi") ? (spiroR + spiror + spiroDistance) : (spiroR - spiror + spiroDistance);
-  const spiroStrokes = getStrokesForRadius(maxSpiroR, "secondary");
+  const pbSpiro = new PathBuilder();
+  addSpirograph(pbSpiro, spiroR * fit, spiror * fit, spiroDistance * fit, spiroResolution, spiroMode);
+
+  const spiroStrokes = getStrokesForRadius(computedRadius * 0.95, "secondary");
 
   doc.body.push(
     pbSpiro.toPath({
       stroke,
       strokeWidthMm: spiroStrokes.detail,
       fill: "none",
-      opacity: 0.8
     })
   );
 }
