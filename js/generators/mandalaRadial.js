@@ -39,7 +39,8 @@ export function generateMandalaRadial(doc, opts) {
     // Marcos
     includeFrames = true,
 
-    organicLevel = 0.5, // 0.0 = Geometric, 1.0 = Very Organic
+    // organicLevel (0.0 = Geometric, 1.0 = Very Organic) se lee más abajo
+    // combinado con el sesgo del arquetipo de composición.
 
     // PHASE 3: Master Tier Controls
     pageBorder = true,
@@ -65,6 +66,65 @@ export function generateMandalaRadial(doc, opts) {
 
   const rng = mulberry32((seed >>> 0) || 0);
 
+  // --- Helpers puros (declarados antes de cualquier uso) ---
+  const _polar0 = (r, theta) => polar(r, theta);
+  const _lerp = (a, b, t) => lerp(a, b, t);
+  const _clamp = (v, min, max) => clamp(v, min, max);
+  const _fmt = (n) => fmt(n);
+
+  function weightedPick(weights) {
+    let total = 0;
+    for (const k in weights) total += weights[k];
+    let t = rng() * total;
+    for (const k in weights) {
+      t -= weights[k];
+      if (t <= 0) return k;
+    }
+    return Object.keys(weights)[0];
+  }
+
+  // --- Arquetipos de composición ---
+  // Cada semilla cae en una "familia" visual distinta: sesga el vocabulario de
+  // formas, el reparto de anillos, la densidad, el centro y el marco. Evita que
+  // todas las semillas converjan al mismo esqueleto (variedad entre páginas).
+  const ARCHETYPES = [
+    { // Floración: pétalos redondeados en capas alternas, con aire
+      name: "bloom", ringMode: "waves", densityBias: 0, organicBias: 0.15, spokes: "none",
+      shapeWeights: { petal_round: 3, petal_teardrop: 2.2, lotus_petal_advanced: 1.6, petal_heart: 1.2, fleur: 1, arch: 0.9, paisley_element: 0.5, peacock_feather: 0.5, diamond: 0.2 },
+      center: ["compass", "lotus_ring"], frames: ["scallop", "beads"] },
+    { // Estrella geométrica: rombos y puntas, anillos uniformes
+      name: "star", ringMode: "uniform", densityBias: 0, organicBias: -0.25, spokes: "rare",
+      shapeWeights: { diamond: 3, petal_pointy: 2, arch: 1.5, islamic_interlace: 1.4, petal_almond: 1.2, fleur: 0.6 },
+      center: ["sunburst", "compass"], frames: ["double_line", "beads"] },
+    { // Encaje / doily: bandas, arcos y cuentas, denso hacia afuera
+      name: "lace", ringMode: "phi_in", densityBias: 1, organicBias: -0.05, spokes: "none",
+      shapeWeights: { arch: 3, petal_round: 1.6, fleur: 1.4, diamond: 1.2, petal_teardrop: 1.2, islamic_interlace: 0.8 },
+      center: ["dot_orbit", "compass"], frames: ["scallop", "beads", "double_line"] },
+    { // Botánico: paisley, plumas y almendras, muy orgánico
+      name: "botanical", ringMode: "phi_out", densityBias: 0, organicBias: 0.2, spokes: "none",
+      shapeWeights: { paisley_element: 2.2, peacock_feather: 2, petal_almond: 1.8, petal_teardrop: 1.5, lotus_petal_advanced: 1.4, arch: 0.8, petal_heart: 0.8 },
+      center: ["lotus_ring", "compass"], frames: ["beads", "petal_rim"] },
+    { // Sol radiante: puntas largas y radios protagonistas, composición aireada
+      name: "sunray", ringMode: "phi_out", densityBias: -1, organicBias: 0, spokes: "feature",
+      shapeWeights: { petal_pointy: 2.6, petal_almond: 2, arch: 1.4, diamond: 1.2, petal_teardrop: 1, fleur: 0.8 },
+      center: ["sunburst"], frames: ["petal_rim", "double_line"] },
+    { // Clásico editorial: mezcla equilibrada (el comportamiento histórico)
+      name: "classic", ringMode: "phi_out", densityBias: 0, organicBias: 0, spokes: "rare",
+      shapeWeights: { petal_round: 1.5, petal_pointy: 1.2, petal_teardrop: 1.2, arch: 1.5, diamond: 1.2, paisley_element: 0.8, peacock_feather: 0.7, lotus_petal_advanced: 0.9, petal_heart: 0.7, fleur: 0.8, islamic_interlace: 0.5 },
+      center: ["sunburst", "compass", "lotus_ring", "dot_orbit"], frames: ["beads", "scallop"] },
+  ];
+  const archetype = ARCHETYPES[Math.floor(rng() * ARCHETYPES.length)];
+
+  // Nivel orgánico efectivo: parámetro del usuario + sesgo del arquetipo.
+  // Techo en 0.85 (salvo que el usuario pida más): por encima, el wobble
+  // desalinea las cuñas espejadas y aparecen trazos "fantasma".
+  const userOrganic = opts.organicLevel ?? 0.5;
+  const organicLevel = _clamp(userOrganic + archetype.organicBias, 0, Math.max(0.85, userOrganic));
+
+  // --- Helpers for natural look ---
+  const { wPhase1, wPhase2 } = getWobblePhases(seed);
+  const _polarW = (r, theta, intensity = 0.5) => polarW(r, theta, intensity, organicLevel, wPhase1, wPhase2);
+
   // --- Jerarquía de trazo base ---
   const strokeBase = Math.max(minStrokeMm, strokeWidthMm);
 
@@ -86,8 +146,11 @@ export function generateMandalaRadial(doc, opts) {
   const cN = _clamp((complexity - 20) / (240 - 20), 0, 1);
   const ringCount = _clamp(Math.round(5 + cN * 7), 5, 12);
 
-  const subProb = _lerp(0.18, 0.72, cN);
-  const detailProb = _lerp(0.35, 0.85, cN);
+  // Con muchos pétalos las celdas angulares se estrechan: bajar la densidad de
+  // detalle evita que el conjunto se sature en negro y deje de ser coloreable.
+  const petalsCrowd = _clamp((petals - 12) / 36, 0, 1);
+  const subProb = _lerp(0.18, 0.72, cN) * _lerp(1, 0.7, petalsCrowd);
+  const detailProb = _lerp(0.35, 0.85, cN) * _lerp(1, 0.55, petalsCrowd);
 
   // --- Rejilla radial ---
   const stepAngle = (2 * Math.PI) / petals;
@@ -106,9 +169,16 @@ export function generateMandalaRadial(doc, opts) {
   const rMax = computedRadius * 0.985;
 
   const totalSpan = Math.max(0, rMax - rMin);
+  // Reparto de grosores según el arquetipo. El exponente 0.55 doma la razón
+  // phi^i (con 12 anillos pasaría de 1:200 a ~1:14): los anillos interiores
+  // conservan espacio útil para colorear en vez de quedar como astillas.
   const weights = [];
-  for (let i = 0; i < ringCount; i++) weights.push(Math.pow(phi, i));
-  if (rng() < 0.35) weights.reverse();
+  for (let i = 0; i < ringCount; i++) {
+    if (archetype.ringMode === "phi_in") weights.push(Math.pow(phi, (ringCount - 1 - i) * 0.55));
+    else if (archetype.ringMode === "uniform") weights.push(1 + rFloat(rng, -0.18, 0.18));
+    else if (archetype.ringMode === "waves") weights.push(i % 2 === 0 ? 1 : 1.8);
+    else weights.push(Math.pow(phi, i * 0.55)); // phi_out
+  }
   const sumW = weights.reduce((a, b) => a + b, 0);
 
   // --- Semántica editorial ---
@@ -137,6 +207,13 @@ export function generateMandalaRadial(doc, opts) {
 
     const role = roleForIndex(i, ringCount);
     let density = densityForIndex(i, ringCount, cN);
+
+    // Sesgo de densidad del arquetipo (aplicado con probabilidad para no
+    // volver el resultado monótono)
+    if (archetype.densityBias !== 0 && rng() < 0.65) {
+      const order = ["low", "med", "high"];
+      density = order[_clamp(order.indexOf(density) + archetype.densityBias, 0, 2)];
+    }
 
     if (prevDensity === "high" && density === "high") density = "med";
 
@@ -186,28 +263,26 @@ export function generateMandalaRadial(doc, opts) {
     const isOrganic = (rng() < organicLevel); /* Bias general */
 
     if (ring.role === "rest") return (isOrganic ? pickPetalVariant(ring) : "spacer_circles");
-    if (ring.role === "frame") return (!isOrganic && rng() < 0.6 ? "diamond" : pickPetalVariant(ring));
+    if (ring.role === "frame") {
+      if (archetype.name === "star" && rng() < 0.5) return "diamond";
+      return (!isOrganic && rng() < 0.45 ? "diamond" : pickPetalVariant(ring));
+    }
 
     if (ring.role === "primary") {
       if (!isOrganic && rng() < 0.4) return "diamond";
       return (rng() < 0.80 ? pickPetalVariant(ring) : "arch");
     }
 
-    const prevType = prevRing?.type;
-
-    if (prevRing && prevRing.density === "high" && ring.density !== "high") {
-      return (rng() < 0.75 ? "arch" : "petal_teardrop");
+    // Respiro visual tras un anillo denso
+    if (prevRing && prevRing.density === "high" && ring.density !== "high" && rng() < 0.55) {
+      return (rng() < 0.7 ? "arch" : "petal_teardrop");
     }
 
-    const rand = rng();
-    const diamondThresh = _lerp(0.7, 0.95, organicLevel);
-
-    if (rand > diamondThresh) return "diamond";
-    if (rand < 0.25 * (1 - organicLevel)) return "islamic_interlace";
-    if (rand < 0.2 + 0.3 * organicLevel) return "peacock_feather";
-    if (rand < 0.4 + 0.2 * organicLevel) return "paisley_element";
-    if (rand < 0.6 + 0.1 * organicLevel) return "petal_teardrop";
-    return (rng() < 0.5 ? "arch" : "petal");
+    // Pool ponderado del arquetipo; si repite el tipo del anillo anterior,
+    // se re-sortea una vez (anti-repetición dentro del mismo mandala).
+    let type = weightedPick(archetype.shapeWeights);
+    if (prevRing && type === prevRing.type) type = weightedPick(archetype.shapeWeights);
+    return type;
   }
 
   function pickPetalVariant(ring) {
@@ -230,16 +305,6 @@ export function generateMandalaRadial(doc, opts) {
 
     return (rng() < 0.75 ? "petal_almond" : "fleur");
   }
-
-  // --- Helpers for natural look ---
-  const { wPhase1, wPhase2 } = getWobblePhases(seed);
-  const _polarW = (r, theta, intensity = 0.5) => polarW(r, theta, intensity, organicLevel, wPhase1, wPhase2);
-  const _polar0 = (r, theta) => polar(r, theta);
-  const _lerp = (a, b, t) => lerp(a, b, t);
-  const _clamp = (v, min, max) => clamp(v, min, max);
-  const _fmt = (n) => fmt(n);
-
-
 
   // --- Área aproximada base ---
   function allowSubdivideArea(ring, localStep) {
@@ -526,21 +591,26 @@ export function generateMandalaRadial(doc, opts) {
       } else if (type === "islamic_interlace") {
         const span = ring.end - ring.start;
         const rMid = ring.start + span * 0.5;
-        const thickness = span * 0.2;
+
+        // Limita el ancho angular al aspecto del anillo: en anillos anchos y
+        // poco subdivididos las cintas a ancho completo se leen como "M"s.
+        const halfW = Math.min(localStep / 2, (span / Math.max(1e-3, rMid)) * 0.75);
+        const tL = thetaC - halfW;
+        const tR = thetaC + halfW;
 
         // Ribbon 1: Left-to-Center
-        const p1 = _polarW(ring.start, thetaL, wobI);
+        const p1 = _polarW(ring.start, tL, wobI);
         const p2 = _polarW(rMid, thetaC, wobI);
-        const p3 = _polarW(ring.end, thetaL, wobI);
+        const p3 = _polarW(ring.end, tL, wobI);
 
-        pbMain.moveTo(p1.x, p1.y).quadTo(_polarW(rMid, thetaL, wobI).x, _polarW(rMid, thetaL, wobI).y, p2.x, p2.y)
-          .quadTo(_polarW(rMid, thetaL, wobI).x, _polarW(rMid, thetaL, wobI).y, p3.x, p3.y);
+        pbMain.moveTo(p1.x, p1.y).quadTo(_polarW(rMid, tL, wobI).x, _polarW(rMid, tL, wobI).y, p2.x, p2.y)
+          .quadTo(_polarW(rMid, tL, wobI).x, _polarW(rMid, tL, wobI).y, p3.x, p3.y);
 
         // Ribbon 2: Right-to-Center
-        const p4 = _polarW(ring.start, thetaR, wobI);
-        const p5 = _polarW(ring.end, thetaR, wobI);
-        pbMain.moveTo(p4.x, p4.y).quadTo(_polarW(rMid, thetaR, wobI).x, _polarW(rMid, thetaR, wobI).y, p2.x, p2.y)
-          .quadTo(_polarW(rMid, thetaR, wobI).x, _polarW(rMid, thetaR, wobI).y, p5.x, p5.y);
+        const p4 = _polarW(ring.start, tR, wobI);
+        const p5 = _polarW(ring.end, tR, wobI);
+        pbMain.moveTo(p4.x, p4.y).quadTo(_polarW(rMid, tR, wobI).x, _polarW(rMid, tR, wobI).y, p2.x, p2.y)
+          .quadTo(_polarW(rMid, tR, wobI).x, _polarW(rMid, tR, wobI).y, p5.x, p5.y);
 
       } else if (type === "lotus_petal_advanced") {
         const span = ring.end - ring.start;
@@ -610,7 +680,7 @@ export function generateMandalaRadial(doc, opts) {
         const pCurl = _polarW(curlR, thetaC + localStep * 0.2 * curveDir, wobI);
         addCirclePoly(pbDetail, pCurl.x, pCurl.y, span * 0.08, 10);
 
-      } else if (type === "petal" || type === "petal_pointy" || type === "petal_round" || type === "petal_almond") {
+      } else if (type === "petal" || type === "petal_pointy" || type === "petal_round" || type === "petal_almond" || type === "petal_teardrop") {
         const outR = (nextRing && ring.role !== "frame" && ring.role !== "rest" && rng() < 0.78)
           ? Math.min(rMax, ring.end + (nextRing.end - nextRing.start) * overlapFactor)
           : ring.end;
@@ -675,10 +745,12 @@ export function generateMandalaRadial(doc, opts) {
 
 
         // Micro-detalle botánico: estambres y punteado (stippling)
-        if (ring.allowDetail && rng() < _lerp(0.3, 0.7, cN) && allowSubdivideSafe(ring, localStep)) {
+        // Solo lejos del núcleo y con ancho acotado: los estambres gruesos
+        // repetidos por pétalo eran la causa de los acúmulos negros del centro.
+        if (ring.allowDetail && ring.start > binduClearR * 1.4 && rng() < _lerp(0.2, 0.5, cN) && allowSubdivideSafe(ring, localStep)) {
           const baseR = ring.start + span * 0.14;
           const tipR = ring.start + span * _clamp(rFloat(rng, 0.48, 0.62), 0.42, 0.68);
-          const wS = Math.max(detailStroke * 0.9, span * 0.035);
+          const wS = Math.min(Math.max(detailStroke * 0.9, span * 0.035), detailStroke * 1.5);
 
           // Add stippling along the central axis or as a shadow
           if (showTextures && complexity > 110 && rng() < 0.7) {
@@ -728,9 +800,9 @@ export function generateMandalaRadial(doc, opts) {
             const sA = _polar0(baseR, aj);
             const sB = _polar0(tipR, aj);
             if (wS * Math.hypot(sB.x - sA.x, sB.y - sA.y) >= minCellAreaMm2 * 0.55) {
-              // Tapered stamens
+              // Tapered stamens (punta acotada para no ennegrecer)
               addTaperedLine(pbDetail, sA, sB, wS, wS * 0.3);
-              addCirclePoly(pbDetail, sB.x, sB.y, Math.max(wS * 0.85, mainStroke * 1.2), 12);
+              addCirclePoly(pbDetail, sB.x, sB.y, Math.min(Math.max(wS * 0.85, mainStroke * 1.2), wS * 1.1), 12);
             }
           }
         }
@@ -897,6 +969,16 @@ export function generateMandalaRadial(doc, opts) {
           }
         }
 
+      } else if (type === "spacer_circles") {
+        // Anillo de descanso: banda fina + punto central (limpio y coloreable)
+        const rMidRing = (ring.start + ring.end) / 2;
+        addArcBand(pbDetail, rMidRing, thetaL, thetaR, Math.max(detailStroke * 1.6, (ring.end - ring.start) * 0.10));
+        const dotR = Math.min((ring.end - ring.start) * 0.30, Math.abs(rMidRing * localStep) * 0.28);
+        if (dotR > mainStroke * 1.5) {
+          const pDot = _polar0(rMidRing, thetaC);
+          addCirclePoly(pbDetail, pDot.x, pDot.y, dotR, 12);
+        }
+
       } else {
         // arch = cinta cerrada (motivo)
         const pL0 = _polar0(ring.start, thetaL);
@@ -946,16 +1028,23 @@ export function generateMandalaRadial(doc, opts) {
   // Mantener los radios escasos y confinados a un anillo intermedio:
   // si arrancan junto al núcleo y cruzan todo el radio saturan el centro
   // (efecto "abanico" negro) y la pieza deja de ser coloreable.
-  const spokeCount = _clamp(Math.round(petals * _lerp(0.3, 0.6, cN)), 6, 24);
-  const targetSpokeWmm = computedRadius * _lerp(0.010, 0.018, cN);
+  if (archetype.spokes !== "none") {
+  const isFeatureSpokes = archetype.spokes === "feature";
+  // Los spokes viven dentro del wedge y se repiten ×petals: deben ser POCOS y
+  // ANCHOS (banda delineada, interior blanco coloreable). Muchas cápsulas
+  // finas se leen como barras negras y ensucian el centro.
+  const spokeTries = isFeatureSpokes ? 2 : 3;
+  const targetSpokeWmm = computedRadius * (isFeatureSpokes ? 0.05 : 0.035);
 
-  for (let i = 0; i < spokeCount; i++) {
-    // Menos radios cuanto más orgánico, y de base ya son un acento esporádico
-    if (rng() > _lerp(0.35, 0.18, organicLevel)) continue;
+  for (let i = 0; i < spokeTries; i++) {
+    // "feature": un radio protagonista casi seguro + segundo opcional (sunray);
+    // "rare": acento esporádico, menos frecuente cuanto más orgánico
+    const keepP = isFeatureSpokes ? (i === 0 ? 0.95 : 0.35) : _lerp(0.30, 0.15, organicLevel);
+    if (rng() > keepP) continue;
 
     // Confinados a un anillo intermedio (no tocan el núcleo ni el marco)
     const rA = Math.max(binduClearR * 1.1, computedRadius * 0.22);
-    const rB = computedRadius * (0.42 + 0.22 * rng());
+    const rB = computedRadius * (isFeatureSpokes ? (0.55 + 0.20 * rng()) : (0.42 + 0.22 * rng()));
     if (rB <= rA) continue;
 
     const halfAngA = Math.atan2(targetSpokeWmm / 2, rA);
@@ -976,6 +1065,7 @@ export function generateMandalaRadial(doc, opts) {
       .lineTo(p3.x, p3.y)
       .lineTo(p4.x, p4.y)
       .close();
+  }
   }
 
   // Final wedge strokes for Spirograph reference or other uses
@@ -1018,7 +1108,9 @@ for (let k = 0; k < petals; k++) {
   // para evitar el aspecto excesivamente sintético de un patrón 100% clonado.
   const rotJitterDeg = Math.sin(phase * 2.7 + (seed % 37)) * organicJitter * 2.2;
   const scaleJitter = 1 + Math.cos(phase * 1.9 + (seed % 19)) * organicJitter * 0.035;
-  const mirror = (k % 2 === 1 && (alternation > 0.24 || kaleidoscope)) ? -1 : 1;
+  // Con wobble alto el espejado desalinea las cuñas adyacentes (líneas dobles
+  // "fantasma"): solo espejamos cuando el nivel orgánico es moderado.
+  const mirror = (k % 2 === 1 && (alternation > 0.24 || kaleidoscope) && organicLevel < 0.55) ? -1 : 1;
 
   const transform = [
     `translate(${_fmt(cx)} ${_fmt(cy)})`,
@@ -1031,10 +1123,24 @@ for (let k = 0; k < petals; k++) {
   );
 }
 
+// --- Círculos guía entre anillos ---
+// Anclan las formas "flotantes" (paisley, fleur, pentágonos) para que la
+// composición no se vea desconectada, y añaden bandas finas coloreables.
+{
+  const guideProb = archetype.name === "lace" ? 0.55 : archetype.name === "star" ? 0.5 : 0.35;
+  for (let i = 1; i < rings.length; i++) {
+    if (rng() < guideProb) {
+      doc.body.push(
+        `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(rings[i].start)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(rings[i].strokes.fine)}" />`
+      );
+    }
+  }
+}
+
 
 // --- Motivo central adicional (roseta avanzada) ---
 if (rng() < 0.98) {
-  const rType = rng();
+  const centerVariant = archetype.center[Math.floor(rng() * archetype.center.length)];
   const cCount = (petals % 2 === 0 ? petals : petals + 1);
   const inner = binduR * 1.05;
   const outer = binduClearR * 0.9;
@@ -1042,7 +1148,27 @@ if (rng() < 0.98) {
 
   const pbC = new PathBuilder();
 
-  if (rType < 0.5) {
+  if (centerVariant === "lotus_ring") {
+    // Doble corona de pétalos apuntados alrededor del bindu
+    for (const [rTip, phase] of [[outer, 0], [_lerp(inner, outer, 0.55), 0.5]]) {
+      for (let k = 0; k < cCount; k++) {
+        const a = (k + phase) * step;
+        const pIn = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
+        const tip = { x: cx + rTip * Math.cos(a + step / 2), y: cy + rTip * Math.sin(a + step / 2) };
+        const pIn2 = { x: cx + inner * Math.cos(a + step), y: cy + inner * Math.sin(a + step) };
+        pbC.moveTo(pIn.x, pIn.y).quadTo(tip.x, tip.y, pIn2.x, pIn2.y);
+      }
+    }
+  } else if (centerVariant === "dot_orbit") {
+    // Órbitas de puntos: centro limpio y muy coloreable
+    addCirclePoly(pbC, cx, cy, _lerp(inner, outer, 0.35), 40);
+    const rOrbit = _lerp(inner, outer, 0.72);
+    const dotR = Math.max(outerRingStrokes.main * 1.4, (outer - inner) * 0.10);
+    for (let k = 0; k < cCount; k++) {
+      const a = k * step;
+      addCirclePoly(pbC, cx + rOrbit * Math.cos(a), cy + rOrbit * Math.sin(a), dotR, 10);
+    }
+  } else if (centerVariant === "sunburst") {
     // SUNBURST: Rayos y picos geométricos
     for (let k = 0; k < cCount; k++) {
       const a = k * step;
@@ -1091,7 +1217,7 @@ if (rng() < 0.98) {
   }
 
   // NESTED CORE (Double Core)
-  if (complexity > 100) {
+  if (complexity > 100 && centerVariant !== "lotus_ring") {
     const pbInner = new PathBuilder();
     const innerR = inner * 0.8;
     for (let k = 0; k < cCount; k++) {
@@ -1118,9 +1244,13 @@ doc.body.push(
 // --- Frames fuera del wedge ---
 if (includeFrames) {
 
+  // Tratamientos de marco según el arquetipo: uno garantizado, segundo opcional
+  const framePick = new Set([archetype.frames[Math.floor(rng() * archetype.frames.length)]]);
+  if (rng() < 0.45) framePick.add(archetype.frames[Math.floor(rng() * archetype.frames.length)]);
+
   // --- Estética “cuadernillo”: anillos de cuentas y borde festoneado (círculos grandes repetidos) ---
   // 1) Bead ring (cerca del núcleo, típico en mandalas impresos)
-  if (rng() < _lerp(0.95, 0.62, harmony)) {
+  if (framePick.has("beads") || rng() < _lerp(0.35, 0.15, harmony)) {
     const beadRingR = binduClearR * _clamp(rFloat(rng, 0.72, 0.88), 0.66, 0.92);
     const beadDensity = _lerp(2.4, 1.3, organicLevel);
     const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82);
@@ -1137,7 +1267,7 @@ if (includeFrames) {
   }
 
   // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
-  if (rng() < _lerp(0.88, 0.55, harmony)) {
+  if (framePick.has("scallop")) {
     const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56);
     const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), outerRingStrokes.main * 2.6, computedRadius * 0.060);
     const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
@@ -1151,6 +1281,37 @@ if (includeFrames) {
     }
     doc.body.push(pbScallop.toPath({ stroke, strokeWidthMm: outerRingStrokes.main, fill: "none" }));
   }
+
+  // 3) Petal rim: corona de arcos apuntados en el borde exterior
+  if (framePick.has("petal_rim")) {
+    const rimCount = _clamp(petals * 2, 16, 64);
+    const rimH = computedRadius * _clamp(rFloat(rng, 0.035, 0.055), 0.03, 0.06);
+    const rimBase = computedRadius * 0.985 - rimH;
+    const rimStep = (Math.PI * 2) / rimCount;
+
+    const pbRim = new PathBuilder();
+    for (let i = 0; i < rimCount; i++) {
+      const a1 = i * rimStep;
+      const a2 = (i + 1) * rimStep;
+      const am = a1 + rimStep / 2;
+      pbRim.moveTo(cx + rimBase * Math.cos(a1), cy + rimBase * Math.sin(a1))
+        .quadTo(cx + (rimBase + rimH * 1.9) * Math.cos(am), cy + (rimBase + rimH * 1.9) * Math.sin(am),
+                cx + rimBase * Math.cos(a2), cy + rimBase * Math.sin(a2));
+    }
+    addCirclePoly(pbRim, cx, cy, rimBase, 96);
+    doc.body.push(pbRim.toPath({ stroke, strokeWidthMm: outerRingStrokes.main, fill: "none" }));
+  }
+
+  // 4) Double line: marco sobrio de dos líneas concéntricas
+  if (framePick.has("double_line")) {
+    doc.body.push(
+      `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(computedRadius * 0.985)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(outerRingStrokes.main)}" />`
+    );
+    doc.body.push(
+      `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(computedRadius * 0.955)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(outerRingStrokes.fine)}" />`
+    );
+  }
+
   doc.body.push(
     `<circle cx="${_fmt(cx)}" cy="${_fmt(cy)}" r="${_fmt(binduClearR)}" fill="none" stroke="${stroke}" stroke-width="${_fmt(Math.max(minStrokeMm, outerRingStrokes.main * 0.7))}" />`
   );
