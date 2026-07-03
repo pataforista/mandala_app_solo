@@ -369,9 +369,39 @@
         <sl-accordion-item>
           <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="palette"></sl-icon> Trazo & Detalle</span>
           <div class="control-group" style="padding: 12px 0;">
-            <sl-range id="complexity" label="Complejidad" min="20" max="320" value="110"></sl-range>
-            <sl-range id="organic" label="Organicidad" min="0" max="1" step="0.05" value="0.2"></sl-range>
-            <sl-range id="strokeWidth" label="Grosor" min="0.1" max="5" step="0.1" value="0.6"></sl-range>
+            <sl-select id="coloringPreset" label="Nivel de Dificultad" size="small" value="adulto">
+              <sl-option value="ninos">Niños (5-8 años) - Muy Simple</sl-option>
+              <sl-option value="ninos_grande">Niños Grandes (9-12) - Simple</sl-option>
+              <sl-option value="adulto">Adulto - Balanceado</sl-option>
+              <sl-option value="experto">Experto - Detallado</sl-option>
+              <sl-option value="zen">Zen - Minimalista</sl-option>
+            </sl-select>
+            
+            <sl-button id="applyColoringPreset" variant="secondary" size="small" pill style="width: 100%;">Aplicar Nivel</sl-button>
+            
+            <sl-divider></sl-divider>
+            
+            <sl-checkbox id="outlineMode" style="--sl-toggle-size: 20px;">
+              <span style="font-weight: 600; color: var(--m3-primary);">🎨 Modo Solo Contornos</span>
+            </sl-checkbox>
+            <p style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 4px 0 0 0; padding-left: 24px;">
+              Elimina texturas internas y deja solo los contornos principales para colorear fácilmente
+            </p>
+            
+            <sl-divider></sl-divider>
+            
+            <sl-range id="strokeWidth" label="Grosor de Línea (mm)" min="0.1" max="2.0" step="0.05" value="0.55" title="Líneas más gruesas son mejores para imprimir y colorear"></sl-range>
+            
+            <!-- Phase 5: Coloring Book Controls -->
+            <sl-divider></sl-divider>
+            <div class="section-title" style="font-size:0.75rem; margin:8px 0;"><sl-icon name="book"></sl-icon> Espacio para Colorear</div>
+            <sl-range id="spacing" label="Espaciado entre Elementos" min="0" max="1" step="0.05" value="0.3" title="Controla el espacio negativo entre formas. Valores altos = más espacio para colorear"></sl-range>
+            <sl-range id="densityFactor" label="Densidad de Patrones" min="0.2" max="1.5" step="0.05" value="0.7" title="Reduce la cantidad de elementos decorativos. Valores bajos = patrones más simples"></sl-range>
+            <sl-range id="minCellArea" label="Área Mínima de Celda" min="1" max="8" step="0.5" value="3.0" title="Tamaño mínimo de las áreas cerradas. Valores altos evitan espacios demasiado pequeños"></sl-range>
+            <sl-range id="detailSimplification" label="Simplificación de Detalles" min="0" max="1" step="0.05" value="0.5" title="Elimina detalles internos complejos. Valores altos = formas más limpias para colorear"></sl-range>
+            
+            <sl-divider></sl-divider>
+            
             <sl-checkbox id="textures" checked>Texturas avanzadas</sl-checkbox>
             <sl-checkbox id="frames" checked>Marcos interiores</sl-checkbox>
             <sl-checkbox id="pageBorder" checked>Borde de página</sl-checkbox>

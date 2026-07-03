@@ -1,5 +1,53 @@
+```
+# Dependencies
 node_modules/
-.DS_Store
-*.log
+
+# Editors
+.vscode/
+
+# Compiled/build artifacts
 dist/
+build/
+*.o
+*.obj
+*.out
+
+# Python specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
 .env
+.env.local
+*.env.*
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# MyPy
+.mypy_cache/
+
+# PyTest
+.pytest_cache/
+
+# Gradle
+.gradle/
+
+# Target (Rust, etc.)
+target/
+
+# Temporary files
+*.tmp
+*~
+.DS_Store
+Thumbs.db
+```
