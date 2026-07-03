@@ -129,6 +129,12 @@ const STRUCTURE_PRESETS = {
     layer4Intensity: 0.8, layer5Intensity: 0.5, layer6Intensity: 0.75, layer7Intensity: 0.7, layer8Intensity: 0.35,
     frames: true, pageBorder: true,
   },
+  tibetano: {
+    petals: 8, complexity: 140, organic: 0.35, strokeWidth: 0.6,
+    styleMode: "tibetano", layer1Intensity: 0.85, layer2Intensity: 0.8, layer3Intensity: 0.9,
+    layer4Intensity: 0.85, layer5Intensity: 0.6, layer6Intensity: 0.8, layer7Intensity: 0.75, layer8Intensity: 0.5,
+    frames: true, pageBorder: true,
+  },
 };
 
 const recentSeeds = [];
