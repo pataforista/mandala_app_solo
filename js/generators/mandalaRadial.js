@@ -65,6 +65,15 @@ export function generateMandalaRadial(doc, opts) {
 
   const rng = mulberry32((seed >>> 0) || 0);
 
+  // --- Helpers for natural look ---
+  // (declarados antes de cualquier uso: cN/binduR/etc. los necesitan más abajo)
+  const { wPhase1, wPhase2 } = getWobblePhases(seed);
+  const _polarW = (r, theta, intensity = 0.5) => polarW(r, theta, intensity, organicLevel, wPhase1, wPhase2);
+  const _polar0 = (r, theta) => polar(r, theta);
+  const _lerp = (a, b, t) => lerp(a, b, t);
+  const _clamp = (v, min, max) => clamp(v, min, max);
+  const _fmt = (n) => fmt(n);
+
   // --- Jerarquía de trazo base ---
   const strokeBase = Math.max(minStrokeMm, strokeWidthMm);
 
@@ -230,16 +239,6 @@ export function generateMandalaRadial(doc, opts) {
 
     return (rng() < 0.75 ? "petal_almond" : "fleur");
   }
-
-  // --- Helpers for natural look ---
-  const { wPhase1, wPhase2 } = getWobblePhases(seed);
-  const _polarW = (r, theta, intensity = 0.5) => polarW(r, theta, intensity, organicLevel, wPhase1, wPhase2);
-  const _polar0 = (r, theta) => polar(r, theta);
-  const _lerp = (a, b, t) => lerp(a, b, t);
-  const _clamp = (v, min, max) => clamp(v, min, max);
-  const _fmt = (n) => fmt(n);
-
-
 
   // --- Área aproximada base ---
   function allowSubdivideArea(ring, localStep) {
