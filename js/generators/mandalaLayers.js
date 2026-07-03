@@ -19,6 +19,181 @@ function _polar0(r, theta, center = { x: 0, y: 0 }) {
   };
 }
 
+/**
+ * Genera un nudo céltico continuo usando curvas Bézier
+ * Basado en patrones tradicionales de Book of Kells
+ */
+function addCelticKnot(pb, cx, cy, outerR, innerR, rotation = 0, segments = 8) {
+  const knotPoints = [];
+  
+  // Generar puntos de control para el nudo
+  for (let i = 0; i < segments; i++) {
+    const baseAngle = (i / segments) * Math.PI * 2 + rotation;
+    const nextAngle = ((i + 1) / segments) * Math.PI * 2 + rotation;
+    
+    // Punto exterior (cresta del nudo)
+    const outPt = _polar0(outerR, baseAngle, {x: cx, y: cy});
+    knotPoints.push({ type: 'outer', pt: outPt, angle: baseAngle });
+    
+    // Punto interior (valle del nudo) - con desplazamiento para entrelazado
+    const inAngle = baseAngle + (Math.PI / segments) * 0.5;
+    const inPt = _polar0(innerR, inAngle, {x: cx, y: cy});
+    knotPoints.push({ type: 'inner', pt: inPt, angle: inAngle });
+  }
+  
+  // Dibujar el nudo continuo con curvas suaves
+  if (knotPoints.length > 0) {
+    pb.moveTo(knotPoints[0].pt.x, knotPoints[0].pt.y);
+    
+    for (let i = 0; i < knotPoints.length; i++) {
+      const curr = knotPoints[i];
+      const next = knotPoints[(i + 1) % knotPoints.length];
+      
+      // Calcular punto de control para curva Bézier suave
+      const midAngle = (curr.angle + next.angle) / 2;
+      const controlDist = (curr.type === 'outer' ? outerR : innerR) * 0.85;
+      const cp = _polar0(controlDist, midAngle, {x: cx, y: cy});
+      
+      pb.quadTo(cp.x, cp.y, next.pt.x, next.pt.y);
+    }
+    pb.close();
+  }
+  
+  // Añadir círculos decorativos en las intersecciones (nudos tradicionales)
+  for (let i = 0; i < segments; i++) {
+    const angle = (i / segments) * Math.PI * 2 + rotation;
+    const circlePt = _polar0(outerR * 0.95, angle, {x: cx, y: cy});
+    addCirclePoly(pb, circlePt.x, circlePt.y, outerR * 0.08, 12);
+  }
+}
+
+/**
+ * Dibuja espirales celtas auténticas (triskele-inspired)
+ */
+function addCelticSpiral(pb, cx, cy, radius, turns = 2, clockwise = true) {
+  const points = [];
+  const totalPoints = turns * 36;
+  const dir = clockwise ? 1 : -1;
+  
+  for (let i = 0; i <= totalPoints; i++) {
+    const t = i / totalPoints;
+    const angle = t * Math.PI * 2 * turns * dir;
+    const r = radius * t;
+    points.push({
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle)
+    });
+  }
+  
+  if (points.length > 1) {
+    pb.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      pb.lineTo(points[i].x, points[i].y);
+    }
+  }
+}
+
+/**
+ * Genera el símbolo Vajra (Dorje) tibetano simplificado
+ */
+function addVajra(pb, cx, cy, size, rotation = 0) {
+  const halfSize = size / 2;
+  
+  // Eje central
+  addCapsule(pb, cx, cy - halfSize * 0.3, cx, cy + halfSize * 0.3, size * 0.12);
+  
+  // Brazos superiores (izquierda y derecha)
+  const armTopY = cy - halfSize * 0.15;
+  const armCurveLeft = [
+    {x: cx, y: armTopY},
+    {x: cx - size * 0.25, y: armTopY - size * 0.15},
+    {x: cx - size * 0.35, y: armTopY - size * 0.35},
+    {x: cx - size * 0.2, y: armTopY - size * 0.45}
+  ];
+  const armCurveRight = [
+    {x: cx, y: armTopY},
+    {x: cx + size * 0.25, y: armTopY - size * 0.15},
+    {x: cx + size * 0.35, y: armTopY - size * 0.35},
+    {x: cx + size * 0.2, y: armTopY - size * 0.45}
+  ];
+  
+  pb.moveTo(armCurveLeft[0].x, armCurveLeft[0].y);
+  for (let i = 1; i < armCurveLeft.length; i++) {
+    pb.quadTo(armCurveLeft[i-1].x + (armCurveLeft[i].x - armCurveLeft[i-1].x)*0.5, 
+              armCurveLeft[i-1].y + (armCurveLeft[i].y - armCurveLeft[i-1].y)*0.5,
+              armCurveLeft[i].x, armCurveLeft[i].y);
+  }
+  
+  pb.moveTo(armCurveRight[0].x, armCurveRight[0].y);
+  for (let i = 1; i < armCurveRight.length; i++) {
+    pb.quadTo(armCurveRight[i-1].x + (armCurveRight[i].x - armCurveRight[i-1].x)*0.5, 
+              armCurveRight[i-1].y + (armCurveRight[i].y - armCurveRight[i-1].y)*0.5,
+              armCurveRight[i].x, armCurveRight[i].y);
+  }
+  
+  // Brazos inferiores (simétricos)
+  const armBotY = cy + halfSize * 0.15;
+  const armCurveLeftBot = [
+    {x: cx, y: armBotY},
+    {x: cx - size * 0.25, y: armBotY + size * 0.15},
+    {x: cx - size * 0.35, y: armBotY + size * 0.35},
+    {x: cx - size * 0.2, y: armBotY + size * 0.45}
+  ];
+  const armCurveRightBot = [
+    {x: cx, y: armBotY},
+    {x: cx + size * 0.25, y: armBotY + size * 0.15},
+    {x: cx + size * 0.35, y: armBotY + size * 0.35},
+    {x: cx + size * 0.2, y: armBotY + size * 0.45}
+  ];
+  
+  pb.moveTo(armCurveLeftBot[0].x, armCurveLeftBot[0].y);
+  for (let i = 1; i < armCurveLeftBot.length; i++) {
+    pb.quadTo(armCurveLeftBot[i-1].x + (armCurveLeftBot[i].x - armCurveLeftBot[i-1].x)*0.5, 
+              armCurveLeftBot[i-1].y + (armCurveLeftBot[i].y - armCurveLeftBot[i-1].y)*0.5,
+              armCurveLeftBot[i].x, armCurveLeftBot[i].y);
+  }
+  
+  pb.moveTo(armCurveRightBot[0].x, armCurveRightBot[0].y);
+  for (let i = 1; i < armCurveRightBot.length; i++) {
+    pb.quadTo(armCurveRightBot[i-1].x + (armCurveRightBot[i].x - armCurveRightBot[i-1].x)*0.5, 
+              armCurveRightBot[i-1].y + (armCurveRightBot[i].y - armCurveRightBot[i-1].y)*0.5,
+              armCurveRightBot[i].x, armCurveRightBot[i].y);
+  }
+  
+  // Círculo central (bindu tibetano)
+  addCirclePoly(pb, cx, cy, size * 0.12, 16);
+}
+
+/**
+ * Genera llamas/fuego protector tibetano (estilo tradicional)
+ */
+function addTibetanFire(pb, cx, cy, radius, count = 8) {
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const nextAngle = ((i + 1) / count) * Math.PI * 2;
+    const midAngle = (angle + nextAngle) / 2;
+    
+    const basePt = _polar0(radius, angle, {x: cx, y: cy});
+    const nextBasePt = _polar0(radius, nextAngle, {x: cx, y: cy});
+    const flameTip = _polar0(radius * 1.35, midAngle, {x: cx, y: cy});
+    const flameInner = _polar0(radius * 0.85, midAngle, {x: cx, y: cy});
+    
+    // Llama curvada estilo tibetano
+    pb.moveTo(basePt.x, basePt.y);
+    pb.quadTo(
+      _polar0(radius * 1.1, angle + 0.15, {x: cx, y: cy}).x,
+      _polar0(radius * 1.1, angle + 0.15, {x: cx, y: cy}).y,
+      flameTip.x, flameTip.y
+    );
+    pb.quadTo(
+      _polar0(radius * 1.1, nextAngle - 0.15, {x: cx, y: cy}).x,
+      _polar0(radius * 1.1, nextAngle - 0.15, {x: cx, y: cy}).y,
+      nextBasePt.x, nextBasePt.y
+    );
+    pb.quadTo(flameInner.x, flameInner.y, basePt.x, basePt.y);
+  }
+}
+
 function addCirclePoly(pb, cx, cy, r, seg = 16) {
   if (r <= 0) return;
   const step = (Math.PI * 2) / Math.max(6, seg);
@@ -195,6 +370,7 @@ export function generateMandalaLayers(doc, opts) {
       azteca: Math.max(6, petals),
       yantra: Math.max(6, petals),
       celtico: Math.max(6, Math.round(petals * 0.75)),
+      tibetano: Math.max(8, petals),
       floral: Math.max(6, Math.round(petals / 2)),
       geometric: Math.max(6, Math.round(petals / 2)),
     };
@@ -273,19 +449,23 @@ export function generateMandalaLayers(doc, opts) {
         addCirclePoly(pb, fCenter.x, fCenter.y, fSize * 0.15, 6);
 
       } else if (normalizedStyleMode === "celtico") {
-        // Trefoil gótico: 3 lóbulos en círculo
-        const lCount = 3;
-        const lobeR = fSize * 0.52;
-        const lobeDist = fSize * 0.43;
-        for (let j = 0; j < lCount; j++) {
-          const la = a + (j / lCount) * Math.PI * 2 + Math.PI / 6;
-          const lc = _polar0(lobeDist, la, fCenter);
-          addCirclePoly(pb, lc.x, lc.y, lobeR, 18);
+        // Nudo céltico continuo auténtico (Book of Kells style)
+        addCelticKnot(pb, fCenter.x, fCenter.y, fSize * 0.85, fSize * 0.42, a, 8);
+        // Espirales decorativas en el centro
+        if (layer3Intensity > 0.5) {
+          addCelticSpiral(pb, fCenter.x, fCenter.y, fSize * 0.25, 1.5, true);
+          addCelticSpiral(pb, fCenter.x, fCenter.y, fSize * 0.25, 1.5, false);
         }
-        // Anillo de unión
-        addCirclePoly(pb, fCenter.x, fCenter.y, fSize * 0.9, 22);
-        if (layer3Intensity > 0.6) {
-          addCirclePoly(pb, fCenter.x, fCenter.y, fSize * 0.22, 8);
+      } else if (normalizedStyleMode === "tibetano") {
+        // Vajra central (Dorje) - símbolo de iluminación en budismo tibetano
+        addVajra(pb, fCenter.x, fCenter.y, fSize * 1.2, a);
+        // Círculo protector exterior
+        addCirclePoly(pb, fCenter.x, fCenter.y, fSize * 1.15, 24);
+        // Puntos de energía (bindus pequeños)
+        for (let j = 0; j < 8; j++) {
+          const binduAngle = a + (j / 8) * Math.PI * 2;
+          const binduPt = _polar0(fSize * 0.95, binduAngle, fCenter);
+          addCirclePoly(pb, binduPt.x, binduPt.y, fSize * 0.08, 8);
         }
       }
     }
@@ -334,11 +514,27 @@ export function generateMandalaLayers(doc, opts) {
           .quadTo(cpR.x, cpR.y, p2a.x, p2a.y);
 
       } else if (normalizedStyleMode === "celtico") {
-        // Arco apuntado gótico (tracería)
+        // Arco apuntado gótico con entrelazado (tracería celta auténtica)
         const cpA = _polar0(r1 + (r2 - r1) * 0.9, a1 + (a2 - a1) * 0.15, center);
         const cpB = _polar0(r1 + (r2 - r1) * 0.9, a2 - (a2 - a1) * 0.15, center);
         pb.moveTo(p1a.x, p1a.y).quadTo(cpA.x, cpA.y, pM.x, pM.y)
           .quadTo(cpB.x, cpB.y, p2a.x, p2a.y);
+        // Añadir pequeña espiral en el ápice del arco
+        if (i % 4 === 0 && layer4Intensity > 0.6) {
+          addCelticSpiral(pb, pM.x, pM.y, (r2 - r1) * 0.35, 1.2, i % 8 < 4);
+        }
+
+      } else if (normalizedStyleMode === "tibetano") {
+        // Pétalos de loto tibetanos con curvas suaves
+        const cpL = _polar0(r2 * 0.94, aM - 0.18, center);
+        const cpR = _polar0(r2 * 0.94, aM + 0.18, center);
+        pb.moveTo(p1a.x, p1a.y).quadTo(cpL.x, cpL.y, pM.x, pM.y)
+          .quadTo(cpR.x, cpR.y, p2a.x, p2a.y);
+        // Línea central decorativa (simula nervadura del pétalo)
+        if (layer4Intensity > 0.5) {
+          const pInner = _polar0(r1 + (r2 - r1) * 0.3, aM, center);
+          addCapsule(pb, pInner.x, pInner.y, pM.x, pM.y, fineStroke * 0.5);
+        }
 
       } else {
         pb.moveTo(p1a.x, p1a.y).quadTo(pM.x, pM.y, p2a.x, p2a.y);
@@ -418,15 +614,31 @@ export function generateMandalaLayers(doc, opts) {
           addStarPolygon(pb, pTop.x, pTop.y, 1.8, 0.8, 4, aC);
         }
       } else if (normalizedStyleMode === "celtico") {
-        // Arco gótico apuntado en el borde
+        // Arco gótico apuntado con entrelazado celta auténtico
         const cpL2 = _polar0(rTop * 0.97, aC - 0.12, center);
         const cpR2 = _polar0(rTop * 0.97, aC + 0.12, center);
         pb.moveTo(pL.x, pL.y).quadTo(cpL2.x, cpL2.y, pTop.x, pTop.y)
           .quadTo(cpR2.x, cpR2.y, pR.x, pR.y);
         if (layer6Intensity > 0.6) {
-          // Pequeño trefoil en el ápice
-          addCirclePoly(pb, pTop.x, pTop.y, 1.6, 10);
+          // Pequeño nudo céltico en el ápice (en lugar de simple círculo)
+          addCelticSpiral(pb, pTop.x, pTop.y, 2.2, 1.0, i % 2 === 0);
         }
+
+      } else if (normalizedStyleMode === "tibetano") {
+        // Corona de llamas protectoras (fuego de la sabiduría)
+        const flameBase = rBase + (rTop - rBase) * 0.3;
+        const flameTip = _polar0(rTop, aC, center);
+        const flameL = _polar0(flameBase, aC - 0.15, center);
+        const flameR = _polar0(flameBase, aC + 0.15, center);
+        pb.moveTo(flameL.x, flameL.y)
+          .quadTo(_polar0(rTop * 0.92, aC - 0.08, center).x, _polar0(rTop * 0.92, aC - 0.08, center).y, flameTip.x, flameTip.y)
+          .quadTo(_polar0(rTop * 0.92, aC + 0.08, center).x, _polar0(rTop * 0.92, aC + 0.08, center).y, flameR.x, flameR.y);
+        if (layer6Intensity > 0.65) {
+          // Bindu decorativo en la base de cada llama
+          const binduPt = _polar0(flameBase, aC, center);
+          addCirclePoly(pb, binduPt.x, binduPt.y, 1.4, 8);
+        }
+
       } else {
         pb.moveTo(pL.x, pL.y)
           .quadTo(_polar0(rTop * 0.95, aC - 0.2, center).x, _polar0(rTop * 0.95, aC - 0.2, center).y, pTop.x, pTop.y)
@@ -513,11 +725,29 @@ export function generateMandalaLayers(doc, opts) {
           .lineTo(pR.x, pR.y).close();
 
       } else if (normalizedStyleMode === "celtico") {
-        // Curvas entrelazadas (sugestión de trenzado céltico)
-        const cpA = _polar0((rInner + rOuter) * 0.5, a - 0.55 * layer7Intensity, center);
-        const cpB = _polar0((rInner + rOuter) * 0.5, a + 0.55 * layer7Intensity, center);
-        pb.moveTo(p1.x, p1.y).quadTo(cpA.x, cpA.y, p2.x, p2.y);
-        pb.moveTo(p1.x, p1.y).quadTo(cpB.x, cpB.y, p2.x, p2.y);
+        // Nudos entrelazados célticos auténticos (trenzado continuo)
+        const knotCenter = _polar0((rInner + rOuter) * 0.5, a, center);
+        const knotSize = (rOuter - rInner) * 0.45;
+        addCelticKnot(pb, knotCenter.x, knotCenter.y, knotSize, knotSize * 0.45, a, 6);
+
+      } else if (normalizedStyleMode === "tibetano") {
+        // Símbolos de buena fortuna tibetanos (nudo infinito simplificado)
+        const knotCenter = _polar0((rInner + rOuter) * 0.5, a, center);
+        const knotR = (rOuter - rInner) * 0.35;
+        
+        // Nudo infinito (endless knot) simplificado
+        for (let loop = 0; loop < 2; loop++) {
+          const loopAngle = a + (loop / 2) * Math.PI;
+          const loopPt = _polar0(knotR * 0.5, loopAngle, knotCenter);
+          addCirclePoly(pb, loopPt.x, loopPt.y, knotR * 0.35, 10);
+        }
+        // Líneas conectoras en forma de 8
+        const pTop = _polar0(knotR, a, knotCenter);
+        const pBot = _polar0(knotR, a + Math.PI, knotCenter);
+        const pL = _polar0(knotR * 0.6, a - Math.PI/2, knotCenter);
+        const pR = _polar0(knotR * 0.6, a + Math.PI/2, knotCenter);
+        pb.moveTo(pTop.x, pTop.y).quadTo(pL.x, pL.y, pBot.x, pBot.y);
+        pb.moveTo(pTop.x, pTop.y).quadTo(pR.x, pR.y, pBot.x, pBot.y);
 
       } else {
         // Hoja orgánica (sashiko / floral)
@@ -608,26 +838,56 @@ export function generateMandalaLayers(doc, opts) {
       }
 
     } else if (normalizedStyleMode === "celtico") {
-      // Textura de cruces y diamantes (motivo répetitivo céltico)
+      // Textura de nudos y espirales celtas auténticas
       const ringCount = Math.max(3, Math.round(3 + layer8Intensity * 6));
       for (let ring = 0; ring < ringCount; ring++) {
         const t = ring / Math.max(1, ringCount - 1);
         const rB = _lerp(maxRadius * 0.22, maxRadius * 0.92, t);
         const segCount = Math.round(petals * (3 + layer8Intensity * 3) + ring * 6);
-        const segLen = maxRadius * (0.01 + layer8Intensity * 0.008);
         for (let i = 0; i < segCount; i++) {
           const a = (i / segCount) * Math.PI * 2;
           const anchor = _polar0(rB, a, center);
-          const d = segLen * 0.5;
-          const ang1 = a + Math.PI / 4;
-          const p1a = _polar0(d, ang1, anchor);
-          const p1b = _polar0(d, ang1 + Math.PI, anchor);
-          pb.moveTo(p1a.x, p1a.y).lineTo(p1b.x, p1b.y);
-          if (ring % 2 === 0) {
-            const ang2 = a - Math.PI / 4;
-            const p2a = _polar0(d, ang2, anchor);
-            const p2b = _polar0(d, ang2 + Math.PI, anchor);
-            pb.moveTo(p2a.x, p2a.y).lineTo(p2b.x, p2b.y);
+          
+          if (i % 3 === 0) {
+            // Pequeña espiral céltica
+            addCelticSpiral(pb, anchor.x, anchor.y, maxRadius * 0.015, 1.5, ring % 2 === 0);
+          } else {
+            // Cruz céltica simplificada
+            const d = maxRadius * 0.012;
+            pb.moveTo(anchor.x - d, anchor.y).lineTo(anchor.x + d, anchor.y);
+            pb.moveTo(anchor.x, anchor.y - d).lineTo(anchor.x, anchor.y + d);
+          }
+        }
+      }
+
+    } else if (normalizedStyleMode === "tibetano") {
+      // Textura de puntos sagrados y símbolos de buena fortuna
+      const ringCount = Math.max(4, Math.round(4 + layer8Intensity * 7));
+      for (let ring = 0; ring < ringCount; ring++) {
+        const t = ring / Math.max(1, ringCount - 1);
+        const rB = _lerp(maxRadius * 0.18, maxRadius * 0.90, t);
+        const symbolCount = Math.round(petals * (2.5 + layer8Intensity * 2.5) + ring * 5);
+        
+        for (let i = 0; i < symbolCount; i++) {
+          const a = (i / symbolCount) * Math.PI * 2 + ((ring % 2) * Math.PI / symbolCount);
+          const anchor = _polar0(rB, a, center);
+          
+          if (i % 4 === 0) {
+            // Bindu (punto de energía)
+            addCirclePoly(pb, anchor.x, anchor.y, 0.55, 6);
+          } else if (i % 4 === 1) {
+            // Pequeño Vajra simplificado
+            const vajraSize = maxRadius * 0.025;
+            addCapsule(pb, anchor.x, anchor.y - vajraSize * 0.3, anchor.x, anchor.y + vajraSize * 0.3, vajraSize * 0.15);
+            addCirclePoly(pb, anchor.x, anchor.y, vajraSize * 0.18, 8);
+          } else if (i % 4 === 2) {
+            // Loto pequeño (círculo con pétalos sugeridos)
+            addCirclePoly(pb, anchor.x, anchor.y, maxRadius * 0.018, 12);
+          } else {
+            // Nube de la fortuna (forma de 8 horizontal)
+            const cloudR = maxRadius * 0.012;
+            addCirclePoly(pb, anchor.x - cloudR, anchor.y, cloudR, 8);
+            addCirclePoly(pb, anchor.x + cloudR, anchor.y, cloudR, 8);
           }
         }
       }
@@ -655,6 +915,14 @@ export function generateMandalaLayers(doc, opts) {
     // Islámico: tercer anillo decorativo
     if (normalizedStyleMode === "islamico") {
       addCirclePoly(pb, center.x, center.y, maxRadius + 1.5, 128);
+    }
+    
+    // Tibetano: anillo de fuego protector exterior
+    if (normalizedStyleMode === "tibetano") {
+      const fireR = maxRadius + 2;
+      addTibetanFire(pb, center.x, center.y, fireR, Math.max(16, petals * 2));
+      // Anillo concéntrico adicional
+      addCirclePoly(pb, center.x, center.y, maxRadius + 4.5, 128);
     }
 
     paths.push(pb.toPath({ stroke, strokeWidthMm: detailStroke }));
