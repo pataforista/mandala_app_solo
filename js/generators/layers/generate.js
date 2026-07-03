@@ -34,14 +34,14 @@ export function generateMandalaLayers(doc, opts) {
     petals = 12,
     stroke = "#000",
     strokeWidthMm = 0.6,
-    layer1Intensity = 0.8,
-    layer2Intensity = 0.8,
-    layer3Intensity = 0.7,
-    layer4Intensity = 0.8,
-    layer5Intensity = 0.6,
-    layer6Intensity = 0.7,
-    layer7Intensity = 0.5,
-    layer8Intensity = 0.4,
+    layer1Intensity = 0.6,
+    layer2Intensity = 0.55,
+    layer3Intensity = 0.45,
+    layer4Intensity = 0.5,
+    layer5Intensity = 0.4,
+    layer6Intensity = 0.45,
+    layer7Intensity = 0.35,
+    layer8Intensity = 0.3,
     styleMode = "sashiko",
     organicLevel = 0.2,
     complexity = 110,
@@ -175,9 +175,9 @@ export function generateMandalaLayers(doc, opts) {
       addCircle(pb, center.x, center.y, rCore, 32);
     }
 
-    // Pearl ring (all variants)
-    if (layer1Intensity > 0.6) {
-      addPearlRing(pb, center.x, center.y, rCore * 1.08, Math.max(12, petals), rCore * 0.05);
+    // Pearl ring (all variants) - reduced density for coloring space
+    if (layer1Intensity > 0.7) {
+      addPearlRing(pb, center.x, center.y, rCore * 1.08, Math.max(12, petals), rCore * 0.04);
     }
 
     // Yantra always gets interlocked triangles on top
@@ -191,7 +191,7 @@ export function generateMandalaLayers(doc, opts) {
     pushPath(pb, detailW);
   }
 
-  // ==================== L2: PÉTALOS INTERNOS (Compound) ====================
+  // ==================== L2: PÉTALOS INTERNOS (Compound) - Simplified for coloring ====================
   if (layer2Intensity > 0.05) {
     const pb = new PathBuilder();
     const rIn = R * R1 + 2; 
@@ -206,19 +206,16 @@ export function generateMandalaLayers(doc, opts) {
       const kROut = rIn + (rOut - rIn) * kScale;
 
       if (style === "islamico") {
-        // Angular khatam petals with inner diamond
+        // Angular khatam petals - simplified without inner diamond for coloring space
         const pIn = _p(rIn, aC, center);
         const pOut = _p(kROut, aC, center);
         const pML = _p(rIn + (kROut - rIn) * 0.55, aC - angStep * 0.35, center);
         const pMR = _p(rIn + (kROut - rIn) * 0.55, aC + angStep * 0.35, center);
         pb.moveTo(pIn.x, pIn.y).lineTo(pML.x, pML.y).lineTo(pOut.x, pOut.y)
           .lineTo(pMR.x, pMR.y).close();
-        if (layer2Intensity > 0.4) {
-          const dC = _p(rIn + (kROut - rIn) * 0.45, aC, center);
-          addStar(pb, dC.x, dC.y, (kROut - rIn) * 0.18, (kROut - rIn) * 0.08, 4, aC);
-        }
 
       } else if (style === "azteca") {
+        // Stepped pyramid petals - simplified
         const pIn = _p(rIn, aC, center);
         const pOut = _p(kROut, aC, center);
         const pL = _p(rIn + (kROut - rIn) * 0.4, aC - angStep * 0.35, center);
@@ -229,14 +226,13 @@ export function generateMandalaLayers(doc, opts) {
           .lineTo(pOut.x, pOut.y).lineTo(pStR.x, pStR.y).lineTo(pR.x, pR.y).close();
 
       } else if (style === "geometric") {
+        // Diamond petals - simplified
         const pIn = _p(rIn, aC, center);
         const pOut = _p(kROut, aC, center);
         const pL = _p(rIn + (kROut - rIn) * 0.5, aC - angStep * 0.38, center);
         const pR = _p(rIn + (kROut - rIn) * 0.5, aC + angStep * 0.38, center);
         pb.moveTo(pIn.x, pIn.y).lineTo(pL.x, pL.y).lineTo(pOut.x, pOut.y)
           .lineTo(pR.x, pR.y).close();
-        const pM = _p(rIn + (kROut - rIn) * 0.55, aC, center);
-        addCapsule(pb, pIn.x, pIn.y, pM.x, pM.y, fineW * 0.4);
 
       } else {
         // Kaleidoscope alternates between two seeded petal shapes for visual rhythm
@@ -252,176 +248,104 @@ export function generateMandalaLayers(doc, opts) {
         } else if (vType === "lotus") {
           addLotusPetal(pb, center, rIn, kROut, aC, angStep * 0.9);
         } else {
+          // Compound petal - simplified without inner details for more coloring space
           addCompoundPetal(pb, center, rIn, kROut, aC, angStep,
-            layer2Intensity > 0.4, layer2Intensity > 0.6, layer2Intensity > 0.3, fineW);
+            false, false, layer2Intensity > 0.5, fineW);
         }
       }
     }
 
-    // Connecting circle at petal tips
-    if (layer2Intensity > 0.3) {
+    // Connecting circle at petal tips - only for higher intensity
+    if (layer2Intensity > 0.5) {
       addCircle(pb, center.x, center.y, rOut, 48);
     }
 
     pushPath(pb, mainW);
   }
 
-  // ==================== RING A: Transition ring (between L2 and L3) ====================
+  // ==================== RING A: Transition ring (between L2 and L3) - Simplified ====================
   {
     const rRing = R * (R1 + R2) / 2 + 5;
     const intensity = Math.min(layer2Intensity, layer3Intensity);
-    if (intensity > 0.2) {
+    if (intensity > 0.3) {
       const pb = new PathBuilder();
       addCircle(pb, center.x, center.y, rRing, 64);
 
-      // Scalloped decoration
-      if (intensity > 0.4) {
-        addScallopRing(pb, center.x, center.y, rRing + 1.2, petals * 2, 1.5, true);
-      }
-
-      // Pearl dots
+      // Scalloped decoration - reduced density
       if (intensity > 0.5) {
-        addPearlRing(pb, center.x, center.y, rRing - 1.5, petals * 2, 0.5);
+        addScallopRing(pb, center.x, center.y, rRing + 1.2, petals, 1.2, true);
       }
 
       pushPath(pb, fineW);
     }
   }
 
-  // ==================== L3: PATRÓN CULTURAL (Enhanced) ====================
+  // ==================== L3: PATRÓN CULTURAL (Simplified for coloring) ====================
   if (layer3Intensity > 0.05) {
     const pb = new PathBuilder();
     const rMid = R * R3;
     const fSize = R * 0.11 * layer3Intensity;
 
-    // Complexity scales element count per motif ring
-    const cMul = _lerp(0.6, 1.4, cFactor);
+    // Complexity scales element count per motif ring - reduced for coloring space
+    const cMul = _lerp(0.5, 1.0, cFactor);
     const countMap = {
-      sashiko: Math.max(8, Math.round(petals * cMul)),
-      islamico: Math.max(8, Math.round(petals * cMul)),
-      azteca: Math.max(6, Math.round(petals * cMul)),
-      yantra: Math.max(6, Math.round(petals * cMul)),
-      celtico: Math.max(6, Math.round(petals * 0.75 * cMul)),
-      floral: Math.max(6, Math.round(petals / 2 * cMul)),
-      geometric: Math.max(6, Math.round(petals / 2 * cMul)),
+      sashiko: Math.max(6, Math.round(petals * 0.7 * cMul)),
+      islamico: Math.max(6, Math.round(petals * 0.7 * cMul)),
+      azteca: Math.max(5, Math.round(petals * 0.6 * cMul)),
+      yantra: Math.max(5, Math.round(petals * 0.6 * cMul)),
+      celtico: Math.max(4, Math.round(petals * 0.5 * cMul)),
+      floral: Math.max(4, Math.round(petals / 2.5 * cMul)),
+      geometric: Math.max(4, Math.round(petals / 2.5 * cMul)),
     };
-    const count = countMap[style] ?? Math.max(6, Math.round(petals / 2 * cMul));
+    const count = countMap[style] ?? Math.max(4, Math.round(petals / 2.5 * cMul));
 
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
       const fc = _p(rMid, a, center);
 
       if (style === "sashiko") {
-        // Enhanced sashiko rosette with stitching detail
+        // Simplified sashiko rosette - fewer lines for coloring space
         const pCount = 6;
         for (let j = 0; j < pCount; j++) {
           const pa = (j / pCount) * Math.PI * 2 + a;
           const pOuter = _polar(fSize, pa, fc.x, fc.y);
-          const pInner = _polar(fSize * 0.42, pa + Math.PI / pCount, fc.x, fc.y);
           pb.moveTo(fc.x, fc.y).lineTo(pOuter.x, pOuter.y);
-          pb.moveTo(pInner.x, pInner.y).lineTo(pOuter.x, pOuter.y);
-          // Cross-stitch detail
-          if (layer3Intensity > 0.5) {
-            const cp1 = _polar(fSize * 0.6, pa - 0.2, fc.x, fc.y);
-            const cp2 = _polar(fSize * 0.6, pa + 0.2, fc.x, fc.y);
-            pb.moveTo(cp1.x, cp1.y).lineTo(cp2.x, cp2.y);
-          }
         }
         addCircle(pb, fc.x, fc.y, fSize * 0.8, 16);
-        addCircle(pb, fc.x, fc.y, fSize * 0.32, 12);
-        // Outer petal highlights
-        if (layer3Intensity > 0.6) {
-          for (let j = 0; j < pCount; j++) {
-            const pa = (j / pCount) * Math.PI * 2 + a + Math.PI / pCount;
-            addTeardrop(pb, fc.x, fc.y, fSize * 0.55, fSize * 0.2, pa);
-          }
-        }
 
       } else if (style === "floral") {
-        // Rich botanical flower
+        // Simplified botanical flower
         const pCount = 5;
         for (let j = 0; j < pCount; j++) {
           const pa = (j / pCount) * Math.PI * 2 + a;
-          // Outer petal
           addLotusPetal(pb, fc, fSize * 0.18, fSize * 0.95, pa, (Math.PI * 2) / pCount);
         }
-        // Center pistil
+        // Center pistil only
         addCircle(pb, fc.x, fc.y, fSize * 0.18, 10);
-        addCircle(pb, fc.x, fc.y, fSize * 0.08, 8);
-        // Small sepals between petals
-        if (layer3Intensity > 0.5) {
-          for (let j = 0; j < pCount; j++) {
-            const pa = (j / pCount) * Math.PI * 2 + a + Math.PI / pCount;
-            addTeardrop(pb, fc.x, fc.y, fSize * 0.45, fSize * 0.12, pa);
-          }
-        }
 
       } else if (style === "geometric") {
-        // Octagon with inner star
+        // Octagon only - no inner star or cross axes
         addPoly(pb, fc.x, fc.y, fSize, 8, a);
-        addStar(pb, fc.x, fc.y, fSize * 0.7, fSize * 0.3, 8, a + Math.PI / 8);
-        // Cross axes
-        for (let j = 0; j < 4; j++) {
-          const ja = a + (j / 4) * Math.PI * 2;
-          const p1 = _polar(fSize * 0.85, ja, fc.x, fc.y);
-          const p2 = _polar(fSize * 0.85, ja + Math.PI, fc.x, fc.y);
-          addCapsule(pb, p1.x, p1.y, p2.x, p2.y, fineW * 0.4);
-        }
-        // Inner circle
         addCircle(pb, fc.x, fc.y, fSize * 0.28, 10);
 
       } else if (style === "islamico") {
-        // 8-pointed khatam star with girih detail
+        // 8-pointed khatam star - simplified without extra details
         addStar(pb, fc.x, fc.y, fSize, fSize * 0.38, 8, a);
         addPoly(pb, fc.x, fc.y, fSize * 0.38, 8, a + Math.PI / 8);
-        // Inner 4-pointed star
-        if (layer3Intensity > 0.4) {
-          addStar(pb, fc.x, fc.y, fSize * 0.35, fSize * 0.15, 4, a);
-        }
-        // Girih connecting lines
-        if (layer3Intensity > 0.5) {
-          for (let j = 0; j < 4; j++) {
-            const ja = a + (j / 4) * Math.PI * 2;
-            const p1 = _polar(fSize * 0.95, ja, fc.x, fc.y);
-            const p2 = _polar(fSize * 0.95, ja + Math.PI, fc.x, fc.y);
-            addCapsule(pb, p1.x, p1.y, p2.x, p2.y, fineW * 0.5);
-          }
-        }
-        // Outer rim dots
-        if (layer3Intensity > 0.6) {
-          addPearlRing(pb, fc.x, fc.y, fSize * 0.85, 8, fSize * 0.06, a + Math.PI / 8);
-        }
 
       } else if (style === "azteca") {
-        // Solar glyph with stepped frame
+        // Solar glyph - simplified
         addStar(pb, fc.x, fc.y, fSize, fSize * 0.5, 4, a + Math.PI / 4);
         addPoly(pb, fc.x, fc.y, fSize * 1.05, 8, a);
-        // Calendar marks
-        for (let j = 0; j < 4; j++) {
-          const ja = a + (j / 4) * Math.PI * 2;
-          const jp = _polar(fSize * 0.72, ja, fc.x, fc.y);
-          addCapsule(pb, fc.x, fc.y, jp.x, jp.y, fineW * 0.7);
-        }
-        // Stepped ring detail
-        if (layer3Intensity > 0.5) {
-          addPoly(pb, fc.x, fc.y, fSize * 0.65, 4, a);
-          addPoly(pb, fc.x, fc.y, fSize * 0.3, 4, a + Math.PI / 4);
-        }
 
       } else if (style === "yantra") {
-        // Shatkona with nested geometry
+        // Shatkona without nested geometry
         addPoly(pb, fc.x, fc.y, fSize, 3, a);
         addPoly(pb, fc.x, fc.y, fSize, 3, a + Math.PI);
         addCircle(pb, fc.x, fc.y, fSize * 1.05, 20);
-        addCircle(pb, fc.x, fc.y, fSize * 0.15, 8);
-        // Inner second shatkona
-        if (layer3Intensity > 0.5) {
-          addPoly(pb, fc.x, fc.y, fSize * 0.55, 3, a + Math.PI / 6);
-          addPoly(pb, fc.x, fc.y, fSize * 0.55, 3, a + Math.PI + Math.PI / 6);
-        }
 
       } else if (style === "celtico") {
-        // Trefoil with knotwork suggestion
+        // Trefoil without knotwork
         const lCount = 3;
         const lobeR = fSize * 0.52;
         const lobeDist = fSize * 0.43;
@@ -429,43 +353,8 @@ export function generateMandalaLayers(doc, opts) {
           const la = a + (j / lCount) * Math.PI * 2 + Math.PI / 6;
           const lc = _polar(lobeDist, la, fc.x, fc.y);
           addSmoothCircle(pb, lc.x, lc.y, lobeR, 10);
-          // Inner lobe circle
-          if (layer3Intensity > 0.5) {
-            addCircle(pb, lc.x, lc.y, lobeR * 0.5, 10);
-          }
         }
         addCircle(pb, fc.x, fc.y, fSize * 0.9, 22);
-        if (layer3Intensity > 0.5) {
-          addCircle(pb, fc.x, fc.y, fSize * 0.25, 10);
-          // Connecting arcs between lobes
-          for (let j = 0; j < lCount; j++) {
-            const la1 = a + (j / lCount) * Math.PI * 2 + Math.PI / 6;
-            const la2 = a + ((j + 1) / lCount) * Math.PI * 2 + Math.PI / 6;
-            const p1 = _polar(lobeDist + lobeR * 0.7, la1, fc.x, fc.y);
-            const p2 = _polar(lobeDist + lobeR * 0.7, la2, fc.x, fc.y);
-            const cp = _polar(fSize * 1.1, (la1 + la2) / 2, fc.x, fc.y);
-            pb.moveTo(p1.x, p1.y).quadTo(cp.x, cp.y, p2.x, p2.y);
-          }
-        }
-      }
-    }
-
-    // Secondary ring of smaller elements between main motifs
-    if (layer3Intensity > 0.4 && count >= 4) {
-      const smallCount = count;
-      const smallSize = fSize * 0.35;
-      for (let i = 0; i < smallCount; i++) {
-        const a = ((i + 0.5) / smallCount) * Math.PI * 2;
-        const sc = _p(rMid, a, center);
-        if (style === "floral" || style === "sashiko") {
-          addTeardrop(pb, sc.x, sc.y, smallSize, smallSize * 0.4, a);
-        } else if (style === "islamico" || style === "geometric") {
-          addStar(pb, sc.x, sc.y, smallSize, smallSize * 0.4, 4, a);
-        } else if (style === "azteca") {
-          addPoly(pb, sc.x, sc.y, smallSize, 4, a);
-        } else {
-          addCircle(pb, sc.x, sc.y, smallSize * 0.6, 10);
-        }
       }
     }
 
@@ -498,14 +387,14 @@ export function generateMandalaLayers(doc, opts) {
     }
   }
 
-  // ==================== L4: ANILLO GEOMÉTRICO (Enhanced) ====================
+  // ==================== L4: ANILLO GEOMÉTRICO (Simplified for coloring) ====================
   if (layer4Intensity > 0.05) {
     const pb = new PathBuilder();
     const r1 = R * 0.56;
     const r2 = r1 + R * 0.1 * layer4Intensity;
-    const count = Math.max(petals, Math.round(petals * 2 * _lerp(0.7, 1.3, cFactor)));
+    const count = Math.max(petals, Math.round(petals * 1.5 * _lerp(0.7, 1.1, cFactor)));
 
-    // Inner ring
+    // Inner ring only - no outer ring for more coloring space
     addCircle(pb, center.x, center.y, r1, 80);
 
     for (let i = 0; i < count; i++) {
@@ -519,176 +408,74 @@ export function generateMandalaLayers(doc, opts) {
 
       if (style === "geometric") {
         pb.moveTo(p1a.x, p1a.y).lineTo(pM.x, pM.y).lineTo(p2a.x, p2a.y);
-        // Inner triangle fill
-        if (layer4Intensity > 0.5 && i % 2 === 0) {
-          const pMid = _p(r1 + (r2 - r1) * 0.4, aM, center);
-          addCircle(pb, pMid.x, pMid.y, (r2 - r1) * 0.12, 6);
-        }
 
       } else if (style === "islamico") {
         pb.moveTo(p1a.x, p1a.y).lineTo(pM.x, pM.y).lineTo(p2a.x, p2a.y);
-        if (i % 2 === 0) {
-          const pIn = _p(r1 - R * 0.025, aM, center);
-          addCapsule(pb, pIn.x, pIn.y, pM.x, pM.y, fineW * 0.5);
-        }
-        // Diamond detail
-        if (layer4Intensity > 0.5 && i % 2 === 1) {
-          const dC = _p(r1 + (r2 - r1) * 0.35, aM, center);
-          addStar(pb, dC.x, dC.y, (r2 - r1) * 0.2, (r2 - r1) * 0.08, 4, aM);
-        }
 
       } else if (style === "azteca") {
-        // Stepped pyramid motif
-        const pStep1 = _p(r1 + (r2 - r1) * 0.35, a1, center);
-        const pStep2 = _p(r1 + (r2 - r1) * 0.35, a2, center);
+        // Simplified stepped pyramid motif
         const pStep3 = _p(r1 + (r2 - r1) * 0.7, aM - (a2 - a1) * 0.15, center);
         const pStep4 = _p(r1 + (r2 - r1) * 0.7, aM + (a2 - a1) * 0.15, center);
-        pb.moveTo(p1a.x, p1a.y).lineTo(pStep1.x, pStep1.y)
-          .lineTo(pStep3.x, pStep3.y).lineTo(pM.x, pM.y)
-          .lineTo(pStep4.x, pStep4.y).lineTo(pStep2.x, pStep2.y)
-          .lineTo(p2a.x, p2a.y);
+        pb.moveTo(p1a.x, p1a.y).lineTo(pM.x, pM.y)
+          .lineTo(pStep4.x, pStep4.y).lineTo(p2a.x, p2a.y);
 
       } else if (style === "yantra") {
-        // Lotus petal arch
+        // Lotus petal arch - simplified
         const cpL = _p(r2 * 0.98, aM - 0.1, center);
         const cpR = _p(r2 * 0.98, aM + 0.1, center);
         pb.moveTo(p1a.x, p1a.y).quadTo(cpL.x, cpL.y, pM.x, pM.y)
           .quadTo(cpR.x, cpR.y, p2a.x, p2a.y);
-        // Inner lotus detail
-        if (layer4Intensity > 0.5 && i % 2 === 0) {
-          const cpLi = _p(r1 + (r2 - r1) * 0.55, aM - 0.06, center);
-          const cpRi = _p(r1 + (r2 - r1) * 0.55, aM + 0.06, center);
-          const pMi = _p(r1 + (r2 - r1) * 0.65, aM, center);
-          pb.moveTo(p1a.x, p1a.y).quadTo(cpLi.x, cpLi.y, pMi.x, pMi.y)
-            .quadTo(cpRi.x, cpRi.y, p2a.x, p2a.y);
-        }
 
       } else if (style === "celtico") {
-        // Gothic pointed arch
+        // Gothic pointed arch - simplified
         const cpA = _p(r1 + (r2 - r1) * 0.92, a1 + (a2 - a1) * 0.15, center);
         const cpB = _p(r1 + (r2 - r1) * 0.92, a2 - (a2 - a1) * 0.15, center);
         pb.moveTo(p1a.x, p1a.y).quadTo(cpA.x, cpA.y, pM.x, pM.y)
           .quadTo(cpB.x, cpB.y, p2a.x, p2a.y);
-        // Trefoil at apex
-        if (layer4Intensity > 0.6 && i % 2 === 0) {
-          addCircle(pb, pM.x, pM.y, (r2 - r1) * 0.15, 8);
-        }
 
       } else {
-        // Default: smooth arch with detail
+        // Default: smooth arch without extra details
         pb.moveTo(p1a.x, p1a.y).quadTo(pM.x, pM.y, p2a.x, p2a.y);
-        // Alternating detail
-        if (i % 3 === 0 && layer4Intensity > 0.4) {
-          const pInner = _p(r1 - R * 0.02, aM, center);
-          const pOuter = _p(r2 + R * 0.02, aM, center);
-          addCapsule(pb, pInner.x, pInner.y, pOuter.x, pOuter.y, fineW * 0.6);
-        }
       }
-    }
-
-    // Outer ring with scallop
-    addCircle(pb, center.x, center.y, r2, 80);
-    if (layer4Intensity > 0.5) {
-      addScallopRing(pb, center.x, center.y, r2 + 1, count, 1.2, true);
     }
 
     pushPath(pb, mainW);
   }
 
-  // ==================== RING C: Between L4 and L5 ====================
+  // ==================== RING C: Between L4 and L5 - Simplified ====================
   {
     const rRing = R * 0.68;
     const intensity = Math.min(layer4Intensity, layer5Intensity);
-    if (intensity > 0.2) {
+    if (intensity > 0.3) {
       const pb = new PathBuilder();
       addCircle(pb, center.x, center.y, rRing, 80);
-
-      // Alternating dots and dashes
-      if (intensity > 0.35) {
-        const count = petals * 3;
-        for (let i = 0; i < count; i++) {
-          const a = (i / count) * Math.PI * 2;
-          if (i % 3 === 0) {
-            addCircle(pb, center.x + Math.cos(a) * rRing, center.y + Math.sin(a) * rRing, 0.6, 6);
-          } else if (i % 3 === 1) {
-            const p1 = _p(rRing - 1, a, center);
-            const p2 = _p(rRing + 1, a, center);
-            addCapsule(pb, p1.x, p1.y, p2.x, p2.y, fineW * 0.4);
-          }
-        }
-      }
 
       pushPath(pb, fineW);
     }
   }
 
-  // ==================== L5: DETALLES FINOS (Enhanced) ====================
+  // ==================== L5: DETALLES FINOS (Simplified for coloring) ====================
   if (layer5Intensity > 0.05) {
     const pb = new PathBuilder();
     const rStart = R * 0.7;
     const rEnd = rStart + R * 0.1 * layer5Intensity;
-    const count = Math.max(petals * 2, Math.round(petals * 4 * _lerp(0.6, 1.5, cFactor)));
+    const count = Math.max(petals, Math.round(petals * 2 * _lerp(0.6, 1.0, cFactor)));
 
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
 
-      if (i % 4 === 0) {
-        // Teardrop pointing outward
-        const base = _p(rStart, a, center);
-        addTeardrop(pb, base.x, base.y, (rEnd - rStart) * 0.8, (rEnd - rStart) * 0.25, a);
-      } else if (i % 4 === 2) {
-        // Line
+      if (i % 2 === 0) {
+        // Simple line instead of teardrop
         const p1 = _p(rStart, a, center);
         const p2 = _p(rEnd, a, center);
         addCapsule(pb, p1.x, p1.y, p2.x, p2.y, fineW);
-      } else if (layer5Intensity > 0.4) {
-        // Small dot
-        const pDot = _p(rEnd + 1.5, a, center);
-        addCircle(pb, pDot.x, pDot.y, 0.7, 6);
-      }
-    }
-
-    // Secondary fine ring with micro-petals
-    if (layer5Intensity > 0.5) {
-      const rMicro = rEnd + 3;
-      addCircle(pb, center.x, center.y, rMicro, 80);
-      const microCount = petals * 2;
-      for (let i = 0; i < microCount; i++) {
-        const a = (i / microCount) * Math.PI * 2;
-        const base = _p(rMicro, a, center);
-        const tip = _p(rMicro + R * 0.025, a, center);
-        const cpL = _p(rMicro + R * 0.015, a - 0.08, center);
-        const cpR = _p(rMicro + R * 0.015, a + 0.08, center);
-        pb.moveTo(base.x, base.y)
-          .quadTo(cpL.x, cpL.y, tip.x, tip.y)
-          .quadTo(cpR.x, cpR.y, base.x, base.y);
-      }
-    }
-
-    // Islamic small diamonds
-    if (style === "islamico" && layer5Intensity > 0.35) {
-      const dCount = petals * 2;
-      for (let i = 0; i < dCount; i++) {
-        const a = ((i + 0.5) / dCount) * Math.PI * 2;
-        const dc = _p((rStart + rEnd) / 2, a, center);
-        addStar(pb, dc.x, dc.y, 1.5, 0.6, 4, a);
-      }
-    }
-
-    // Yantra: diamond accents
-    if (style === "yantra" && layer5Intensity > 0.4) {
-      const dCount = petals * 2;
-      for (let i = 0; i < dCount; i++) {
-        const a = ((i + 0.5) / dCount) * Math.PI * 2;
-        const dc = _p((rStart + rEnd) / 2, a, center);
-        addStar(pb, dc.x, dc.y, 1.2, 0.4, 4, a);
       }
     }
 
     pushPath(pb, fineW);
   }
 
-  // ==================== L7: NATURAL / HOJAS / CULTURAL (Enhanced) ====================
+  // ==================== L7: NATURAL / HOJAS / CULTURAL (Simplified for coloring) ====================
   if (layer7Intensity > 0.05 && style !== "geometric") {
     const pb = new PathBuilder();
     // Position L7 in the mid-ring zone (between L3 and L4), above L2/L3 content
@@ -700,16 +487,13 @@ export function generateMandalaLayers(doc, opts) {
       const a = (i / count) * Math.PI * 2 + (Math.PI / count);
 
       if (style === "islamico") {
-        // Tessellation element
+        // Simplified tessellation element - single star only
         const pC = _p((rInner + rOuter) * 0.5, a, center);
         const dR = (rOuter - rInner) * 0.32 * layer7Intensity;
         addStar(pb, pC.x, pC.y, dR, dR * 0.42, 8, a);
-        if (layer7Intensity > 0.5) {
-          addCircle(pb, pC.x, pC.y, dR * 0.3, 8);
-        }
 
       } else if (style === "azteca") {
-        // Stepped pyramid profile
+        // Simplified stepped pyramid profile
         const p1 = _p(rInner, a, center);
         const p2 = _p(rOuter, a, center);
         const pMid = _p((rInner + rOuter) * 0.5, a, center);
@@ -717,112 +501,64 @@ export function generateMandalaLayers(doc, opts) {
         const stepR = _p((rInner + rOuter) * 0.5, a + 0.25, center);
         pb.moveTo(p1.x, p1.y).lineTo(stepL.x, stepL.y).lineTo(p2.x, p2.y)
           .lineTo(stepR.x, stepR.y).close();
-        addCapsule(pb, p1.x, p1.y, p2.x, p2.y, fineW * 0.5);
-        // Small glyph
-        if (layer7Intensity > 0.5) {
-          addPoly(pb, pMid.x, pMid.y, (rOuter - rInner) * 0.12, 4, a);
-        }
 
       } else if (style === "yantra") {
-        // Energy diamond between triangles
+        // Energy diamond - simplified without inner detail
         const pTop = _p(rOuter, a, center);
         const pBot = _p(rInner, a, center);
         const pL = _p((rInner + rOuter) * 0.5, a - 0.3 * layer7Intensity, center);
         const pR = _p((rInner + rOuter) * 0.5, a + 0.3 * layer7Intensity, center);
         pb.moveTo(pTop.x, pTop.y).lineTo(pL.x, pL.y).lineTo(pBot.x, pBot.y)
           .lineTo(pR.x, pR.y).close();
-        // Inner diamond
-        if (layer7Intensity > 0.5) {
-          const s = 0.7;
-          const iTop = _p(_lerp(rInner, rOuter, 0.5 + 0.3 * s), a, center);
-          const iBot = _p(_lerp(rInner, rOuter, 0.5 - 0.3 * s), a, center);
-          const iL = _p((rInner + rOuter) * 0.5, a - 0.15 * layer7Intensity, center);
-          const iR = _p((rInner + rOuter) * 0.5, a + 0.15 * layer7Intensity, center);
-          pb.moveTo(iTop.x, iTop.y).lineTo(iL.x, iL.y).lineTo(iBot.x, iBot.y)
-            .lineTo(iR.x, iR.y).close();
-        }
 
       } else if (style === "celtico") {
-        // Interlaced curves
+        // Simplified interlaced curves without knotwork
         const p1 = _p(rInner, a, center);
         const p2 = _p(rOuter, a, center);
         const cpA = _p((rInner + rOuter) * 0.5, a - 0.55 * layer7Intensity, center);
         const cpB = _p((rInner + rOuter) * 0.5, a + 0.55 * layer7Intensity, center);
         pb.moveTo(p1.x, p1.y).quadTo(cpA.x, cpA.y, p2.x, p2.y);
         pb.moveTo(p1.x, p1.y).quadTo(cpB.x, cpB.y, p2.x, p2.y);
-        // Knotwork crossing
-        if (layer7Intensity > 0.5) {
-          const pMid = _p((rInner + rOuter) * 0.5, a, center);
-          addCircle(pb, pMid.x, pMid.y, (rOuter - rInner) * 0.08, 6);
-        }
 
       } else {
-        // Rich organic leaf (sashiko / floral)
+        // Rich organic leaf (sashiko / floral) - simplified without veins
         const p1 = _p(rInner, a, center);
         const p2 = _p(rOuter, a, center);
         // Scale leaf width by angular spacing so leaves don't overlap at high petal counts
         const leafW = Math.min(0.45, (Math.PI / count) * 0.7) * layer7Intensity;
         const cp1 = _p(rInner + (rOuter - rInner) * 0.5, a - leafW, center);
         const cp2 = _p(rInner + (rOuter - rInner) * 0.5, a + leafW, center);
-        // Leaf outline
+        // Leaf outline only - no midrib or side veins
         pb.moveTo(p1.x, p1.y)
           .quadTo(cp1.x, cp1.y, p2.x, p2.y)
           .quadTo(cp2.x, cp2.y, p1.x, p1.y)
           .close();
-        // Midrib
-        addCapsule(pb, p1.x, p1.y, p2.x, p2.y, fineW * 0.4);
-        // Side veins
-        if (layer7Intensity > 0.4) {
-          for (let v = 0.25; v < 0.85; v += 0.2) {
-            const vBase = _p(rInner + (rOuter - rInner) * v, a, center);
-            const vTipL = _p(rInner + (rOuter - rInner) * (v + 0.08), a - leafW * 0.5, center);
-            const vTipR = _p(rInner + (rOuter - rInner) * (v + 0.08), a + leafW * 0.5, center);
-            pb.moveTo(vBase.x, vBase.y).lineTo(vTipL.x, vTipL.y);
-            pb.moveTo(vBase.x, vBase.y).lineTo(vTipR.x, vTipR.y);
-          }
-        }
-        // Berry/bud at leaf base (between leaves)
-        if (layer7Intensity > 0.5 && i % 2 === 0) {
-          const aNext = a + Math.PI / count;
-          const budPos = _p(rInner + (rOuter - rInner) * 0.3, aNext, center);
-          addCircle(pb, budPos.x, budPos.y, (rOuter - rInner) * 0.06, 8);
-        }
       }
     }
 
     pushPath(pb, detailW);
   }
 
-  // ==================== RING D: Between L5/L7 and L6 ====================
+  // ==================== RING D: Between L5/L7 and L6 - Simplified ====================
   {
     const rRing = R * 0.80;
     const intensity = Math.min(Math.max(layer5Intensity, layer7Intensity), layer6Intensity);
-    if (intensity > 0.15) {
+    if (intensity > 0.2) {
       const pb = new PathBuilder();
       addCircle(pb, center.x, center.y, rRing, 96);
-
-      if (intensity > 0.3) {
-        // Inward-pointing scallops
-        addScallopRing(pb, center.x, center.y, rRing - 0.5, petals * 2, 1.8, false);
-      }
-
-      if (intensity > 0.45) {
-        addCircle(pb, center.x, center.y, rRing + 1.2, 96);
-        addPearlRing(pb, center.x, center.y, rRing + 1.2, petals * 3, 0.45);
-      }
 
       pushPath(pb, fineW);
     }
   }
 
-  // ==================== L6: BORDE DECORATIVO (Enhanced Crown) ====================
+  // ==================== L6: BORDE DECORATIVO (Simplified for coloring) ====================
   if (layer6Intensity > 0.05) {
     const pb = new PathBuilder();
     const rBase = R * 0.83;
     const rTop = rBase + R * 0.13 * layer6Intensity;
     const count = petals;
 
-    // Main crown arches
+    // Main crown arches - simplified without inner details
     for (let i = 0; i < count; i++) {
       const aC = (i / count) * Math.PI * 2;
       const aL = aC - (Math.PI / count);
@@ -833,19 +569,14 @@ export function generateMandalaLayers(doc, opts) {
       const pTop = _p(rTop, aC, center);
 
       if (style === "islamico") {
-        // Geometric diamond crown
+        // Simplified geometric diamond crown
         const pMidL = _p(rBase + (rTop - rBase) * 0.5, aC - 0.12, center);
         const pMidR = _p(rBase + (rTop - rBase) * 0.5, aC + 0.12, center);
         pb.moveTo(pL.x, pL.y).lineTo(pMidL.x, pMidL.y).lineTo(pTop.x, pTop.y)
           .lineTo(pMidR.x, pMidR.y).lineTo(pR.x, pR.y);
-        // Inner diamond detail
-        if (layer6Intensity > 0.5) {
-          const dc = _p(rBase + (rTop - rBase) * 0.4, aC, center);
-          addStar(pb, dc.x, dc.y, (rTop - rBase) * 0.2, (rTop - rBase) * 0.08, 4, aC);
-        }
 
       } else if (style === "azteca") {
-        // Stepped crown with glyphs
+        // Simplified stepped crown
         const pStepL = _p(rBase + (rTop - rBase) * 0.5, aC - 0.1, center);
         const pStepR = _p(rBase + (rTop - rBase) * 0.5, aC + 0.1, center);
         const pNarrowL = _p(rBase + (rTop - rBase) * 0.8, aC - 0.05, center);
@@ -853,15 +584,25 @@ export function generateMandalaLayers(doc, opts) {
         pb.moveTo(pL.x, pL.y).lineTo(pStepL.x, pStepL.y).lineTo(pNarrowL.x, pNarrowL.y)
           .lineTo(pTop.x, pTop.y).lineTo(pNarrowR.x, pNarrowR.y)
           .lineTo(pStepR.x, pStepR.y).lineTo(pR.x, pR.y);
-        if (layer6Intensity > 0.6) {
-          addStar(pb, pTop.x, pTop.y, 1.8, 0.8, 4, aC);
-        }
 
       } else if (style === "celtico") {
-        // Gothic pointed arch with trefoil
+        // Simplified Gothic pointed arch
         const cpL2 = _p(rTop * 0.97, aC - 0.13, center);
         const cpR2 = _p(rTop * 0.97, aC + 0.13, center);
         pb.moveTo(pL.x, pL.y).quadTo(cpL2.x, cpL2.y, pTop.x, pTop.y)
+          .quadTo(cpR2.x, cpR2.y, pR.x, pR.y);
+
+      } else {
+        // Default smooth arch
+        const cpL = _p(rBase + (rTop - rBase) * 0.6, aC - 0.15, center);
+        const cpR = _p(rBase + (rTop - rBase) * 0.6, aC + 0.15, center);
+        pb.moveTo(pL.x, pL.y).quadTo(cpL.x, cpL.y, pTop.x, pTop.y)
+          .quadTo(cpR.x, cpR.y, pR.x, pR.y);
+      }
+    }
+
+    pushPath(pb, mainW);
+  }
           .quadTo(cpR2.x, cpR2.y, pR.x, pR.y);
         // Inner arch
         if (layer6Intensity > 0.4) {

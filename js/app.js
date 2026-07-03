@@ -32,6 +32,17 @@ const strokeWidthEl = document.getElementById("strokeWidth");
 const framesEl = document.getElementById("frames");
 const pageBorderEl = document.getElementById("pageBorder");
 
+// Phase 5: Coloring Book Controls
+const spacingEl = document.getElementById("spacing");
+const densityFactorEl = document.getElementById("densityFactor");
+const minCellAreaEl = document.getElementById("minCellArea");
+const detailSimplificationEl = document.getElementById("detailSimplification");
+
+// New coloring book features
+const coloringPresetEl = document.getElementById("coloringPreset");
+const outlineModeEl = document.getElementById("outlineMode");
+const applyColoringPresetBtn = document.getElementById("applyColoringPreset");
+
 const styleModeEl = document.getElementById("styleMode");
 const layer1IntensityEl = document.getElementById("layer1Intensity");
 const layer2IntensityEl = document.getElementById("layer2Intensity");
@@ -120,6 +131,14 @@ const DEFAULTS = {
   layoutMode: "single",
   pngDpi: 300,
   layerPreset: "custom",
+  // Phase 5: Coloring Book Controls
+  spacing: 0.3,
+  densityFactor: 0.7,
+  minCellArea: 3.0,
+  detailSimplification: 0.5,
+  // New coloring book features
+  outlineMode: false,
+  coloringPreset: "adulto",
 };
 
 const STRUCTURE_PRESETS = {
@@ -180,6 +199,120 @@ const STRUCTURE_PRESETS = {
   },
 };
 
+// Coloring Book Presets - Pre-configured difficulty levels
+const COLORING_PRESETS = {
+  ninos: {
+    // Niños pequeños (5-8 años) - Muy simple
+    complexity: 40,
+    organic: 0.1,
+    strokeWidth: 0.8,
+    spacing: 0.6,
+    densityFactor: 0.35,
+    minCellArea: 6.0,
+    detailSimplification: 0.85,
+    textures: false,
+    frames: false,
+    pageBorder: true,
+    layer1Intensity: 0.5,
+    layer2Intensity: 0.3,
+    layer3Intensity: 0.2,
+    layer4Intensity: 0.3,
+    layer5Intensity: 0.1,
+    layer6Intensity: 0.3,
+    layer7Intensity: 0.15,
+    layer8Intensity: 0.1,
+    outlineMode: true,
+  },
+  ninos_grande: {
+    // Niños grandes (9-12 años) - Simple
+    complexity: 70,
+    organic: 0.15,
+    strokeWidth: 0.7,
+    spacing: 0.45,
+    densityFactor: 0.5,
+    minCellArea: 4.5,
+    detailSimplification: 0.7,
+    textures: false,
+    frames: true,
+    pageBorder: true,
+    layer1Intensity: 0.6,
+    layer2Intensity: 0.45,
+    layer3Intensity: 0.35,
+    layer4Intensity: 0.45,
+    layer5Intensity: 0.2,
+    layer6Intensity: 0.45,
+    layer7Intensity: 0.25,
+    layer8Intensity: 0.15,
+    outlineMode: true,
+  },
+  adulto: {
+    // Adulto - Balanceado (default)
+    complexity: 130,
+    organic: 0.25,
+    strokeWidth: 0.55,
+    spacing: 0.3,
+    densityFactor: 0.7,
+    minCellArea: 3.0,
+    detailSimplification: 0.5,
+    textures: true,
+    frames: true,
+    pageBorder: true,
+    layer1Intensity: 0.85,
+    layer2Intensity: 0.75,
+    layer3Intensity: 0.8,
+    layer4Intensity: 0.7,
+    layer5Intensity: 0.55,
+    layer6Intensity: 0.8,
+    layer7Intensity: 0.65,
+    layer8Intensity: 0.35,
+    outlineMode: false,
+  },
+  experto: {
+    // Experto - Detallado
+    complexity: 220,
+    organic: 0.3,
+    strokeWidth: 0.4,
+    spacing: 0.15,
+    densityFactor: 1.0,
+    minCellArea: 2.0,
+    detailSimplification: 0.2,
+    textures: true,
+    frames: true,
+    pageBorder: true,
+    layer1Intensity: 0.95,
+    layer2Intensity: 0.9,
+    layer3Intensity: 0.95,
+    layer4Intensity: 0.9,
+    layer5Intensity: 0.8,
+    layer6Intensity: 0.9,
+    layer7Intensity: 0.85,
+    layer8Intensity: 0.6,
+    outlineMode: false,
+  },
+  zen: {
+    // Zen - Minimalista
+    complexity: 50,
+    organic: 0.2,
+    strokeWidth: 0.9,
+    spacing: 0.7,
+    densityFactor: 0.3,
+    minCellArea: 7.0,
+    detailSimplification: 0.9,
+    textures: false,
+    frames: false,
+    pageBorder: false,
+    layer1Intensity: 0.4,
+    layer2Intensity: 0.25,
+    layer3Intensity: 0.15,
+    layer4Intensity: 0.25,
+    layer5Intensity: 0.1,
+    layer6Intensity: 0.2,
+    layer7Intensity: 0.1,
+    layer8Intensity: 0.05,
+    outlineMode: true,
+  },
+};
+
 const recentSeeds = [];
 
 const state = getStateFromURL(DEFAULTS);
@@ -189,6 +322,7 @@ if (typeof state.pageBorder === "string") state.pageBorder = state.pageBorder ==
 if (typeof state.kaleidoscope === "string") state.kaleidoscope = state.kaleidoscope === "true";
 if (typeof state.textures === "string") state.textures = state.textures === "true";
 if (typeof state.spiroEnabled === "string") state.spiroEnabled = state.spiroEnabled === "true";
+if (typeof state.outlineMode === "string") state.outlineMode = state.outlineMode === "true";
 if (typeof state.pngDpi === "string") state.pngDpi = parseInt(state.pngDpi, 10);
 if (!state.pngDpi) state.pngDpi = 300;
 if (!state.previewQuality) state.previewQuality = "high";
@@ -196,6 +330,7 @@ if (!state.layoutMode) state.layoutMode = "single";
 if (!state.layerPreset) state.layerPreset = "custom";
 if (!state.generatorType) state.generatorType = "layers";
 if (!state.structurePreset || !STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
+if (!state.coloringPreset || !COLORING_PRESETS[state.coloringPreset]) state.coloringPreset = "adulto";
 
 if (state.styleMode === "hashiko") state.styleMode = "sashiko";
 
@@ -234,7 +369,7 @@ function buildOpts(s) {
     includeFrames: s.frames,
     pageBorder: s.pageBorder,
     kaleidoscope: s.kaleidoscope,
-    textures: s.textures,
+    textures: s.textures && !s.outlineMode, // Disable textures in outline mode
     styleMode: s.styleMode,
     layer1Intensity: s.layer1Intensity,
     layer2Intensity: s.layer2Intensity,
@@ -244,6 +379,12 @@ function buildOpts(s) {
     layer6Intensity: s.layer6Intensity,
     layer7Intensity: s.layer7Intensity,
     layer8Intensity: s.layer8Intensity,
+    // Phase 5: Coloring Book Controls
+    spacing: s.spacing,
+    densityFactor: s.densityFactor,
+    minCellAreaMm2: s.minCellArea,
+    detailSimplification: s.detailSimplification,
+    outlineMode: s.outlineMode,
   };
 }
 
@@ -601,6 +742,10 @@ function bindUI() {
   pageBorderEl.checked = state.pageBorder;
   kaleidoscopeEl.checked = state.kaleidoscope;
   texturesEl.checked = state.textures;
+  
+  // New coloring book features
+  if (coloringPresetEl) coloringPresetEl.value = state.coloringPreset;
+  if (outlineModeEl) outlineModeEl.checked = state.outlineMode;
 
   styleModeEl.value = state.styleMode;
   layer1IntensityEl.value = String(state.layer1Intensity);
@@ -951,6 +1096,30 @@ function bindUI() {
       update();
     }
   });
+  
+  // Coloring preset button
+  if (applyColoringPresetBtn && coloringPresetEl) {
+    applyColoringPresetBtn.addEventListener("click", () => {
+      const presetKey = coloringPresetEl.value;
+      const preset = COLORING_PRESETS[presetKey];
+      if (preset) {
+        Object.entries(preset).forEach(([key, value]) => {
+          state[key] = value;
+        });
+        state.coloringPreset = presetKey;
+        bindUI();
+        update();
+      }
+    });
+  }
+  
+  // Outline mode toggle
+  if (outlineModeEl) {
+    outlineModeEl.addEventListener("sl-change", () => {
+      state.outlineMode = outlineModeEl.checked;
+      updateImmediate();
+    });
+  }
 
   const prevSeedBtn = document.getElementById("prevSeed");
   const nextSeedBtn = document.getElementById("nextSeed");
@@ -1046,6 +1215,19 @@ function bindUI() {
       }
 
       state.strokeWidth = rFloat(shuffleRng, 0.4, 1.0);
+      
+      // Randomize coloring book controls with quality safeguards
+      const coloringOptions = [\"ninos\", \"ninos_grande\", \"adulto\", \"experto\", \"zen\"];
+      const randomColoring = pick(shuffleRng, coloringOptions);
+      const coloringPreset = COLORING_PRESETS[randomColoring];
+      if (coloringPreset) {
+        Object.entries(coloringPreset).forEach(([key, value]) => {
+          // Don't override seed or style-related properties in shuffle
+          if (!['complexity', 'organic', 'styleMode'].includes(key)) {
+            state[key] = value;
+          }
+        });
+      }
       
       state.structurePreset = "custom";
       bindUI();
