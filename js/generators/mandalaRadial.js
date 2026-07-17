@@ -1352,12 +1352,14 @@ if (pageBorder) {
   // Draw outer rect
   pbB.moveTo(x0, y0).lineTo(x1, y0).lineTo(x1, y1).lineTo(x0, y1).close();
 
-  // Corners
-  const cornerR = marginMm * 0.8;
-  addCirclePoly(pbB, x0, y0, cornerR, 12);
-  addCirclePoly(pbB, x1, y0, cornerR, 12);
-  addCirclePoly(pbB, x1, y1, cornerR, 12);
-  addCirclePoly(pbB, x0, y1, cornerR, 12);
+  // Corners: rosetas tangentes por DENTRO del marco. Centradas en la esquina
+  // sobresalían cornerR hacia el borde físico (llegaban a salirse de la página),
+  // lo que incumple el mínimo de 6.35 mm de KDP e imprime cortado.
+  const cornerR = Math.min(marginMm * 0.8, 8);
+  addCirclePoly(pbB, x0 + cornerR, y0 + cornerR, cornerR, 12);
+  addCirclePoly(pbB, x1 - cornerR, y0 + cornerR, cornerR, 12);
+  addCirclePoly(pbB, x1 - cornerR, y1 - cornerR, cornerR, 12);
+  addCirclePoly(pbB, x0 + cornerR, y1 - cornerR, cornerR, 12);
 
   doc.body.push(
     pbB.toPath({ stroke, strokeWidthMm: outerRingStrokes.main * 0.8, fill: "none" })

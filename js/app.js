@@ -29,6 +29,9 @@ const structurePresetEl = document.getElementById("structurePreset");
 const applyStructureBtn = document.getElementById("applyStructure");
 
 const strokeWidthEl = document.getElementById("strokeWidth");
+const marginMmEl = document.getElementById("marginMm");
+const kdpWarnEl = document.getElementById("kdpWarn");
+const kdpWarnTipEl = document.getElementById("kdpWarnTip");
 const framesEl = document.getElementById("frames");
 const pageBorderEl = document.getElementById("pageBorder");
 
@@ -99,6 +102,8 @@ const DEFAULTS = {
   generatorType: "layers",
   spiroEnabled: false,
   preset: "A4",
+  // 12.7 mm (0.5") = mínimo KDP y gutter válido para libros de <150 páginas
+  marginMm: 12.7,
   petals: 12,
   complexity: 130,
   organic: 0.25,
@@ -328,6 +333,7 @@ if (!state.layerPreset) state.layerPreset = "custom";
 if (!state.generatorType) state.generatorType = "layers";
 if (!state.structurePreset || !STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
 if (!state.coloringPreset || !COLORING_PRESETS[state.coloringPreset]) state.coloringPreset = "adulto";
+state.marginMm = Math.max(4, Math.min(25.4, parseFloat(state.marginMm) || DEFAULTS.marginMm));
 
 if (state.styleMode === "hashiko") state.styleMode = "sashiko";
 
@@ -389,8 +395,38 @@ function getCurrentDoc() {
   return createDoc({
     preset: state.preset,
     seed: state.seed,
-    marginMm: 10,
+    marginMm: state.marginMm,
   });
+}
+
+// --- Conformidad KDP (Amazon) ---
+const KDP_MIN_ART_MM = 6.35;   // 0.25": arte más cerca del borde = rechazo seguro
+const KDP_MIN_GUTTER_MM = 9.5; // 0.375": gutter mínimo en libros de <150 páginas
+
+// El borde de página del motor Radial y del collage se extiende hasta la mitad
+// del margen (extensión artística del marco); el resto del arte queda al margen.
+function artEdgeDistanceMm() {
+  const borderExtends = state.pageBorder &&
+    (state.generatorType === "radial" || state.layoutMode !== "single");
+  return borderExtends ? state.marginMm * 0.5 : state.marginMm;
+}
+
+function updateKdpNotice() {
+  if (!kdpWarnEl || !kdpWarnTipEl) return;
+  const artEdge = artEdgeDistanceMm();
+  let msg = "";
+
+  if (artEdge < KDP_MIN_ART_MM) {
+    const fix = artEdge < state.marginMm
+      ? `Sube el margen a ${(KDP_MIN_ART_MM * 2).toFixed(1)} mm o desactiva el borde de página.`
+      : `Sube el margen a al menos ${KDP_MIN_ART_MM.toFixed(2)} mm.`;
+    msg = `Arte a ${artEdge.toFixed(1)} mm del borde: KDP rechaza todo lo que quede a menos de 6.35 mm (0.25"). ${fix}`;
+  } else if (state.marginMm < KDP_MIN_GUTTER_MM) {
+    msg = `Margen de ${state.marginMm.toFixed(1)} mm: gutter insuficiente para KDP (mínimo 9.5 mm en libros de menos de 150 páginas). Usa 12.7 mm recomendado.`;
+  }
+
+  kdpWarnEl.style.display = msg ? "inline" : "none";
+  kdpWarnTipEl.content = msg;
 }
 
 function updateGeneratorUI() {
@@ -456,6 +492,7 @@ function updateImmediate() {
 
 function render() {
   updateGeneratorUI();
+  updateKdpNotice();
   seedText.textContent = String(state.seed >>> 0);
 
   const doc = getCurrentDoc();
@@ -476,7 +513,7 @@ function render() {
   if (state.layoutMode !== "single") {
     const cols = state.layoutMode === "grid2x2" ? 2 : 3;
     const rows = cols;
-    const margin = 8;
+    const margin = state.marginMm;
     const cellW = (wMm - margin * (cols + 1)) / cols;
     const cellH = (hMm - margin * (rows + 1)) / rows;
     const cellR = Math.min(cellW, cellH) / 2 - 4;
@@ -525,10 +562,10 @@ function render() {
     }
     svgContent += bodiesHtml;
 
-    // Borde de página único
+    // Borde de página único (extensión artística: mitad del margen)
     if (state.pageBorder) {
       const pb = new PathBuilder();
-      const m = 4;
+      const m = state.marginMm * 0.5;
       pb.moveTo(m, m).lineTo(wMm - m, m).lineTo(wMm - m, hMm - m).lineTo(m, hMm - m).close();
       svgContent += pb.toPath({ stroke: "#000", strokeWidthMm: 0.5, fill: "none" });
     }
@@ -741,6 +778,7 @@ function bindUI() {
   if (detailSimplificationEl) detailSimplificationEl.value = String(state.detailSimplification);
 
   strokeWidthEl.value = String(state.strokeWidth);
+  if (marginMmEl) marginMmEl.value = String(state.marginMm);
   framesEl.checked = state.frames;
   pageBorderEl.checked = state.pageBorder;
   kaleidoscopeEl.checked = state.kaleidoscope;
@@ -968,6 +1006,14 @@ function bindUI() {
     debouncedRender();
   });
   strokeWidthEl.addEventListener("sl-change", updateImmediate);
+
+  if (marginMmEl) {
+    marginMmEl.addEventListener("sl-input", () => {
+      state.marginMm = clampFloat(marginMmEl.value, 4, 25.4);
+      debouncedRender();
+    });
+    marginMmEl.addEventListener("sl-change", updateImmediate);
+  }
 
   framesEl.addEventListener("sl-change", () => {
     state.frames = framesEl.checked;
