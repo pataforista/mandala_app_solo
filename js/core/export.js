@@ -60,12 +60,13 @@ export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 
     const wPx = Math.ceil(widthMm * pixelDensity);
     const hPx = Math.ceil(heightMm * pixelDensity);
 
-    const { Resvg, initWasm } = await import("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/wasm.js");
+    const { Resvg, initWasm } = await import("https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.6.2/index.mjs");
 
     try {
-      await initWasm("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/index_bg.wasm");
+      await initWasm(fetch("https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.6.2/index_bg.wasm"));
     } catch (e) {
-      console.warn("WASM initialization failed, but continuing", e);
+      // Second call throws "Already initialized" — safe to continue
+      console.warn("WASM initialization skipped:", e);
     }
 
     const resvg = new Resvg(svgString, {
