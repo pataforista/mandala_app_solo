@@ -334,7 +334,7 @@ if (!state.coloringPreset || !COLORING_PRESETS[state.coloringPreset]) state.colo
 
 if (state.styleMode === "hashiko") state.styleMode = "sashiko";
 
-if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
+if (!stage || !presetEl || !petalsEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
   throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
 }
 
@@ -734,8 +734,14 @@ function bindUI() {
   presetEl.value = state.preset;
   petalsEl.value = String(state.petals);
 
-  complexityEl.value = String(state.complexity);
-  organicEl.value = String(state.organic);
+  if (complexityEl) complexityEl.value = String(state.complexity);
+  if (organicEl) organicEl.value = String(state.organic);
+
+  // Phase 5: Coloring Book Controls
+  if (spacingEl) spacingEl.value = String(state.spacing);
+  if (densityFactorEl) densityFactorEl.value = String(state.densityFactor);
+  if (minCellAreaEl) minCellAreaEl.value = String(state.minCellArea);
+  if (detailSimplificationEl) detailSimplificationEl.value = String(state.detailSimplification);
 
   strokeWidthEl.value = String(state.strokeWidth);
   framesEl.checked = state.frames;
@@ -905,21 +911,58 @@ function bindUI() {
   });
   petalsEl.addEventListener("sl-change", updateImmediate);
 
-  complexityEl.addEventListener("sl-input", () => {
-    state.complexity = clampInt(complexityEl.value, 20, 320);
-    state.structurePreset = "custom";
-    structurePresetEl.value = "custom";
-    debouncedRender();
-  });
-  complexityEl.addEventListener("sl-change", updateImmediate);
+  if (complexityEl) {
+    complexityEl.addEventListener("sl-input", () => {
+      state.complexity = clampInt(complexityEl.value, 20, 320);
+      state.structurePreset = "custom";
+      structurePresetEl.value = "custom";
+      debouncedRender();
+    });
+    complexityEl.addEventListener("sl-change", updateImmediate);
+  }
 
-  organicEl.addEventListener("sl-input", () => {
-    state.organic = clampFloat(organicEl.value, 0, 1);
-    state.structurePreset = "custom";
-    structurePresetEl.value = "custom";
-    debouncedRender();
-  });
-  organicEl.addEventListener("sl-change", updateImmediate);
+  if (organicEl) {
+    organicEl.addEventListener("sl-input", () => {
+      state.organic = clampFloat(organicEl.value, 0, 1);
+      state.structurePreset = "custom";
+      structurePresetEl.value = "custom";
+      debouncedRender();
+    });
+    organicEl.addEventListener("sl-change", updateImmediate);
+  }
+
+  // Phase 5: Coloring Book Controls
+  if (spacingEl) {
+    spacingEl.addEventListener("sl-input", () => {
+      state.spacing = clampFloat(spacingEl.value, 0, 1);
+      debouncedRender();
+    });
+    spacingEl.addEventListener("sl-change", updateImmediate);
+  }
+
+  if (densityFactorEl) {
+    densityFactorEl.addEventListener("sl-input", () => {
+      state.densityFactor = clampFloat(densityFactorEl.value, 0.2, 1.5);
+      debouncedRender();
+    });
+    densityFactorEl.addEventListener("sl-change", updateImmediate);
+  }
+
+  if (minCellAreaEl) {
+    minCellAreaEl.addEventListener("sl-input", () => {
+      state.minCellArea = clampFloat(minCellAreaEl.value, 1, 8);
+      debouncedRender();
+    });
+    minCellAreaEl.addEventListener("sl-change", updateImmediate);
+  }
+
+  if (detailSimplificationEl) {
+    detailSimplificationEl.addEventListener("sl-input", () => {
+      state.detailSimplification = clampFloat(detailSimplificationEl.value, 0, 1);
+      debouncedRender();
+    });
+    detailSimplificationEl.addEventListener("sl-change", updateImmediate);
+  }
 
   strokeWidthEl.addEventListener("sl-input", () => {
     state.strokeWidth = clampFloat(strokeWidthEl.value, 0.1, 5.0);
@@ -1217,7 +1260,7 @@ function bindUI() {
       state.strokeWidth = rFloat(shuffleRng, 0.4, 1.0);
       
       // Randomize coloring book controls with quality safeguards
-      const coloringOptions = [\"ninos\", \"ninos_grande\", \"adulto\", \"experto\", \"zen\"];
+      const coloringOptions = ["ninos", "ninos_grande", "adulto", "experto", "zen"];
       const randomColoring = pick(shuffleRng, coloringOptions);
       const coloringPreset = COLORING_PRESETS[randomColoring];
       if (coloringPreset) {
