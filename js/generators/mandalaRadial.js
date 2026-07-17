@@ -49,6 +49,13 @@ export function generateMandalaRadial(doc, opts) {
     taper = 0.2,
     kaleidoscope = true,
     showTextures = true,
+    textures = true,
+
+    // Coloring-book controls (shared with the layers engine)
+    spacing = 0.3,
+    densityFactor = 0.7,
+    detailSimplification = 0.5,
+    outlineMode = false,
 
     // Phase 4: Spirograph
     spiroEnabled = false,
@@ -144,13 +151,25 @@ export function generateMandalaRadial(doc, opts) {
 
   // --- Complejidad normalizada ---
   const cN = _clamp((complexity - 20) / (240 - 20), 0, 1);
-  const ringCount = _clamp(Math.round(5 + cN * 7), 5, 12);
+
+  // Controles de libro de colorear, normalizados para que los valores por
+  // defecto (spacing 0.3, densityFactor 0.7, detailSimplification 0.5)
+  // reproduzcan el resultado previo sin cambios.
+  const densityMul = _clamp(densityFactor / 0.7, 0.3, 2.2);
+  const detail = outlineMode ? Math.max(detailSimplification, 0.85) : detailSimplification;
+  const keepDetail = (threshold) => detail < threshold;
+  const detailMul = _clamp(1 - (detail - 0.5) * 1.6, 0.2, 1.8);
+  const spaceMul = _clamp(1 - (spacing - 0.3) * 0.9, 0.35, 1.3);
+  const sizeMul = _clamp(1 - (spacing - 0.3) * 0.55, 0.55, 1.17);
+  const texturesOn = showTextures && textures;
+
+  const ringCount = _clamp(Math.round((5 + cN * 7) * _clamp(Math.sqrt(densityMul), 0.6, 1.35)), 4, 13);
 
   // Con muchos pétalos las celdas angulares se estrechan: bajar la densidad de
   // detalle evita que el conjunto se sature en negro y deje de ser coloreable.
   const petalsCrowd = _clamp((petals - 12) / 36, 0, 1);
-  const subProb = _lerp(0.18, 0.72, cN) * _lerp(1, 0.7, petalsCrowd);
-  const detailProb = _lerp(0.35, 0.85, cN) * _lerp(1, 0.55, petalsCrowd);
+  const subProb = _clamp(_lerp(0.18, 0.72, cN) * _lerp(1, 0.7, petalsCrowd) * densityMul * spaceMul, 0, 0.95);
+  const detailProb = _clamp(_lerp(0.35, 0.85, cN) * _lerp(1, 0.55, petalsCrowd) * detailMul, 0, 0.95);
 
   // --- Rejilla radial ---
   const stepAngle = (2 * Math.PI) / petals;
@@ -240,7 +259,7 @@ export function generateMandalaRadial(doc, opts) {
       idx: i,
       role,
       density,
-      allowDetail: (role !== "rest") && (i !== 0),
+      allowDetail: (role !== "rest") && (i !== 0) && keepDetail(0.8),
       allowSubdivide: (role !== "rest") && (i !== 0),
       type: null,
       strokes: ringStrokes
@@ -378,7 +397,7 @@ export function generateMandalaRadial(doc, opts) {
 
   // --- PHASE 2: Textural Fills ---
   function _addStippling(pb, cx, cy, radius, count = 5, fineW = strokeBase * 0.4) {
-    if (complexity < 100) return;
+    if (complexity < 100 || !texturesOn || !keepDetail(0.65)) return;
     for (let i = 0; i < count; i++) {
       const r = rFloat(rng, radius * 0.2, radius * 0.9);
       const a = rFloat(rng, 0, Math.PI * 2);
@@ -389,7 +408,7 @@ export function generateMandalaRadial(doc, opts) {
   }
 
   function _addHatching(pb, p1, p2, p3, p4, density = 4, fineW = strokeBase * 0.4) {
-    if (complexity < 140) return;
+    if (complexity < 140 || !texturesOn || !keepDetail(0.65)) return;
     for (let i = 1; i < density; i++) {
       const t = i / density;
       const startX = _lerp(p1.x, p2.x, t);
@@ -493,7 +512,7 @@ export function generateMandalaRadial(doc, opts) {
   // --- Generación del wedge ---
   let prevRing = null;
 
-  const overlapFactor = _lerp(0.12, 0.55, cN);
+  const overlapFactor = _lerp(0.12, 0.55, cN) * spaceMul;
 
   for (let ri = 0; ri < rings.length; ri++) {
     const ring = rings[ri];
@@ -671,7 +690,7 @@ export function generateMandalaRadial(doc, opts) {
           .close();
 
         // Texture: internal hatching
-        if (showTextures && complexity > 120 && ring.allowDetail) {
+        if (texturesOn && complexity > 120 && ring.allowDetail) {
           _addHatching(pbFine, pIn, cp1, pOut, cp2, 3, fineStroke);
         }
 
@@ -707,6 +726,9 @@ export function generateMandalaRadial(doc, opts) {
           midR = ring.start + span * _clamp(rFloat(rng, 0.85, 0.98), 0.82, 0.99);
           widthFactor = _clamp(rFloat(rng, 0.45, 0.75), 0.35, 0.88);
         }
+
+        // Espaciado: pétalos más angostos abren blanco entre cuñas vecinas
+        widthFactor = _clamp(widthFactor * sizeMul, 0.15, 0.99);
 
         const cpL = _polar0(midR, thetaC - (localStep / 2) * widthFactor);
         const cpR = _polar0(midR, thetaC + (localStep / 2) * widthFactor);
@@ -753,7 +775,7 @@ export function generateMandalaRadial(doc, opts) {
           const wS = Math.min(Math.max(detailStroke * 0.9, span * 0.035), detailStroke * 1.5);
 
           // Add stippling along the central axis or as a shadow
-          if (showTextures && complexity > 110 && rng() < 0.7) {
+          if (texturesOn && complexity > 110 && rng() < 0.7) {
             const dotCount = Math.floor(_lerp(2, 6, cN));
             for (let d = 0; d < dotCount; d++) {
               const dr = _lerp(baseR, tipR, (d + 1) / (dotCount + 1));
@@ -763,7 +785,7 @@ export function generateMandalaRadial(doc, opts) {
           }
 
           // Advanced Texture: Internal Hatching for shadows
-          if (showTextures && complexity > 150 && rng() < 0.5) {
+          if (texturesOn && complexity > 150 && rng() < 0.5) {
             const hp1 = _polar0(baseR, thetaC - localStep * 0.1);
             const hp2 = _polar0(baseR, thetaC + localStep * 0.1);
             const hp3 = _polar0(tipR, thetaC + localStep * 0.05);
@@ -860,8 +882,8 @@ export function generateMandalaRadial(doc, opts) {
         const base = _polar0(ring.start + span * 0.18, thetaC); // hendidura interior
         const lobeR = ring.start + span * _clamp(rFloat(rng, 0.52, 0.70), 0.48, 0.76);
 
-        const aL = thetaC - localStep * 0.22;
-        const aR = thetaC + localStep * 0.22;
+        const aL = thetaC - localStep * 0.22 * sizeMul;
+        const aR = thetaC + localStep * 0.22 * sizeMul;
 
         const lobeL = _polar0(lobeR, aL);
         const lobeRgt = _polar0(lobeR, aR);
@@ -906,7 +928,7 @@ export function generateMandalaRadial(doc, opts) {
         const pOut = _polar0(outR, thetaC);
 
         const midR = ring.start + span * _clamp(rFloat(rng, 0.62, 0.82), 0.60, 0.88);
-        const widthFactor = _clamp(rFloat(rng, 0.32, 0.58), 0.28, 0.70);
+        const widthFactor = _clamp(rFloat(rng, 0.32, 0.58) * sizeMul, 0.20, 0.70);
 
         const cpL = _polar0(midR, thetaC - (localStep / 2) * widthFactor);
         const cpR = _polar0(midR, thetaC + (localStep / 2) * widthFactor);
@@ -940,8 +962,8 @@ export function generateMandalaRadial(doc, opts) {
         const pIn = _polar0(ring.start, thetaC);
         const pOut = _polar0(ring.end, thetaC);
         const mid = (ring.start + ring.end) / 2;
-        const pL = _polar0(mid, thetaL);
-        const pR = _polar0(mid, thetaR);
+        const pL = _polar0(mid, thetaC + (thetaL - thetaC) * sizeMul);
+        const pR = _polar0(mid, thetaC + (thetaR - thetaC) * sizeMul);
 
         pbMain.moveTo(pIn.x, pIn.y)
           .lineTo(pL.x, pL.y)
@@ -1127,7 +1149,7 @@ for (let k = 0; k < petals; k++) {
 // Anclan las formas "flotantes" (paisley, fleur, pentágonos) para que la
 // composición no se vea desconectada, y añaden bandas finas coloreables.
 {
-  const guideProb = archetype.name === "lace" ? 0.55 : archetype.name === "star" ? 0.5 : 0.35;
+  const guideProb = (archetype.name === "lace" ? 0.55 : archetype.name === "star" ? 0.5 : 0.35) * detailMul;
   for (let i = 1; i < rings.length; i++) {
     if (rng() < guideProb) {
       doc.body.push(
@@ -1209,7 +1231,7 @@ if (rng() < 0.98) {
   );
 
   // Layered central rosettes (Circle grid / petals)
-  if (rng() < 0.7) {
+  if (rng() < 0.7 && keepDetail(0.8)) {
     const pbExtra = new PathBuilder();
     addCirclePoly(pbExtra, cx, cy, inner * 0.6, 12);
     addCirclePoly(pbExtra, cx, cy, inner * 0.5, 8);
@@ -1217,7 +1239,7 @@ if (rng() < 0.98) {
   }
 
   // NESTED CORE (Double Core)
-  if (complexity > 100 && centerVariant !== "lotus_ring") {
+  if (complexity > 100 && centerVariant !== "lotus_ring" && keepDetail(0.85)) {
     const pbInner = new PathBuilder();
     const innerR = inner * 0.8;
     for (let k = 0; k < cCount; k++) {
@@ -1253,7 +1275,7 @@ if (includeFrames) {
   if (framePick.has("beads") || rng() < _lerp(0.35, 0.15, harmony)) {
     const beadRingR = binduClearR * _clamp(rFloat(rng, 0.72, 0.88), 0.66, 0.92);
     const beadDensity = _lerp(2.4, 1.3, organicLevel);
-    const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82);
+    const beadCount = _clamp(Math.round(_clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82) * densityMul), 8, 82);
     const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), outerRingStrokes.main * 2.2, computedRadius * 0.020);
 
     const pbBeads = new PathBuilder();
@@ -1268,7 +1290,7 @@ if (includeFrames) {
 
   // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
   if (framePick.has("scallop")) {
-    const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56);
+    const scallopCount = _clamp(Math.round(_clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56) * densityMul), 6, 56);
     const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), outerRingStrokes.main * 2.6, computedRadius * 0.060);
     const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
 
@@ -1284,7 +1306,7 @@ if (includeFrames) {
 
   // 3) Petal rim: corona de arcos apuntados en el borde exterior
   if (framePick.has("petal_rim")) {
-    const rimCount = _clamp(petals * 2, 16, 64);
+    const rimCount = _clamp(Math.round(_clamp(petals * 2, 16, 64) * densityMul), 10, 64);
     const rimH = computedRadius * _clamp(rFloat(rng, 0.035, 0.055), 0.03, 0.06);
     const rimBase = computedRadius * 0.985 - rimH;
     const rimStep = (Math.PI * 2) / rimCount;
