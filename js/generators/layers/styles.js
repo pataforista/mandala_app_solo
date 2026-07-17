@@ -1,6 +1,6 @@
 // js/generators/layers/styles.js
 import { polar } from "../../core/geometry.js";
-import { addCircle, addCapsule, addTeardrop } from "./core.js";
+import { addCircle, addCapsule } from "./core.js";
 
 /** Compound petal - outer petal with inner nested petal and vein line */
 export function addCompoundPetal(pb, center, rIn, rOut, angle, angSpread, hasInner, hasDot, hasVein, fineStroke) {

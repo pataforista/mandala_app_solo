@@ -1,5 +1,5 @@
 // js/core/storage.js
-import { get, set, update } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
+import { get, update } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 
 const FAVORITES_KEY = 'mandala_favorites';
 

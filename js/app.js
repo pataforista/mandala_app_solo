@@ -1,7 +1,7 @@
 import { getStateFromURL, setStateToURL, randomSeed32 } from "./core/urlState.js";
 import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
-import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSvgElement, svgStringToImageData } from "./core/export.js";
+import { downloadTextFile, downloadPng, downloadBatchPdf, flattenSvgElement, svgStringToImageData } from "./core/export.js";
 import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
 import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
@@ -69,9 +69,6 @@ const pngDpiEl = document.getElementById("pngDpi");
 const layerPresetEl = document.getElementById("layerPreset");
 
 const regenBtn = document.getElementById("regen");
-const downloadBtn = document.getElementById("download");
-const downloadPngBtn = document.getElementById("downloadPng");
-const downloadPdfBtn = document.getElementById("downloadPdf");
 const shareBtn = document.getElementById("share");
 
 const undoBtn = document.getElementById("undo");
