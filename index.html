@@ -351,6 +351,7 @@
               <sl-option value="A4">A4</sl-option>
               <sl-option value="LETTER">Carta</sl-option>
             </sl-select>
+            <sl-range id="marginMm" label="Margen de página (mm)" min="4" max="25.4" step="0.1" value="12.7" title="12.7 mm (0.5&quot;) cumple el mínimo de Amazon KDP y el gutter para libros de menos de 150 páginas"></sl-range>
             <sl-range id="petals" label="Pétalos" min="6" max="96" value="12"></sl-range>
             <sl-select id="styleMode" label="Estilo" size="small">
               <sl-option value="sashiko">Sashiko</sl-option>
@@ -471,6 +472,9 @@
           <sl-icon slot="prefix" name="download"></sl-icon>
           Descargar PDF
         </sl-button>
+        <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 4px 0 0 0; line-height: 1.4;">
+          Guía KDP: el PDF y las imágenes salen a tamaño <i>trim</i> exacto. Al subir a Amazon selecciona <b>"Sin sangrado" (No Bleed)</b>. Con el margen por defecto (12.7 mm) cumples el mínimo de 0.5" y el gutter para libros de &lt;150 páginas.
+        </p>
       </div>
 
       <div style="margin-top: auto; padding-top: 24px; text-align: center; color: var(--m3-on-surface-variant); font-size: 0.8rem;">
@@ -484,6 +488,9 @@
       <div class="meta-footer">
         <span>Semilla: <b id="seedText">—</b></span>
         <span>Caminos: <b id="pathsText">—</b></span>
+        <sl-tooltip id="kdpWarnTip" content="">
+          <span id="kdpWarn" style="display:none; color:#b45309; font-weight:600; cursor:help;">⚠ KDP</span>
+        </sl-tooltip>
         <sl-tooltip content="Presiona 'R' para aleatorio, '&larr;' o '&rarr;' para cambiar semilla">
           <sl-icon name="info-circle"></sl-icon>
         </sl-tooltip>

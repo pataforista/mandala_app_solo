@@ -1,7 +1,7 @@
 import { getStateFromURL, setStateToURL, randomSeed32 } from "./core/urlState.js";
 import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
-import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSvgElement, svgStringToImageData } from "./core/export.js";
+import { downloadTextFile, downloadPng, downloadBatchPdf, flattenSvgElement, svgStringToImageData } from "./core/export.js";
 import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
 import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
@@ -29,6 +29,9 @@ const structurePresetEl = document.getElementById("structurePreset");
 const applyStructureBtn = document.getElementById("applyStructure");
 
 const strokeWidthEl = document.getElementById("strokeWidth");
+const marginMmEl = document.getElementById("marginMm");
+const kdpWarnEl = document.getElementById("kdpWarn");
+const kdpWarnTipEl = document.getElementById("kdpWarnTip");
 const framesEl = document.getElementById("frames");
 const pageBorderEl = document.getElementById("pageBorder");
 
@@ -69,9 +72,6 @@ const pngDpiEl = document.getElementById("pngDpi");
 const layerPresetEl = document.getElementById("layerPreset");
 
 const regenBtn = document.getElementById("regen");
-const downloadBtn = document.getElementById("download");
-const downloadPngBtn = document.getElementById("downloadPng");
-const downloadPdfBtn = document.getElementById("downloadPdf");
 const shareBtn = document.getElementById("share");
 
 const undoBtn = document.getElementById("undo");
@@ -102,6 +102,8 @@ const DEFAULTS = {
   generatorType: "layers",
   spiroEnabled: false,
   preset: "A4",
+  // 12.7 mm (0.5") = mínimo KDP y gutter válido para libros de <150 páginas
+  marginMm: 12.7,
   petals: 12,
   complexity: 130,
   organic: 0.25,
@@ -331,10 +333,11 @@ if (!state.layerPreset) state.layerPreset = "custom";
 if (!state.generatorType) state.generatorType = "layers";
 if (!state.structurePreset || !STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
 if (!state.coloringPreset || !COLORING_PRESETS[state.coloringPreset]) state.coloringPreset = "adulto";
+state.marginMm = Math.max(4, Math.min(25.4, parseFloat(state.marginMm) || DEFAULTS.marginMm));
 
 if (state.styleMode === "hashiko") state.styleMode = "sashiko";
 
-if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
+if (!stage || !presetEl || !petalsEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
   throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
 }
 
@@ -392,8 +395,38 @@ function getCurrentDoc() {
   return createDoc({
     preset: state.preset,
     seed: state.seed,
-    marginMm: 10,
+    marginMm: state.marginMm,
   });
+}
+
+// --- Conformidad KDP (Amazon) ---
+const KDP_MIN_ART_MM = 6.35;   // 0.25": arte más cerca del borde = rechazo seguro
+const KDP_MIN_GUTTER_MM = 9.5; // 0.375": gutter mínimo en libros de <150 páginas
+
+// El borde de página del motor Radial y del collage se extiende hasta la mitad
+// del margen (extensión artística del marco); el resto del arte queda al margen.
+function artEdgeDistanceMm() {
+  const borderExtends = state.pageBorder &&
+    (state.generatorType === "radial" || state.layoutMode !== "single");
+  return borderExtends ? state.marginMm * 0.5 : state.marginMm;
+}
+
+function updateKdpNotice() {
+  if (!kdpWarnEl || !kdpWarnTipEl) return;
+  const artEdge = artEdgeDistanceMm();
+  let msg = "";
+
+  if (artEdge < KDP_MIN_ART_MM) {
+    const fix = artEdge < state.marginMm
+      ? `Sube el margen a ${(KDP_MIN_ART_MM * 2).toFixed(1)} mm o desactiva el borde de página.`
+      : `Sube el margen a al menos ${KDP_MIN_ART_MM.toFixed(2)} mm.`;
+    msg = `Arte a ${artEdge.toFixed(1)} mm del borde: KDP rechaza todo lo que quede a menos de 6.35 mm (0.25"). ${fix}`;
+  } else if (state.marginMm < KDP_MIN_GUTTER_MM) {
+    msg = `Margen de ${state.marginMm.toFixed(1)} mm: gutter insuficiente para KDP (mínimo 9.5 mm en libros de menos de 150 páginas). Usa 12.7 mm recomendado.`;
+  }
+
+  kdpWarnEl.style.display = msg ? "inline" : "none";
+  kdpWarnTipEl.content = msg;
 }
 
 function updateGeneratorUI() {
@@ -459,6 +492,7 @@ function updateImmediate() {
 
 function render() {
   updateGeneratorUI();
+  updateKdpNotice();
   seedText.textContent = String(state.seed >>> 0);
 
   const doc = getCurrentDoc();
@@ -479,7 +513,7 @@ function render() {
   if (state.layoutMode !== "single") {
     const cols = state.layoutMode === "grid2x2" ? 2 : 3;
     const rows = cols;
-    const margin = 8;
+    const margin = state.marginMm;
     const cellW = (wMm - margin * (cols + 1)) / cols;
     const cellH = (hMm - margin * (rows + 1)) / rows;
     const cellR = Math.min(cellW, cellH) / 2 - 4;
@@ -528,10 +562,10 @@ function render() {
     }
     svgContent += bodiesHtml;
 
-    // Borde de página único
+    // Borde de página único (extensión artística: mitad del margen)
     if (state.pageBorder) {
       const pb = new PathBuilder();
-      const m = 4;
+      const m = state.marginMm * 0.5;
       pb.moveTo(m, m).lineTo(wMm - m, m).lineTo(wMm - m, hMm - m).lineTo(m, hMm - m).close();
       svgContent += pb.toPath({ stroke: "#000", strokeWidthMm: 0.5, fill: "none" });
     }
@@ -734,10 +768,17 @@ function bindUI() {
   presetEl.value = state.preset;
   petalsEl.value = String(state.petals);
 
-  complexityEl.value = String(state.complexity);
-  organicEl.value = String(state.organic);
+  if (complexityEl) complexityEl.value = String(state.complexity);
+  if (organicEl) organicEl.value = String(state.organic);
+
+  // Phase 5: Coloring Book Controls
+  if (spacingEl) spacingEl.value = String(state.spacing);
+  if (densityFactorEl) densityFactorEl.value = String(state.densityFactor);
+  if (minCellAreaEl) minCellAreaEl.value = String(state.minCellArea);
+  if (detailSimplificationEl) detailSimplificationEl.value = String(state.detailSimplification);
 
   strokeWidthEl.value = String(state.strokeWidth);
+  if (marginMmEl) marginMmEl.value = String(state.marginMm);
   framesEl.checked = state.frames;
   pageBorderEl.checked = state.pageBorder;
   kaleidoscopeEl.checked = state.kaleidoscope;
@@ -905,21 +946,58 @@ function bindUI() {
   });
   petalsEl.addEventListener("sl-change", updateImmediate);
 
-  complexityEl.addEventListener("sl-input", () => {
-    state.complexity = clampInt(complexityEl.value, 20, 320);
-    state.structurePreset = "custom";
-    structurePresetEl.value = "custom";
-    debouncedRender();
-  });
-  complexityEl.addEventListener("sl-change", updateImmediate);
+  if (complexityEl) {
+    complexityEl.addEventListener("sl-input", () => {
+      state.complexity = clampInt(complexityEl.value, 20, 320);
+      state.structurePreset = "custom";
+      structurePresetEl.value = "custom";
+      debouncedRender();
+    });
+    complexityEl.addEventListener("sl-change", updateImmediate);
+  }
 
-  organicEl.addEventListener("sl-input", () => {
-    state.organic = clampFloat(organicEl.value, 0, 1);
-    state.structurePreset = "custom";
-    structurePresetEl.value = "custom";
-    debouncedRender();
-  });
-  organicEl.addEventListener("sl-change", updateImmediate);
+  if (organicEl) {
+    organicEl.addEventListener("sl-input", () => {
+      state.organic = clampFloat(organicEl.value, 0, 1);
+      state.structurePreset = "custom";
+      structurePresetEl.value = "custom";
+      debouncedRender();
+    });
+    organicEl.addEventListener("sl-change", updateImmediate);
+  }
+
+  // Phase 5: Coloring Book Controls
+  if (spacingEl) {
+    spacingEl.addEventListener("sl-input", () => {
+      state.spacing = clampFloat(spacingEl.value, 0, 1);
+      debouncedRender();
+    });
+    spacingEl.addEventListener("sl-change", updateImmediate);
+  }
+
+  if (densityFactorEl) {
+    densityFactorEl.addEventListener("sl-input", () => {
+      state.densityFactor = clampFloat(densityFactorEl.value, 0.2, 1.5);
+      debouncedRender();
+    });
+    densityFactorEl.addEventListener("sl-change", updateImmediate);
+  }
+
+  if (minCellAreaEl) {
+    minCellAreaEl.addEventListener("sl-input", () => {
+      state.minCellArea = clampFloat(minCellAreaEl.value, 1, 8);
+      debouncedRender();
+    });
+    minCellAreaEl.addEventListener("sl-change", updateImmediate);
+  }
+
+  if (detailSimplificationEl) {
+    detailSimplificationEl.addEventListener("sl-input", () => {
+      state.detailSimplification = clampFloat(detailSimplificationEl.value, 0, 1);
+      debouncedRender();
+    });
+    detailSimplificationEl.addEventListener("sl-change", updateImmediate);
+  }
 
   strokeWidthEl.addEventListener("sl-input", () => {
     state.strokeWidth = clampFloat(strokeWidthEl.value, 0.1, 5.0);
@@ -928,6 +1006,14 @@ function bindUI() {
     debouncedRender();
   });
   strokeWidthEl.addEventListener("sl-change", updateImmediate);
+
+  if (marginMmEl) {
+    marginMmEl.addEventListener("sl-input", () => {
+      state.marginMm = clampFloat(marginMmEl.value, 4, 25.4);
+      debouncedRender();
+    });
+    marginMmEl.addEventListener("sl-change", updateImmediate);
+  }
 
   framesEl.addEventListener("sl-change", () => {
     state.frames = framesEl.checked;
@@ -1217,7 +1303,7 @@ function bindUI() {
       state.strokeWidth = rFloat(shuffleRng, 0.4, 1.0);
       
       // Randomize coloring book controls with quality safeguards
-      const coloringOptions = [\"ninos\", \"ninos_grande\", \"adulto\", \"experto\", \"zen\"];
+      const coloringOptions = ["ninos", "ninos_grande", "adulto", "experto", "zen"];
       const randomColoring = pick(shuffleRng, coloringOptions);
       const coloringPreset = COLORING_PRESETS[randomColoring];
       if (coloringPreset) {

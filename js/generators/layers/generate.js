@@ -52,6 +52,11 @@ export function generateMandalaLayers(doc, opts) {
     imagePoints = null,
     imageScale = 1.0,
     imageIntensity = 1.0,
+    spacing = 0.3,
+    densityFactor = 0.7,
+    minCellAreaMm2 = 3.0,
+    detailSimplification = 0.5,
+    outlineMode = false,
   } = opts;
 
   const page = doc?.page ?? { wMm: 210, hMm: 297, marginMm: 10 };
@@ -66,6 +71,18 @@ export function generateMandalaLayers(doc, opts) {
 
   // Complexity factor: scales density of sub-elements (0..1 from range 20..320)
   const cFactor = _clamp((complexity - 20) / (320 - 20), 0, 1);
+
+  // Coloring-book controls, normalized so the defaults (spacing 0.3,
+  // densityFactor 0.7, detailSimplification 0.5) reproduce the baseline look.
+  const densityMul = _clamp(densityFactor / 0.7, 0.3, 2.2);
+  const sizeMul = _clamp(1 - (spacing - 0.3) * 0.55, 0.55, 1.17);
+  const detail = outlineMode ? Math.max(detailSimplification, 0.85) : detailSimplification;
+  // Fine decorations declare the simplification level at which they disappear;
+  // thresholds sit above the 0.5 default so the baseline keeps them all.
+  const keepDetail = (threshold) => detail < threshold;
+  // Cap ring subdivisions so each cell stays colorable: cellArea ~ arcW * bandH
+  const maxCellCount = (r, bandH) =>
+    Math.max(6, Math.floor((Math.PI * 2 * r * bandH * 0.7) / Math.max(0.5, minCellAreaMm2)));
 
   const mainW = strokeWidthMm;
   const detailW = strokeWidthMm * 0.75;
@@ -176,8 +193,8 @@ export function generateMandalaLayers(doc, opts) {
     }
 
     // Pearl ring (all variants) - reduced density for coloring space
-    if (layer1Intensity > 0.7) {
-      addPearlRing(pb, center.x, center.y, rCore * 1.08, Math.max(12, petals), rCore * 0.04);
+    if (layer1Intensity > 0.7 && keepDetail(0.65)) {
+      addPearlRing(pb, center.x, center.y, rCore * 1.08, Math.max(12, Math.round(petals * densityMul)), rCore * 0.04);
     }
 
     // Yantra always gets interlocked triangles on top
@@ -194,8 +211,8 @@ export function generateMandalaLayers(doc, opts) {
   // ==================== L2: PÉTALOS INTERNOS (Compound) - Simplified for coloring ====================
   if (layer2Intensity > 0.05) {
     const pb = new PathBuilder();
-    const rIn = R * R1 + 2; 
-    const rOut = rIn + (R * R2 - rIn) * layer2Intensity;
+    const rIn = R * R1 + 2;
+    const rOut = rIn + (R * R2 - rIn) * layer2Intensity * sizeMul;
     const count = petals;
     const angStep = (Math.PI * 2) / count;
 
@@ -272,8 +289,8 @@ export function generateMandalaLayers(doc, opts) {
       addCircle(pb, center.x, center.y, rRing, 64);
 
       // Scalloped decoration - reduced density
-      if (intensity > 0.5) {
-        addScallopRing(pb, center.x, center.y, rRing + 1.2, petals, 1.2, true);
+      if (intensity > 0.5 && keepDetail(0.6)) {
+        addScallopRing(pb, center.x, center.y, rRing + 1.2, Math.max(6, Math.round(petals * densityMul)), 1.2, true);
       }
 
       pushPath(pb, fineW);
@@ -284,10 +301,10 @@ export function generateMandalaLayers(doc, opts) {
   if (layer3Intensity > 0.05) {
     const pb = new PathBuilder();
     const rMid = R * R3;
-    const fSize = R * 0.11 * layer3Intensity;
+    const fSize = R * 0.11 * layer3Intensity * sizeMul;
 
     // Complexity scales element count per motif ring - reduced for coloring space
-    const cMul = _lerp(0.5, 1.0, cFactor);
+    const cMul = _lerp(0.5, 1.0, cFactor) * densityMul;
     const countMap = {
       sashiko: Math.max(6, Math.round(petals * 0.7 * cMul)),
       islamico: Math.max(6, Math.round(petals * 0.7 * cMul)),
@@ -299,7 +316,9 @@ export function generateMandalaLayers(doc, opts) {
     };
     const count = countMap[style] ?? Math.max(4, Math.round(petals / 2.5 * cMul));
 
-    for (let i = 0; i < count; i++) {
+    // Skip the motif ring entirely when motifs shrink below a colorable cell
+    const motifArea = Math.PI * fSize * fSize;
+    for (let i = 0; motifArea >= minCellAreaMm2 && i < count; i++) {
       const a = (i / count) * Math.PI * 2;
       const fc = _p(rMid, a, center);
 
@@ -369,17 +388,22 @@ export function generateMandalaLayers(doc, opts) {
       const pb = new PathBuilder();
       addCircle(pb, center.x, center.y, rRing, 80);
 
-      if (intensity > 0.35) {
+      if (intensity > 0.35 && keepDetail(0.7)) {
         // Teardrop ring pointing outward
-        const tdCount = petals;
-        for (let i = 0; i < tdCount; i++) {
-          const a = (i / tdCount) * Math.PI * 2;
-          const base = _p(rRing + 0.5, a, center);
-          addTeardrop(pb, base.x, base.y, R * 0.035 * intensity, R * 0.015, a);
+        const tdLen = R * 0.035 * intensity * sizeMul;
+        const tdWid = R * 0.015 * sizeMul;
+        // Teardrops below a quarter cell read as clutter, not colorable shapes
+        if (tdLen * tdWid * 0.5 >= minCellAreaMm2 * 0.25) {
+          const tdCount = Math.max(6, Math.round(petals * densityMul));
+          for (let i = 0; i < tdCount; i++) {
+            const a = (i / tdCount) * Math.PI * 2;
+            const base = _p(rRing + 0.5, a, center);
+            addTeardrop(pb, base.x, base.y, tdLen, tdWid, a);
+          }
         }
       }
 
-      if (intensity > 0.5) {
+      if (intensity > 0.5 && keepDetail(0.8)) {
         addCircle(pb, center.x, center.y, rRing - 1.5, 80);
       }
 
@@ -391,8 +415,11 @@ export function generateMandalaLayers(doc, opts) {
   if (layer4Intensity > 0.05) {
     const pb = new PathBuilder();
     const r1 = R * 0.56;
-    const r2 = r1 + R * 0.1 * layer4Intensity;
-    const count = Math.max(petals, Math.round(petals * 1.5 * _lerp(0.7, 1.1, cFactor)));
+    const r2 = r1 + R * 0.1 * layer4Intensity * sizeMul;
+    const count = Math.min(
+      Math.max(petals, Math.round(petals * 1.5 * _lerp(0.7, 1.1, cFactor) * densityMul)),
+      maxCellCount(r1, Math.max(1, r2 - r1))
+    );
 
     // Inner ring only - no outer ring for more coloring space
     addCircle(pb, center.x, center.y, r1, 80);
@@ -455,11 +482,11 @@ export function generateMandalaLayers(doc, opts) {
   }
 
   // ==================== L5: DETALLES FINOS (Simplified for coloring) ====================
-  if (layer5Intensity > 0.05) {
+  if (layer5Intensity > 0.05 && keepDetail(0.85)) {
     const pb = new PathBuilder();
     const rStart = R * 0.7;
-    const rEnd = rStart + R * 0.1 * layer5Intensity;
-    const count = Math.max(petals, Math.round(petals * 2 * _lerp(0.6, 1.0, cFactor)));
+    const rEnd = rStart + R * 0.1 * layer5Intensity * sizeMul;
+    const count = Math.max(petals, Math.round(petals * 2 * _lerp(0.6, 1.0, cFactor) * densityMul));
 
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
@@ -480,7 +507,7 @@ export function generateMandalaLayers(doc, opts) {
     const pb = new PathBuilder();
     // Position L7 in the mid-ring zone (between L3 and L4), above L2/L3 content
     const rInner = R * (R3 + 0.06);
-    const rOuter = rInner + R * 0.18 * layer7Intensity;
+    const rOuter = rInner + R * 0.18 * layer7Intensity * sizeMul;
     const count = petals;
 
     for (let i = 0; i < count; i++) {
@@ -555,8 +582,8 @@ export function generateMandalaLayers(doc, opts) {
   if (layer6Intensity > 0.05) {
     const pb = new PathBuilder();
     const rBase = R * 0.83;
-    const rTop = rBase + R * 0.13 * layer6Intensity;
-    const count = petals;
+    const rTop = rBase + R * 0.13 * layer6Intensity * sizeMul;
+    const count = Math.min(petals, maxCellCount(rBase, Math.max(1, rTop - rBase)));
 
     // Main crown arches - simplified without inner details
     for (let i = 0; i < count; i++) {
@@ -601,86 +628,6 @@ export function generateMandalaLayers(doc, opts) {
       }
     }
 
-    pushPath(pb, mainW);
-  }
-          .quadTo(cpR2.x, cpR2.y, pR.x, pR.y);
-        // Inner arch
-        if (layer6Intensity > 0.4) {
-          const irBase = rBase + (rTop - rBase) * 0.15;
-          const irTop = rBase + (rTop - rBase) * 0.75;
-          const ipL = _p(irBase, aL, center);
-          const ipR = _p(irBase, aR, center);
-          const ipTop = _p(irTop, aC, center);
-          const icpL = _p(irTop * 0.97, aC - 0.1, center);
-          const icpR = _p(irTop * 0.97, aC + 0.1, center);
-          pb.moveTo(ipL.x, ipL.y).quadTo(icpL.x, icpL.y, ipTop.x, ipTop.y)
-            .quadTo(icpR.x, icpR.y, ipR.x, ipR.y);
-        }
-        if (layer6Intensity > 0.6) {
-          addCircle(pb, pTop.x, pTop.y, 1.6, 10);
-        }
-
-      } else {
-        // Organic arch with nested curve
-        const cpLo = _p(rTop * 0.96, aC - 0.2, center);
-        const cpRo = _p(rTop * 0.96, aC + 0.2, center);
-        pb.moveTo(pL.x, pL.y)
-          .quadTo(cpLo.x, cpLo.y, pTop.x, pTop.y)
-          .quadTo(cpRo.x, cpRo.y, pR.x, pR.y);
-
-        // Nested inner arch
-        if (layer6Intensity > 0.4) {
-          const irBase = rBase + (rTop - rBase) * 0.12;
-          const irTop = rBase + (rTop - rBase) * 0.7;
-          const ipL = _p(irBase, aL, center);
-          const ipR = _p(irBase, aR, center);
-          const ipTop = _p(irTop, aC, center);
-          pb.moveTo(ipL.x, ipL.y)
-            .quadTo(_p(irTop * 0.96, aC - 0.15, center).x, _p(irTop * 0.96, aC - 0.15, center).y, ipTop.x, ipTop.y)
-            .quadTo(_p(irTop * 0.96, aC + 0.15, center).x, _p(irTop * 0.96, aC + 0.15, center).y, ipR.x, ipR.y);
-        }
-
-        // Dot at tip
-        if (layer6Intensity > 0.6) {
-          addCircle(pb, pTop.x, pTop.y, 1.5, 8);
-        }
-      }
-    }
-
-    // Garland of arches with pearls below the crown
-    if (layer6Intensity > 0.3 && style !== "azteca" && style !== "islamico") {
-      const archCount = petals * 2;
-      const archRise = R * (0.025 + layer6Intensity * 0.03);
-      const pearlR = _clamp(R * 0.006 + layer6Intensity * 0.7, 0.5, 1.8);
-
-      for (let i = 0; i < archCount; i++) {
-        const a1 = (i / archCount) * Math.PI * 2;
-        const a2 = ((i + 1) / archCount) * Math.PI * 2;
-        const am = (a1 + a2) / 2;
-
-        const p1 = _p(rBase + 1.1, a1, center);
-        const p2 = _p(rBase + 1.1, a2, center);
-        const pArc = _p(rBase + archRise + 1.1, am, center);
-
-        pb.moveTo(p1.x, p1.y).quadTo(pArc.x, pArc.y, p2.x, p2.y);
-
-        if (i % 2 === 0) {
-          const pearl = _p(rTop + 1.6, am, center);
-          addCircle(pb, pearl.x, pearl.y, pearlR, 8);
-        }
-      }
-    }
-
-    // Islamic: star band in border
-    if (style === "islamico" && layer6Intensity > 0.3) {
-      const starCount = petals * 2;
-      for (let i = 0; i < starCount; i++) {
-        const a = ((i + 0.5) / starCount) * Math.PI * 2;
-        const sp = _p(rBase + (rTop - rBase) * 0.5, a, center);
-        addStar(pb, sp.x, sp.y, 1.6, 0.6, 6, a);
-      }
-    }
-
     // Base ring
     addCircle(pb, center.x, center.y, rBase, 128);
 
@@ -693,11 +640,11 @@ export function generateMandalaLayers(doc, opts) {
 
     if (style === "sashiko") {
       // Enhanced sashiko stitching with pattern variation
-      const ringCount = Math.max(4, Math.round(5 + layer8Intensity * 10));
+      const ringCount = Math.max(4, Math.round((5 + layer8Intensity * 10) * densityMul));
       for (let ring = 0; ring < ringCount; ring++) {
         const t = ring / Math.max(1, ringCount - 1);
         const rB = _lerp(R * 0.18, R * 0.95, t);
-        const stitches = Math.max(24, Math.round(petals * (3 + layer8Intensity * 3) + ring * 8));
+        const stitches = Math.max(24, Math.round((petals * (3 + layer8Intensity * 3) + ring * 8) * densityMul));
         const stitchLen = R * (0.012 + layer8Intensity * 0.008);
 
         for (let i = 0; i < stitches; i++) {
@@ -711,8 +658,8 @@ export function generateMandalaLayers(doc, opts) {
         }
       }
       // Cross-stitch accents at regular intervals
-      if (layer8Intensity > 0.4) {
-        const accentCount = petals * 3;
+      if (layer8Intensity > 0.4 && keepDetail(0.75)) {
+        const accentCount = Math.max(6, Math.round(petals * 3 * densityMul));
         for (let i = 0; i < accentCount; i++) {
           const a = (i / accentCount) * Math.PI * 2;
           const r = R * 0.35 + rFloat(rng, 0, R * 0.45);
@@ -726,11 +673,11 @@ export function generateMandalaLayers(doc, opts) {
 
     } else if (style === "islamico") {
       // Geometric grid - triangles
-      const ringCount = Math.max(3, Math.round(4 + layer8Intensity * 7));
+      const ringCount = Math.max(3, Math.round((4 + layer8Intensity * 7) * densityMul));
       for (let ring = 0; ring < ringCount; ring++) {
         const t = ring / Math.max(1, ringCount - 1);
         const rB = _lerp(R * 0.22, R * 0.92, t);
-        const segCount = Math.max(petals * 3, Math.round(petals * (3 + layer8Intensity * 3) + ring * 5));
+        const segCount = Math.max(petals * 3, Math.round((petals * (3 + layer8Intensity * 3) + ring * 5) * densityMul));
         for (let i = 0; i < segCount; i++) {
           if (i % 2 !== 0) continue;
           const a1 = (i / segCount) * Math.PI * 2;
@@ -745,11 +692,11 @@ export function generateMandalaLayers(doc, opts) {
 
     } else if (style === "azteca") {
       // Calendar notch marks
-      const ringCount = Math.max(3, Math.round(3 + layer8Intensity * 6));
+      const ringCount = Math.max(3, Math.round((3 + layer8Intensity * 6) * densityMul));
       for (let ring = 0; ring < ringCount; ring++) {
         const t = ring / Math.max(1, ringCount - 1);
         const rB = _lerp(R * 0.25, R * 0.88, t);
-        const notchCount = Math.round(petals * (3 + layer8Intensity * 4));
+        const notchCount = Math.round(petals * (3 + layer8Intensity * 4) * densityMul);
         const notchLen = R * (0.014 + layer8Intensity * 0.01);
         for (let i = 0; i < notchCount; i++) {
           const a = (i / notchCount) * Math.PI * 2;
@@ -762,11 +709,11 @@ export function generateMandalaLayers(doc, opts) {
 
     } else if (style === "yantra") {
       // Concentric dot rings
-      const ringCount = Math.max(4, Math.round(5 + layer8Intensity * 9));
+      const ringCount = Math.max(4, Math.round((5 + layer8Intensity * 9) * densityMul));
       for (let ring = 0; ring < ringCount; ring++) {
         const t = ring / Math.max(1, ringCount - 1);
         const rB = _lerp(R * 0.18, R * 0.93, t);
-        const dotCount = Math.max(petals * 2, Math.round(petals * (2.5 + layer8Intensity * 2.5) + ring * 6));
+        const dotCount = Math.max(petals * 2, Math.round((petals * (2.5 + layer8Intensity * 2.5) + ring * 6) * densityMul));
         for (let i = 0; i < dotCount; i++) {
           const a = (i / dotCount) * Math.PI * 2;
           const p = _polar(rB, a, center.x, center.y);
@@ -776,11 +723,11 @@ export function generateMandalaLayers(doc, opts) {
 
     } else if (style === "celtico") {
       // Cross and diamond motif grid
-      const ringCount = Math.max(3, Math.round(4 + layer8Intensity * 7));
+      const ringCount = Math.max(3, Math.round((4 + layer8Intensity * 7) * densityMul));
       for (let ring = 0; ring < ringCount; ring++) {
         const t = ring / Math.max(1, ringCount - 1);
         const rB = _lerp(R * 0.2, R * 0.92, t);
-        const segCount = Math.round(petals * (3 + layer8Intensity * 3) + ring * 6);
+        const segCount = Math.round((petals * (3 + layer8Intensity * 3) + ring * 6) * densityMul);
         const segLen = R * (0.01 + layer8Intensity * 0.008);
         for (let i = 0; i < segCount; i++) {
           const a = (i / segCount) * Math.PI * 2;
@@ -801,7 +748,7 @@ export function generateMandalaLayers(doc, opts) {
 
     } else {
       // Enhanced stippling (floral/geometric) with radial bias
-      const dotCount = Math.round(complexity * 5 * layer8Intensity);
+      const dotCount = Math.round(complexity * 5 * layer8Intensity * densityMul);
       for (let i = 0; i < dotCount; i++) {
         const a = rFloat(rng, 0, Math.PI * 2);
         const r = rFloat(rng, R * 0.08, R * 0.98);
@@ -810,8 +757,8 @@ export function generateMandalaLayers(doc, opts) {
         addCircle(pb, dotX, dotY, 0.4, 4);
       }
       // Additional radial stitch lines for floral
-      if (style === "floral" && layer8Intensity > 0.3) {
-        const lineCount = petals * 4;
+      if (style === "floral" && layer8Intensity > 0.3 && keepDetail(0.75)) {
+        const lineCount = Math.max(8, Math.round(petals * 4 * densityMul));
         for (let i = 0; i < lineCount; i++) {
           const a = (i / lineCount) * Math.PI * 2;
           const r1 = rFloat(rng, R * 0.2, R * 0.5);
@@ -838,7 +785,9 @@ export function generateMandalaLayers(doc, opts) {
     }
 
     // Pearl dots along outer frame
-    addPearlRing(pb, center.x, center.y, R + 1.5, petals * 4, 0.4);
+    if (keepDetail(0.7)) {
+      addPearlRing(pb, center.x, center.y, R + 1.5, Math.max(12, Math.round(petals * 4 * densityMul)), 0.4);
+    }
 
     pushPath(pb, detailW);
   }
