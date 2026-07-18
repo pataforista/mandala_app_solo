@@ -383,6 +383,7 @@ function buildOpts(s) {
     layer6Intensity: s.layer6Intensity,
     layer7Intensity: s.layer7Intensity,
     layer8Intensity: s.layer8Intensity,
+    imageMirror: s.imageMirror,
     // Phase 5: Coloring Book Controls
     spacing: s.spacing,
     densityFactor: s.densityFactor,
