@@ -95,6 +95,8 @@ const imageScaleEl = document.getElementById("imageScale");
 const imageOffsetXEl = document.getElementById("imageOffsetX");
 const imageOffsetYEl = document.getElementById("imageOffsetY");
 const imageIntensityEl = document.getElementById("imageIntensity");
+const imageMirrorEl = document.getElementById("imageMirror");
+const showGuidesEl = document.getElementById("showGuides");
 const imageUploadEl = document.getElementById("imageUpload");
 const uploadBtn = document.getElementById("uploadBtn");
 
@@ -127,6 +129,8 @@ const DEFAULTS = {
   imageOffsetX: 0,
   imageOffsetY: 0,
   imageIntensity: 1.0,
+  imageMirror: true,
+  showGuides: false,
   previewQuality: "high",
   layoutMode: "single",
   pngDpi: 300,
@@ -573,7 +577,52 @@ function render() {
       imagePoints: currentImagePoints,
       imageScale: state.imageScale,
       imageIntensity: state.imageIntensity,
+      imageMirror: state.imageMirror,
     });
+  }
+
+  // Draw structural guides if enabled
+  if (state.showGuides) {
+    const page = doc.page;
+    const marginMm = page.marginMm || 10;
+    const center = { x: page.wMm / 2, y: page.hMm / 2 };
+    const R = Math.min(page.wMm, page.hMm) / 2 - marginMm - 5;
+    const petals = effectivePetals;
+
+    const pb = new PathBuilder();
+    // Radial axes lines
+    const angleStep = (Math.PI * 2) / petals;
+    for (let i = 0; i < petals; i++) {
+      const a = angleStep * i;
+      pb.moveTo(center.x, center.y);
+      pb.lineTo(center.x + Math.cos(a) * R, center.y + Math.sin(a) * R);
+    }
+    // Concentric rings
+    for (let r = 15; r <= R; r += 15) {
+      const seg = 48;
+      const step = (Math.PI * 2) / seg;
+      pb.moveTo(center.x + r, center.y);
+      for (let j = 1; j < seg; j++) {
+        const a = step * j;
+        pb.lineTo(center.x + Math.cos(a) * r, center.y + Math.sin(a) * r);
+      }
+      pb.close();
+    }
+    // Outer bounding ring
+    const seg = 48;
+    const step = (Math.PI * 2) / seg;
+    pb.moveTo(center.x + R, center.y);
+    for (let j = 1; j < seg; j++) {
+      const a = step * j;
+      pb.lineTo(center.x + Math.cos(a) * R, center.y + Math.sin(a) * R);
+    }
+    pb.close();
+
+    const pathStr = pb.toPath({ stroke: "#79747E", strokeWidthMm: 0.15, fill: "none" });
+    if (pathStr) {
+      const guidedPath = pathStr.replace("<path ", '<path id="guides-layer" stroke-dasharray="1,1" style="opacity:0.4; pointer-events:none;" ');
+      doc.body.push(guidedPath);
+    }
   }
 
   const svgStr = renderDocToSvgString(doc);
@@ -774,6 +823,8 @@ function bindUI() {
   imageOffsetXEl.value = String(state.imageOffsetX);
   imageOffsetYEl.value = String(state.imageOffsetY);
   imageIntensityEl.value = String(state.imageIntensity);
+  if (imageMirrorEl) imageMirrorEl.checked = state.imageMirror;
+  if (showGuidesEl) showGuidesEl.checked = state.showGuides;
 
   if (listenersBound) return;
   listenersBound = true;
@@ -948,6 +999,11 @@ function bindUI() {
     updateImmediate();
   });
 
+  showGuidesEl.addEventListener("sl-change", () => {
+    state.showGuides = showGuidesEl.checked;
+    updateImmediate();
+  });
+
   texturesEl.addEventListener("sl-change", () => {
     state.textures = texturesEl.checked;
     updateImmediate();
@@ -1074,6 +1130,11 @@ function bindUI() {
     debouncedRender();
   });
   imageIntensityEl.addEventListener("sl-change", updateImmediate);
+
+  imageMirrorEl.addEventListener("sl-change", () => {
+    state.imageMirror = imageMirrorEl.checked;
+    updateImmediate();
+  });
 
   uploadBtn.onclick = () => imageUploadEl.click();
   imageUploadEl.onchange = (e) => {
@@ -1217,7 +1278,7 @@ function bindUI() {
       state.strokeWidth = rFloat(shuffleRng, 0.4, 1.0);
       
       // Randomize coloring book controls with quality safeguards
-      const coloringOptions = [\"ninos\", \"ninos_grande\", \"adulto\", \"experto\", \"zen\"];
+      const coloringOptions = ["ninos", "ninos_grande", "adulto", "experto", "zen"];
       const randomColoring = pick(shuffleRng, coloringOptions);
       const coloringPreset = COLORING_PRESETS[randomColoring];
       if (coloringPreset) {
@@ -1246,15 +1307,21 @@ function bindUI() {
         if (id === "download") {
           const svg = stage.querySelector("svg");
           if (!svg) return;
+          const svgClone = svg.cloneNode(true);
+          const guides = svgClone.querySelector("#guides-layer");
+          if (guides) guides.remove();
           const filename = `mandala_${state.preset}_seed_${state.seed}.svg`;
-          downloadTextFile(filename, svg.outerHTML);
+          downloadTextFile(filename, svgClone.outerHTML);
         } else if (id === "downloadPng") {
           const svg = stage.querySelector("svg");
           if (!svg) return;
+          const svgClone = svg.cloneNode(true);
+          const guides = svgClone.querySelector("#guides-layer");
+          if (guides) guides.remove();
           const doc = getCurrentDoc();
           const filename = `mandala_${state.preset}_seed_${state.seed}_${state.pngDpi}dpi.png`;
           const { wMm, hMm } = doc.page;
-          await downloadPng(filename, svg.outerHTML, wMm, hMm, state.pngDpi || 300);
+          await downloadPng(filename, svgClone.outerHTML, wMm, hMm, state.pngDpi || 300);
         } else if (id === "downloadPdf") {
           await downloadManualPdf();
         } else if (id === "share") {

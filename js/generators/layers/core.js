@@ -100,7 +100,7 @@ export function addScallopRing(pb, cx, cy, r, count, amplitude, outward = true, 
   }
 }
 
-export function addImageLayer(pb, center, R, points, count, scale = 1.0, strokeWidth) {
+export function addImageLayer(pb, center, R, points, count, scale = 1.0, strokeWidth, mirror = false) {
   if (!points || points.length === 0) return;
 
   const radius = R * 0.95;
@@ -111,30 +111,40 @@ export function addImageLayer(pb, center, R, points, count, scale = 1.0, strokeW
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
 
-    let prevPoint = null;
+    // Draw normal path for this wedge
+    drawWedgePath(pb, center, points, radius, scale, cosA, sinA, connectThreshSq, false);
 
-    for (const p of points) {
-      const px = p.x * radius * scale;
-      const py = p.y * radius * scale;
-
-      const rx = px * cosA - py * sinA;
-      const ry = px * sinA + py * cosA;
-
-      const nx = center.x + rx;
-      const ny = center.y + ry;
-
-      if (prevPoint === null) {
-        pb.moveTo(nx, ny);
-      } else {
-        const dx = p.x - prevPoint.x;
-        const dy = p.y - prevPoint.y;
-        if (dx * dx + dy * dy <= connectThreshSq) {
-          pb.lineTo(nx, ny);
-        } else {
-          pb.moveTo(nx, ny);
-        }
-      }
-      prevPoint = p;
+    // Draw mirrored path for this wedge
+    if (mirror) {
+      drawWedgePath(pb, center, points, radius, scale, cosA, sinA, connectThreshSq, true);
     }
+  }
+}
+
+function drawWedgePath(pb, center, points, radius, scale, cosA, sinA, connectThreshSq, isMirrored) {
+  let prevPoint = null;
+
+  for (const p of points) {
+    const px = p.x * radius * scale;
+    const py = (isMirrored ? -p.y : p.y) * radius * scale;
+
+    const rx = px * cosA - py * sinA;
+    const ry = px * sinA + py * cosA;
+
+    const nx = center.x + rx;
+    const ny = center.y + ry;
+
+    if (prevPoint === null) {
+      pb.moveTo(nx, ny);
+    } else {
+      const dx = p.x - prevPoint.x;
+      const dy = p.y - prevPoint.y;
+      if (dx * dx + dy * dy <= connectThreshSq) {
+        pb.lineTo(nx, ny);
+      } else {
+        pb.moveTo(nx, ny);
+      }
+    }
+    prevPoint = p;
   }
 }

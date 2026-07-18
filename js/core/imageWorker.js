@@ -8,8 +8,11 @@ self.onmessage = function(e) {
     // 1. Grayscale conversion
     const grayscale = toGrayscale(pixelData, width, height);
 
+    // 1.5. Contrast Normalization (Histogram Equalization)
+    const normalized = contrastNormalize(grayscale, width, height);
+
     // 2. Gaussian Blur
-    const blurred = gaussianBlur(grayscale, width, height, 1.5);
+    const blurred = gaussianBlur(normalized, width, height, 1.5);
 
     // 3. Sobel Edge Detection
     const edges = applySobel(blurred, width, height, threshold);
@@ -25,6 +28,28 @@ self.onmessage = function(e) {
     self.postMessage({ status: 'error', error: error.message || 'Worker processing failed' });
   }
 };
+
+function contrastNormalize(gray, width, height) {
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < gray.length; i++) {
+    hist[gray[i]]++;
+  }
+
+  const cumHist = new Uint32Array(256);
+  cumHist[0] = hist[0];
+  for (let i = 1; i < 256; i++) {
+    cumHist[i] = cumHist[i - 1] + hist[i];
+  }
+
+  const normalized = new Uint8ClampedArray(gray.length);
+  const pixelCount = width * height;
+  for (let i = 0; i < gray.length; i++) {
+    const normalized_val = (cumHist[gray[i]] * 255) / pixelCount;
+    normalized[i] = Math.min(255, Math.round(normalized_val));
+  }
+
+  return normalized;
+}
 
 function toGrayscale(data, width, height) {
   const grayscale = new Uint8ClampedArray(width * height);

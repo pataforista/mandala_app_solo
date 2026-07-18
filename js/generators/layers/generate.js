@@ -52,6 +52,7 @@ export function generateMandalaLayers(doc, opts) {
     imagePoints = null,
     imageScale = 1.0,
     imageIntensity = 1.0,
+    imageMirror = false,
   } = opts;
 
   const page = doc?.page ?? { wMm: 210, hMm: 297, marginMm: 10 };
@@ -100,7 +101,7 @@ export function generateMandalaLayers(doc, opts) {
   // ==================== L0: CAPA DE IMAGEN (ZENTANGLE) ====================
   if (imagePoints && imagePoints.length > 0 && imageIntensity > 0.05) {
     const pb = new PathBuilder();
-    addImageLayer(pb, center, R, imagePoints, petals, imageScale, detailW);
+    addImageLayer(pb, center, R, imagePoints, petals, imageScale, detailW, imageMirror);
     pushPath(pb, detailW);
   }
 
