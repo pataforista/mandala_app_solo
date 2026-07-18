@@ -602,10 +602,6 @@ export function generateMandalaLayers(doc, opts) {
       }
     }
 
-    pushPath(pb, mainW);
-  }
-
-
     // Garland of arches with pearls below the crown
     if (layer6Intensity > 0.3 && style !== "azteca" && style !== "islamico") {
       const archCount = petals * 2;
