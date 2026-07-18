@@ -604,49 +604,7 @@ export function generateMandalaLayers(doc, opts) {
 
     pushPath(pb, mainW);
   }
-          .quadTo(cpR2.x, cpR2.y, pR.x, pR.y);
-        // Inner arch
-        if (layer6Intensity > 0.4) {
-          const irBase = rBase + (rTop - rBase) * 0.15;
-          const irTop = rBase + (rTop - rBase) * 0.75;
-          const ipL = _p(irBase, aL, center);
-          const ipR = _p(irBase, aR, center);
-          const ipTop = _p(irTop, aC, center);
-          const icpL = _p(irTop * 0.97, aC - 0.1, center);
-          const icpR = _p(irTop * 0.97, aC + 0.1, center);
-          pb.moveTo(ipL.x, ipL.y).quadTo(icpL.x, icpL.y, ipTop.x, ipTop.y)
-            .quadTo(icpR.x, icpR.y, ipR.x, ipR.y);
-        }
-        if (layer6Intensity > 0.6) {
-          addCircle(pb, pTop.x, pTop.y, 1.6, 10);
-        }
 
-      } else {
-        // Organic arch with nested curve
-        const cpLo = _p(rTop * 0.96, aC - 0.2, center);
-        const cpRo = _p(rTop * 0.96, aC + 0.2, center);
-        pb.moveTo(pL.x, pL.y)
-          .quadTo(cpLo.x, cpLo.y, pTop.x, pTop.y)
-          .quadTo(cpRo.x, cpRo.y, pR.x, pR.y);
-
-        // Nested inner arch
-        if (layer6Intensity > 0.4) {
-          const irBase = rBase + (rTop - rBase) * 0.12;
-          const irTop = rBase + (rTop - rBase) * 0.7;
-          const ipL = _p(irBase, aL, center);
-          const ipR = _p(irBase, aR, center);
-          const ipTop = _p(irTop, aC, center);
-          pb.moveTo(ipL.x, ipL.y)
-            .quadTo(_p(irTop * 0.96, aC - 0.15, center).x, _p(irTop * 0.96, aC - 0.15, center).y, ipTop.x, ipTop.y)
-            .quadTo(_p(irTop * 0.96, aC + 0.15, center).x, _p(irTop * 0.96, aC + 0.15, center).y, ipR.x, ipR.y);
-        }
-
-        // Dot at tip
-        if (layer6Intensity > 0.6) {
-          addCircle(pb, pTop.x, pTop.y, 1.5, 8);
-        }
-      }
-    }
 
     // Garland of arches with pearls below the crown
     if (layer6Intensity > 0.3 && style !== "azteca" && style !== "islamico") {
