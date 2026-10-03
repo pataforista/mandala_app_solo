@@ -5,6 +5,7 @@ import { createDoc } from "../js/core/svgDoc.js";
 import { renderDocToSvgString } from "../js/core/svgRender.js";
 import { generateMandalaLayers } from "../js/generators/mandalaLayers.js";
 import { generateMandalaRadial } from "../js/generators/mandalaRadial.js";
+import { PathBuilder, coloringCullArea } from "../js/core/pathBuilder.js";
 
 const STYLES = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
 const BASE = {
@@ -150,4 +151,28 @@ test("radial: cada cuña cae en su eje y el espejado refleja sobre el eje propio
       });
     }
   }
+});
+
+test("PathBuilder descarta formas cerradas menores que minClosedArea", () => {
+  const pb = new PathBuilder({ minClosedArea: 4 });
+  pb.moveTo(0, 0).lineTo(1, 0).lineTo(1, 1).lineTo(0, 1).close();      // 1 mm²: fuera
+  pb.moveTo(10, 10).lineTo(13, 10).lineTo(13, 13).lineTo(10, 13).close(); // 9 mm²: queda
+  pb.moveTo(20, 20).lineTo(21, 21);                                      // abierto: queda
+  assert.equal(pb.d, "M 10 10 L 13 10 L 13 13 L 10 13 Z M 20 20 L 21 21");
+});
+
+test("perfil de coloreo: adulto/experto intactos, niños filtra y simplifica", () => {
+  assert.equal(coloringCullArea({ minCellAreaMm2: 3, detailSimplification: 0.5 }), 0);
+  assert.equal(coloringCullArea({ minCellAreaMm2: 2, detailSimplification: 0.2 }), 0);
+  assert.equal(coloringCullArea({ minCellAreaMm2: 6, detailSimplification: 0.85, outlineMode: true }), 6);
+
+  const count = (o) => {
+    const { svg } = render(generateMandalaRadial, { ...BASE, seed: 7, petals: 12, ...o });
+    // Formas por cuña (defs, se repiten petals veces) + formas fuera del wedge
+    const [defs, body] = [svg.slice(0, svg.indexOf("</defs>")), svg.slice(svg.indexOf("</defs>"))];
+    return (defs.match(/M /g) || []).length * 12 + (body.match(/M |<circle/g) || []).length;
+  };
+  const adult = count({ minCellAreaMm2: 3, detailSimplification: 0.5 });
+  const kids = count({ complexity: 40, minCellAreaMm2: 6, detailSimplification: 0.85, outlineMode: true, textures: false });
+  assert.ok(kids < adult * 0.6, `niños (${kids}) debería ser mucho más simple que adulto (${adult})`);
 });

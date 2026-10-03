@@ -1,6 +1,6 @@
 // js/core/export.js
 
-const RENDER_PX_PER_MM = 6; // ~152 DPI — good quality for fine mandala lines
+const RENDER_PX_PER_MM = 300 / 25.4; // 300 DPI: estándar de imprenta para libros
 
 export function downloadTextFile(filename, text) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -130,7 +130,7 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
     }
 
     const { onProgress = null, coverPage = null, pageNumbers = false } = options;
-    const dpi = options.dpi ?? 150;
+    const dpi = options.dpi ?? 300; // 150 DPI deja bordes dentados en impresión
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({

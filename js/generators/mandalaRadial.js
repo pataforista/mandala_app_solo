@@ -1,6 +1,7 @@
 import { mulberry32, rFloat } from "../core/prng.js";
-import { PathBuilder } from "../core/pathBuilder.js";
+import { PathBuilder, coloringCullArea } from "../core/pathBuilder.js";
 import { lerp, clamp, fmt, polar, polarW, getWobblePhases } from "../core/geometry.js";
+import { circleSegments } from "./layers/core.js";
 
 /**
  * Mandala Radial (Book / Coloring) — Editorial
@@ -48,7 +49,8 @@ export function generateMandalaRadial(doc, opts) {
     harmony = 0.5,
     taper = 0.2,
     kaleidoscope = true,
-    showTextures = true,
+    // La app envía `textures`; `showTextures` se conserva por compatibilidad
+    showTextures = opts.textures ?? true,
 
     // Phase 4: Spirograph
     spiroEnabled = false,
@@ -62,9 +64,14 @@ export function generateMandalaRadial(doc, opts) {
   const page = doc?.page ?? { wMm: 210, hMm: 297, marginMm: 10 };
   const marginMm = Number.isFinite(page.marginMm) ? page.marginMm : 10;
   const computedCenter = centerMm ?? { x: page.wMm / 2, y: page.hMm / 2 };
-  const computedRadius = radiusMm ?? Math.max(10, Math.min(page.wMm, page.hMm) / 2 - marginMm);
+  // Con marco de página, el mandala deja 4 mm de aire para no tocarlo
+  const computedRadius = radiusMm ?? Math.max(10, Math.min(page.wMm, page.hMm) / 2 - marginMm - (pageBorder ? 4 : 0));
 
   const rng = mulberry32((seed >>> 0) || 0);
+
+  // Perfil de coloreo: descarta formas cerradas demasiado pequeñas para colorear
+  const cullArea = coloringCullArea(opts);
+  const newPB = () => new PathBuilder({ minClosedArea: cullArea });
 
   // --- Helpers puros (declarados antes de cualquier uso) ---
   const _polar0 = (r, theta) => polar(r, theta);
@@ -144,13 +151,18 @@ export function generateMandalaRadial(doc, opts) {
 
   // --- Complejidad normalizada ---
   const cN = _clamp((complexity - 20) / (240 - 20), 0, 1);
-  const ringCount = _clamp(Math.round(5 + cN * 7), 5, 12);
+  // Simplificación para colorear (0 = diseño completo, 1 = máximo aire).
+  // Igual que coloringCullArea: el valor por defecto de adulto (0.5) no altera nada.
+  const simpRaw = _clamp(((opts.detailSimplification ?? 0) - 0.5) * 2, 0, 1);
+  const simplify = opts.outlineMode ? Math.max(0.5, simpRaw) : simpRaw;
+
+  const ringCount = _clamp(Math.round((5 + cN * 7) * _lerp(1, 0.55, simplify)), 3, 12);
 
   // Con muchos pétalos las celdas angulares se estrechan: bajar la densidad de
   // detalle evita que el conjunto se sature en negro y deje de ser coloreable.
   const petalsCrowd = _clamp((petals - 12) / 36, 0, 1);
-  const subProb = _lerp(0.18, 0.72, cN) * _lerp(1, 0.7, petalsCrowd);
-  const detailProb = _lerp(0.35, 0.85, cN) * _lerp(1, 0.55, petalsCrowd);
+  const subProb = _lerp(0.18, 0.72, cN) * _lerp(1, 0.7, petalsCrowd) * (1 - simplify);
+  const detailProb = _lerp(0.35, 0.85, cN) * _lerp(1, 0.55, petalsCrowd) * (1 - simplify);
 
   // --- Rejilla radial ---
   const stepAngle = (2 * Math.PI) / petals;
@@ -254,9 +266,9 @@ export function generateMandalaRadial(doc, opts) {
   const wedgeId = `wedge_${(seed >>> 0)}_${petals}_${ringCount}_${Math.round(computedRadius * 10)}_${Math.round(strokeBase * 1000)}_${Math.round(complexity)}`;
 
   // --- Builders ---
-  const pbMain = new PathBuilder();
-  const pbDetail = new PathBuilder();
-  const pbFine = new PathBuilder();
+  const pbMain = newPB();
+  const pbDetail = newPB();
+  const pbFine = newPB();
 
   // --- Selector de forma ---
   function pickShapeForRing(ring, prevRing) {
@@ -403,7 +415,8 @@ export function generateMandalaRadial(doc, opts) {
 
   function addCirclePoly(pb, cx, cy, r, seg = 16) {
     if (r <= 0) return;
-    const step = (Math.PI * 2) / Math.max(6, seg);
+    seg = circleSegments(r, seg);
+    const step = (Math.PI * 2) / seg;
     let x0 = cx + Math.cos(0) * r;
     let y0 = cy + Math.sin(0) * r;
     pb.moveTo(x0, y0);
@@ -1157,7 +1170,7 @@ if (rng() < 0.98) {
   const outer = binduClearR * 0.9;
   const step = (Math.PI * 2) / cCount;
 
-  const pbC = new PathBuilder();
+  const pbC = newPB();
 
   if (centerVariant === "lotus_ring") {
     // Doble corona de pétalos apuntados alrededor del bindu
@@ -1224,7 +1237,7 @@ if (rng() < 0.98) {
 
   // Layered central rosettes (Circle grid / petals)
   if (rng() < 0.7) {
-    const pbExtra = new PathBuilder();
+    const pbExtra = newPB();
     addCirclePoly(pbExtra, cx, cy, inner * 0.6, 48);
     addCirclePoly(pbExtra, cx, cy, inner * 0.5, 48);
     doc.body.push(pbExtra.toPath({ stroke, strokeWidthMm: outerRingStrokes.fine, fill: "none" }));
@@ -1232,7 +1245,7 @@ if (rng() < 0.98) {
 
   // NESTED CORE (Double Core)
   if (complexity > 100 && centerVariant !== "lotus_ring") {
-    const pbInner = new PathBuilder();
+    const pbInner = newPB();
     const innerR = inner * 0.8;
     for (let k = 0; k < cCount; k++) {
       const a = k * (Math.PI * 2 / cCount) + radialPhase;
@@ -1270,7 +1283,7 @@ if (includeFrames) {
     const beadCount = snapToPetals(_clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82));
     const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), outerRingStrokes.main * 2.2, computedRadius * 0.020);
 
-    const pbBeads = new PathBuilder();
+    const pbBeads = newPB();
     for (let i = 0; i < beadCount; i++) {
       const a = (i * 2 * Math.PI) / beadCount + radialPhase;
       const bx = cx + beadRingR * Math.cos(a);
@@ -1286,7 +1299,7 @@ if (includeFrames) {
     const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), outerRingStrokes.main * 2.6, computedRadius * 0.060);
     const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
 
-    const pbScallop = new PathBuilder();
+    const pbScallop = newPB();
     for (let i = 0; i < scallopCount; i++) {
       const a = (i * 2 * Math.PI) / scallopCount + radialPhase;
       const sx = cx + scallopCenterR * Math.cos(a);
@@ -1303,7 +1316,7 @@ if (includeFrames) {
     const rimBase = computedRadius * 0.985 - rimH;
     const rimStep = (Math.PI * 2) / rimCount;
 
-    const pbRim = new PathBuilder();
+    const pbRim = newPB();
     for (let i = 0; i < rimCount; i++) {
       const a1 = i * rimStep + radialPhase;
       const a2 = a1 + rimStep;
@@ -1334,8 +1347,10 @@ if (includeFrames) {
 // --- PHASE 3: Ornamental Page Border ---
 if (pageBorder) {
   const { wMm, hMm } = page;
-  const borderMargin = marginMm * 0.5;
-  const pbB = new PathBuilder();
+  // Marco dentro de la zona segura de imprenta (≥ 6.4 mm del corte; 10 mm
+  // también respeta el margen interior/gutter de libros encuadernados).
+  const borderMargin = marginMm;
+  const pbB = newPB();
 
   // Simple ornamental frame: Rect with corner rosettes
   const x0 = borderMargin, y0 = borderMargin;
@@ -1345,7 +1360,8 @@ if (pageBorder) {
   pbB.moveTo(x0, y0).lineTo(x1, y0).lineTo(x1, y1).lineTo(x0, y1).close();
 
   // Corners
-  const cornerR = marginMm * 0.8;
+  // Rosetas de esquina pequeñas: no deben invadir el margen exterior
+  const cornerR = marginMm * 0.3;
   addCirclePoly(pbB, x0, y0, cornerR, 12);
   addCirclePoly(pbB, x1, y0, cornerR, 12);
   addCirclePoly(pbB, x1, y1, cornerR, 12);
@@ -1356,7 +1372,7 @@ if (pageBorder) {
   );
 
   // Hairline detail inside border
-  const pbB2 = new PathBuilder();
+  const pbB2 = newPB();
   const b2m = borderMargin + 1.2;
   pbB2.moveTo(b2m, b2m).lineTo(wMm - b2m, b2m).lineTo(wMm - b2m, hMm - b2m).lineTo(b2m, hMm - b2m).close();
   doc.body.push(
@@ -1375,7 +1391,7 @@ if (spiroEnabled) {
     : (Math.abs(spiroR - spiror) + spiroDistance);
   const fit = rawReach > 1e-6 ? (computedRadius * 0.95) / rawReach : 1;
 
-  const pbSpiro = new PathBuilder();
+  const pbSpiro = newPB();
   addSpirograph(pbSpiro, spiroR * fit, spiror * fit, spiroDistance * fit, spiroResolution, spiroMode);
 
   const spiroStrokes = getStrokesForRadius(computedRadius * 0.95, "secondary");

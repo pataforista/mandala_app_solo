@@ -1,6 +1,6 @@
 // js/generators/layers/generate.js
 import { mulberry32, rFloat } from "../../core/prng.js";
-import { PathBuilder } from "../../core/pathBuilder.js";
+import { PathBuilder, coloringCullArea } from "../../core/pathBuilder.js";
 import { lerp, clamp, polar } from "../../core/geometry.js";
 import {
   addCircle,
@@ -75,6 +75,10 @@ export function generateMandalaLayers(doc, opts) {
   const rng = mulberry32(seed);
   const paths = [];
 
+  // Perfil de coloreo: descarta formas cerradas demasiado pequeñas para colorear
+  const cullArea = coloringCullArea(opts);
+  const newPB = () => new PathBuilder({ minClosedArea: cullArea });
+
   const style = styleMode === "hashiko" ? "sashiko" : styleMode;
 
   // Complexity factor: scales density of sub-elements (0..1 from range 20..320)
@@ -112,14 +116,14 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L0: CAPA DE IMAGEN (ZENTANGLE) ====================
   if (imagePoints && imagePoints.length > 0 && imageIntensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     addImageLayer(pb, center, R, imagePoints, petals, imageScale, detailW, imageMirror);
     pushPath(pb, detailW);
   }
 
   // ==================== L1: NÚCLEO (BINDU) ====================
   if (layer1Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const rCore = R * R1 * layer1Intensity;
 
     // Bindu central dot (always present)
@@ -225,7 +229,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L2: PÉTALOS INTERNOS (Compound) - Simplified for coloring ====================
   if (layer2Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const rIn = R * R1 + 2; 
     const rOut = rIn + (R * R2 - rIn) * layer2Intensity;
     const count = petals;
@@ -304,7 +308,7 @@ export function generateMandalaLayers(doc, opts) {
     const rRing = ringARadius;
     const intensity = Math.min(layer2Intensity, layer3Intensity);
     if (intensity > 0.3) {
-      const pb = new PathBuilder();
+      const pb = newPB();
       addCircle(pb, center.x, center.y, rRing, 64);
 
       // Scalloped decoration - reduced density
@@ -318,7 +322,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L3: PATRÓN CULTURAL (Simplified for coloring) ====================
   if (layer3Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const rMid = l3Mid;
     // Tamaño acotado por los anillos vecinos y por el espacio angular entre motivos
     const fSize = Math.min(R * 0.11 * layer3Intensity, l3MaxSize);
@@ -392,7 +396,7 @@ export function generateMandalaLayers(doc, opts) {
     const rRing = ringBRadius;
     const intensity = Math.min(layer3Intensity, layer4Intensity);
     if (intensity > 0.15) {
-      const pb = new PathBuilder();
+      const pb = newPB();
       addCircle(pb, center.x, center.y, rRing, 80);
 
       if (intensity > 0.35) {
@@ -415,7 +419,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L4: ANILLO GEOMÉTRICO (Simplified for coloring) ====================
   if (layer4Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const r1 = R * 0.56;
     const r2 = r1 + R * 0.1 * layer4Intensity;
     const count = petals * Math.max(1, Math.round(1.5 * _lerp(0.7, 1.1, cFactor)));
@@ -473,7 +477,7 @@ export function generateMandalaLayers(doc, opts) {
     const rRing = R * 0.68;
     const intensity = Math.min(layer4Intensity, layer5Intensity);
     if (intensity > 0.3) {
-      const pb = new PathBuilder();
+      const pb = newPB();
       addCircle(pb, center.x, center.y, rRing, 80);
 
       pushPath(pb, fineW);
@@ -482,7 +486,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L5: DETALLES FINOS (Simplified for coloring) ====================
   if (layer5Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const rStart = R * 0.7;
     const rEnd = rStart + R * 0.08 * layer5Intensity;
     // Múltiplo de petals: el patrón previo (dibujar solo índices pares de un
@@ -501,7 +505,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L7: NATURAL / HOJAS / CULTURAL (Simplified for coloring) ====================
   if (layer7Intensity > 0.05 && style !== "geometric") {
-    const pb = new PathBuilder();
+    const pb = newPB();
     // L7 se intercala entre los motivos de L3, dentro de la misma banda
     // (entre el anillo A y el anillo B): antes se solapaba con L3, el anillo B y L4.
     const count = l3Count;
@@ -579,7 +583,7 @@ export function generateMandalaLayers(doc, opts) {
     const rRing = R * 0.80;
     const intensity = Math.min(Math.max(layer5Intensity, layer7Intensity), layer6Intensity);
     if (intensity > 0.2) {
-      const pb = new PathBuilder();
+      const pb = newPB();
       addCircle(pb, center.x, center.y, rRing, 96);
 
       pushPath(pb, fineW);
@@ -588,7 +592,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L6: BORDE DECORATIVO (Simplified for coloring) ====================
   if (layer6Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const rBase = R * 0.83;
     const rTop = rBase + R * 0.13 * layer6Intensity;
     const count = petals;
@@ -678,7 +682,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L8: TEXTURAS CULTURALES (Enhanced) ====================
   if (layer8Intensity > 0.1 && textures) {
-    const pb = new PathBuilder();
+    const pb = newPB();
 
     if (style === "sashiko") {
       // Enhanced sashiko stitching with pattern variation
@@ -817,7 +821,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== FRAMES ====================
   if (includeFrames) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     addCircle(pb, center.x, center.y, R, 128);
     addCircle(pb, center.x, center.y, R + 3, 128);
 
@@ -833,7 +837,7 @@ export function generateMandalaLayers(doc, opts) {
   }
 
   if (pageBorder) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const m = marginMm;
     pb.moveTo(m, m).lineTo(page.wMm - m, m)
       .lineTo(page.wMm - m, page.hMm - m)
