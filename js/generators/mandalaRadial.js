@@ -1110,12 +1110,17 @@ for (let k = 0; k < petals; k++) {
   const scaleJitter = 1 + Math.cos(phase * 1.9 + (seed % 19)) * organicJitter * 0.035;
   // Con wobble alto el espejado desalinea las cuñas adyacentes (líneas dobles
   // "fantasma"): solo espejamos cuando el nivel orgánico es moderado.
-  const mirror = (k % 2 === 1 && (alternation > 0.24 || kaleidoscope) && organicLevel < 0.55) ? -1 : 1;
+  // Con pétalos impares la última y la primera cuña quedarían sin alternar,
+  // así que el espejado (simetría diedral) solo aplica a conteos pares.
+  const mirror = (petals % 2 === 0 && k % 2 === 1 && (alternation > 0.24 || kaleidoscope) && organicLevel < 0.55) ? -1 : 1;
 
+  // El eje de la cuña es el eje X local (thetaC = 0): reflejar sobre él es
+  // invertir Y. Invertir X la reflejaría sobre el eje perpendicular y la
+  // desplazaría 180°, rompiendo la simetría con conteos impares o 4n+2.
   const transform = [
     `translate(${_fmt(cx)} ${_fmt(cy)})`,
     `rotate(${_fmt(deg - 90 + rotJitterDeg)})`,
-    `scale(${_fmt(mirror * scaleJitter)} ${_fmt(scaleJitter)})`
+    `scale(${_fmt(scaleJitter)} ${_fmt(mirror * scaleJitter)})`
   ].join(" ");
 
   doc.body.push(
@@ -1138,13 +1143,19 @@ for (let k = 0; k < petals; k++) {
 }
 
 
+// Las cuñas se dibujan con rotate(deg - 90): su eje k está en k·step − 90°.
+// Los elementos repetidos fuera del wedge (centro, cuentas, festón, corona)
+// usan la misma fase y conteos múltiplos de petals para heredar su simetría.
+const radialPhase = -Math.PI / 2;
+const snapToPetals = (n) => petals * Math.max(1, Math.round(n / petals));
+
 // --- Motivo central adicional (roseta avanzada) ---
 if (rng() < 0.98) {
   const centerVariant = archetype.center[Math.floor(rng() * archetype.center.length)];
-  const cCount = (petals % 2 === 0 ? petals : petals + 1);
+  const cCount = petals * Math.ceil(6 / petals);
   const inner = binduR * 1.05;
   const outer = binduClearR * 0.9;
-  const step = (Math.PI * 2) / Math.max(6, cCount);
+  const step = (Math.PI * 2) / cCount;
 
   const pbC = new PathBuilder();
 
@@ -1152,7 +1163,7 @@ if (rng() < 0.98) {
     // Doble corona de pétalos apuntados alrededor del bindu
     for (const [rTip, phase] of [[outer, 0], [_lerp(inner, outer, 0.55), 0.5]]) {
       for (let k = 0; k < cCount; k++) {
-        const a = (k + phase) * step;
+        const a = (k + phase) * step + radialPhase;
         const pIn = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
         const tip = { x: cx + rTip * Math.cos(a + step / 2), y: cy + rTip * Math.sin(a + step / 2) };
         const pIn2 = { x: cx + inner * Math.cos(a + step), y: cy + inner * Math.sin(a + step) };
@@ -1165,14 +1176,14 @@ if (rng() < 0.98) {
     const rOrbit = _lerp(inner, outer, 0.72);
     const dotR = Math.max(outerRingStrokes.main * 1.4, (outer - inner) * 0.10);
     for (let k = 0; k < cCount; k++) {
-      const a = k * step;
+      const a = k * step + radialPhase;
       addCirclePoly(pbC, cx + rOrbit * Math.cos(a), cy + rOrbit * Math.sin(a), dotR, 10);
     }
   } else if (centerVariant === "sunburst") {
     // SUNBURST: Rayos y picos geométricos
     for (let k = 0; k < cCount; k++) {
-      const a = k * step;
-      const aNext = (k + 1) * step;
+      const a = k * step + radialPhase;
+      const aNext = a + step;
       const aMid = a + step * 0.5;
 
       const p1 = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
@@ -1187,8 +1198,11 @@ if (rng() < 0.98) {
     }
   } else {
     // FLORAL COMPASS: Puntos cardinales y pétalos suaves
+    // Marcas de brújula: 4 si el conteo lo permite; si no, el menor reparto simétrico
+    const compassMarks = [4, 3, 5, 7].find(d => cCount % d === 0) ?? cCount;
+    const compassEvery = cCount / compassMarks;
     for (let k = 0; k < cCount; k++) {
-      const a = k * step;
+      const a = k * step + radialPhase;
       const pIn = { x: cx + inner * Math.cos(a), y: cy + inner * Math.sin(a) };
       const pOut = { x: cx + outer * Math.cos(a), y: cy + outer * Math.sin(a) };
       const cpL = { x: cx + _lerp(inner, outer, 0.5) * Math.cos(a - step * 0.3), y: cy + _lerp(inner, outer, 0.5) * Math.sin(a - step * 0.3) };
@@ -1197,7 +1211,7 @@ if (rng() < 0.98) {
       pbC.moveTo(pIn.x, pIn.y).quadTo(cpL.x, cpL.y, pOut.x, pOut.y).quadTo(cpR.x, cpR.y, pIn.x, pIn.y).close();
 
       // Compass line
-      if (k % (cCount / 4) === 0) {
+      if (k % compassEvery === 0) {
         const pTip = { x: cx + (outer * 1.15) * Math.cos(a), y: cy + (outer * 1.15) * Math.sin(a) };
         addTaperedLine(pbC, pOut, pTip, outerRingStrokes.main, outerRingStrokes.detail * 0.5);
       }
@@ -1211,8 +1225,8 @@ if (rng() < 0.98) {
   // Layered central rosettes (Circle grid / petals)
   if (rng() < 0.7) {
     const pbExtra = new PathBuilder();
-    addCirclePoly(pbExtra, cx, cy, inner * 0.6, 12);
-    addCirclePoly(pbExtra, cx, cy, inner * 0.5, 8);
+    addCirclePoly(pbExtra, cx, cy, inner * 0.6, 48);
+    addCirclePoly(pbExtra, cx, cy, inner * 0.5, 48);
     doc.body.push(pbExtra.toPath({ stroke, strokeWidthMm: outerRingStrokes.fine, fill: "none" }));
   }
 
@@ -1221,7 +1235,7 @@ if (rng() < 0.98) {
     const pbInner = new PathBuilder();
     const innerR = inner * 0.8;
     for (let k = 0; k < cCount; k++) {
-      const a = k * (Math.PI * 2 / cCount);
+      const a = k * (Math.PI * 2 / cCount) + radialPhase;
       const p = { x: cx + innerR * Math.cos(a), y: cy + innerR * Math.sin(a) };
       if (k === 0) pbInner.moveTo(p.x, p.y);
       else pbInner.lineTo(p.x, p.y);
@@ -1253,46 +1267,46 @@ if (includeFrames) {
   if (framePick.has("beads") || rng() < _lerp(0.35, 0.15, harmony)) {
     const beadRingR = binduClearR * _clamp(rFloat(rng, 0.72, 0.88), 0.66, 0.92);
     const beadDensity = _lerp(2.4, 1.3, organicLevel);
-    const beadCount = _clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82);
+    const beadCount = snapToPetals(_clamp(Math.round(petals * _clamp(rFloat(rng, beadDensity * 0.8, beadDensity * 1.3), 1.1, 2.8)), 14, 82));
     const beadR = _clamp(computedRadius * _clamp(rFloat(rng, 0.006, 0.010), 0.005, 0.012), outerRingStrokes.main * 2.2, computedRadius * 0.020);
 
     const pbBeads = new PathBuilder();
     for (let i = 0; i < beadCount; i++) {
-      const a = (i * 2 * Math.PI) / beadCount;
+      const a = (i * 2 * Math.PI) / beadCount + radialPhase;
       const bx = cx + beadRingR * Math.cos(a);
       const by = cy + beadRingR * Math.sin(a);
-      addCirclePoly(pbBeads, bx, by, beadR, 8);
+      addCirclePoly(pbBeads, bx, by, beadR, 16);
     }
     doc.body.push(pbBeads.toPath({ stroke, strokeWidthMm: outerRingStrokes.detail, fill: "none" }));
   }
 
   // 2) Scallop edge: círculos grandes tocando el marco exterior (da ese look “flor” del borde)
   if (framePick.has("scallop")) {
-    const scallopCount = _clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56);
+    const scallopCount = snapToPetals(_clamp(Math.round(petals * _clamp(rFloat(rng, 0.9, 1.55), 0.8, 2.0)), 10, 56));
     const scallopR = _clamp(computedRadius * _clamp(rFloat(rng, 0.020, 0.040), 0.018, 0.045), outerRingStrokes.main * 2.6, computedRadius * 0.060);
     const scallopCenterR = computedRadius * 0.985 - scallopR * 0.85;
 
     const pbScallop = new PathBuilder();
     for (let i = 0; i < scallopCount; i++) {
-      const a = (i * 2 * Math.PI) / scallopCount;
+      const a = (i * 2 * Math.PI) / scallopCount + radialPhase;
       const sx = cx + scallopCenterR * Math.cos(a);
       const sy = cy + scallopCenterR * Math.sin(a);
-      addCirclePoly(pbScallop, sx, sy, scallopR, 12);
+      addCirclePoly(pbScallop, sx, sy, scallopR, 32);
     }
     doc.body.push(pbScallop.toPath({ stroke, strokeWidthMm: outerRingStrokes.main, fill: "none" }));
   }
 
   // 3) Petal rim: corona de arcos apuntados en el borde exterior
   if (framePick.has("petal_rim")) {
-    const rimCount = _clamp(petals * 2, 16, 64);
+    const rimCount = snapToPetals(_clamp(petals * 2, 16, 64));
     const rimH = computedRadius * _clamp(rFloat(rng, 0.035, 0.055), 0.03, 0.06);
     const rimBase = computedRadius * 0.985 - rimH;
     const rimStep = (Math.PI * 2) / rimCount;
 
     const pbRim = new PathBuilder();
     for (let i = 0; i < rimCount; i++) {
-      const a1 = i * rimStep;
-      const a2 = (i + 1) * rimStep;
+      const a1 = i * rimStep + radialPhase;
+      const a2 = a1 + rimStep;
       const am = a1 + rimStep / 2;
       pbRim.moveTo(cx + rimBase * Math.cos(a1), cy + rimBase * Math.sin(a1))
         .quadTo(cx + (rimBase + rimH * 1.9) * Math.cos(am), cy + (rimBase + rimH * 1.9) * Math.sin(am),

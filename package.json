@@ -5,12 +5,14 @@
   "main": "index.html",
   "scripts": {
     "start": "npx -y serve .",
-    "dev": "npx -y serve ."
+    "dev": "npx -y serve .",
+    "test": "node --test tests/*.test.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "serve": "^14.2.6"
-  }
+  },
+  "type": "module"
 }
