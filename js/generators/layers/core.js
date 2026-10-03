@@ -1,9 +1,16 @@
 // js/generators/layers/core.js
 import { polar } from "../../core/geometry.js";
 
+// Segmentos necesarios para que la flecha del polígono no supere ~0.04 mm:
+// por debajo de eso el facetado es invisible en impresión a 300 DPI.
+export function circleSegments(r, seg = 8, sagMm = 0.04) {
+  const need = r > sagMm ? Math.ceil(Math.PI / Math.acos(1 - sagMm / r)) : 8;
+  return Math.min(256, Math.max(8, seg, need));
+}
+
 export function addCircle(pb, cx, cy, r, seg = 24) {
   if (r <= 0.05) return;
-  seg = Math.max(8, seg);
+  seg = circleSegments(r, seg);
   const step = (Math.PI * 2) / seg;
   pb.moveTo(cx + r, cy);
   for (let i = 1; i < seg; i++) {

@@ -207,6 +207,10 @@ const STRUCTURE_PRESETS = {
 const COLORING_PRESETS = {
   ninos: {
     // Niños pequeños (5-8 años) - Muy simple
+    // El motor radial simplificado da formas grandes y pocas (≈30-80 zonas);
+    // en "layers" la intensidad controla el TAMAÑO, así que se mantiene alta
+    // y solo se apagan las capas de detalle fino (L5 ranuras, L8 texturas).
+    generatorType: "radial",
     complexity: 40,
     organic: 0.1,
     strokeWidth: 0.8,
@@ -217,18 +221,19 @@ const COLORING_PRESETS = {
     textures: false,
     frames: false,
     pageBorder: true,
-    layer1Intensity: 0.5,
-    layer2Intensity: 0.3,
-    layer3Intensity: 0.2,
-    layer4Intensity: 0.3,
-    layer5Intensity: 0.1,
-    layer6Intensity: 0.3,
-    layer7Intensity: 0.15,
-    layer8Intensity: 0.1,
+    layer1Intensity: 0.7,
+    layer2Intensity: 0.9,
+    layer3Intensity: 0.8,
+    layer4Intensity: 0.8,
+    layer5Intensity: 0,
+    layer6Intensity: 0.85,
+    layer7Intensity: 0.6,
+    layer8Intensity: 0,
     outlineMode: true,
   },
   ninos_grande: {
     // Niños grandes (9-12 años) - Simple
+    generatorType: "radial",
     complexity: 70,
     organic: 0.15,
     strokeWidth: 0.7,
@@ -239,14 +244,14 @@ const COLORING_PRESETS = {
     textures: false,
     frames: true,
     pageBorder: true,
-    layer1Intensity: 0.6,
-    layer2Intensity: 0.45,
-    layer3Intensity: 0.35,
-    layer4Intensity: 0.45,
-    layer5Intensity: 0.2,
-    layer6Intensity: 0.45,
-    layer7Intensity: 0.25,
-    layer8Intensity: 0.15,
+    layer1Intensity: 0.8,
+    layer2Intensity: 0.85,
+    layer3Intensity: 0.85,
+    layer4Intensity: 0.8,
+    layer5Intensity: 0.35,
+    layer6Intensity: 0.85,
+    layer7Intensity: 0.7,
+    layer8Intensity: 0,
     outlineMode: true,
   },
   adulto: {
@@ -295,6 +300,7 @@ const COLORING_PRESETS = {
   },
   zen: {
     // Zen - Minimalista
+    generatorType: "radial",
     complexity: 50,
     organic: 0.2,
     strokeWidth: 0.9,
@@ -363,11 +369,17 @@ function applyStructurePreset(presetKey) {
   return true;
 }
 
+// "Densidad de Patrones" escala la complejidad; 0.7 (valor por defecto) = sin cambio
+function densityScale(s) {
+  const d = Number.isFinite(s.densityFactor) ? s.densityFactor : 0.7;
+  return Math.min(1.6, Math.max(0.3, d / 0.7));
+}
+
 function buildOpts(s) {
   return {
     seed: s.seed,
     petals: s.petals,
-    complexity: s.complexity,
+    complexity: Math.max(20, Math.round(s.complexity * densityScale(s))),
     strokeWidthMm: s.strokeWidth,
     organicLevel: s.organic,
     includeFrames: s.frames,
@@ -477,7 +489,7 @@ function render() {
     default: /* high */ break;
   }
 
-  const effectiveComplexity = Math.max(20, Math.round(state.complexity * scaleComplexity));
+  const effectiveComplexity = Math.max(20, Math.round(state.complexity * densityScale(state) * scaleComplexity));
   const effectivePetals = Math.max(6, Math.round(state.petals * scalePetals / 2) * 2);
 
   // Modo Collage
@@ -1285,7 +1297,7 @@ function bindUI() {
       if (coloringPreset) {
         Object.entries(coloringPreset).forEach(([key, value]) => {
           // Don't override seed or style-related properties in shuffle
-          if (!['complexity', 'organic', 'styleMode'].includes(key)) {
+          if (!['complexity', 'organic', 'styleMode', 'generatorType'].includes(key)) {
             state[key] = value;
           }
         });

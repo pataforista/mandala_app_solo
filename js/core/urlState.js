@@ -11,9 +11,11 @@ export function randomSeed32() {
 const INT_PARAMS = ["petals", "complexity", "seed", "pngDpi"];
 const FLOAT_PARAMS = ["organic", "strokeWidth",
   "layer1Intensity", "layer2Intensity", "layer3Intensity", "layer4Intensity",
-  "layer5Intensity", "layer6Intensity", "layer7Intensity", "layer8Intensity"];
-const STRING_PARAMS = ["preset", "styleMode", "structurePreset", "generatorType", "previewQuality", "layoutMode", "layerPreset"];
-const BOOL_PARAMS = ["frames", "pageBorder", "kaleidoscope", "textures", "spiroEnabled"];
+  "layer5Intensity", "layer6Intensity", "layer7Intensity", "layer8Intensity",
+  // Perfil de libro para colorear
+  "densityFactor", "minCellArea", "detailSimplification", "spacing"];
+const STRING_PARAMS = ["preset", "styleMode", "structurePreset", "generatorType", "previewQuality", "layoutMode", "layerPreset", "coloringPreset"];
+const BOOL_PARAMS = ["frames", "pageBorder", "kaleidoscope", "textures", "spiroEnabled", "outlineMode"];
 
 export function getStateFromURL(defaults) {
   try {

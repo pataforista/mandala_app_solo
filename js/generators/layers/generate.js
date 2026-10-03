@@ -1,6 +1,6 @@
 // js/generators/layers/generate.js
 import { mulberry32, rFloat } from "../../core/prng.js";
-import { PathBuilder } from "../../core/pathBuilder.js";
+import { PathBuilder, coloringCullArea } from "../../core/pathBuilder.js";
 import { lerp, clamp, polar } from "../../core/geometry.js";
 import {
   addCircle,
@@ -27,6 +27,18 @@ const _lerp = (a, b, t) => lerp(a, b, t);
 const _clamp = (v, min, max) => clamp(v, min, max);
 const _polar = (r, theta, cx, cy) => polar(r, theta, cx, cy);
 const _p = (r, theta, center) => polar(r, theta, center.x, center.y);
+
+// Conteo de motivos compatible con la simetría de `petals`: elige el divisor o
+// múltiplo de `petals` más cercano a `target` (nunca menor que `min`). Un conteo
+// arbitrario (p. ej. 15 motivos con 12 pétalos) reduce la simetría a gcd(15,12)=3.
+function symmetricCount(petals, target, min = 1) {
+  const candidates = [];
+  for (let d = 1; d <= petals; d++) if (petals % d === 0) candidates.push(d);
+  for (let m = 2; m <= 4; m++) candidates.push(petals * m);
+  const valid = candidates.filter(c => c >= min);
+  const pool = valid.length ? valid : [petals];
+  return pool.reduce((best, c) => (Math.abs(c - target) < Math.abs(best - target) ? c : best), pool[0]);
+}
 
 export function generateMandalaLayers(doc, opts) {
   const {
@@ -62,6 +74,10 @@ export function generateMandalaLayers(doc, opts) {
 
   const rng = mulberry32(seed);
   const paths = [];
+
+  // Perfil de coloreo: descarta formas cerradas demasiado pequeñas para colorear
+  const cullArea = coloringCullArea(opts);
+  const newPB = () => new PathBuilder({ minClosedArea: cullArea });
 
   const style = styleMode === "hashiko" ? "sashiko" : styleMode;
 
@@ -100,14 +116,14 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L0: CAPA DE IMAGEN (ZENTANGLE) ====================
   if (imagePoints && imagePoints.length > 0 && imageIntensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     addImageLayer(pb, center, R, imagePoints, petals, imageScale, detailW, imageMirror);
     pushPath(pb, detailW);
   }
 
   // ==================== L1: NÚCLEO (BINDU) ====================
   if (layer1Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const rCore = R * R1 * layer1Intensity;
 
     // Bindu central dot (always present)
@@ -115,7 +131,7 @@ export function generateMandalaLayers(doc, opts) {
 
     if (coreVariant === "sunburst") {
       // Radiating spokes of two lengths
-      const spokeCount = Math.max(petals, 12);
+      const spokeCount = petals * Math.ceil(12 / petals);
       for (let i = 0; i < spokeCount; i++) {
         const a = (i / spokeCount) * Math.PI * 2;
         pb.moveTo(_p(rCore * 0.15, a, center).x, _p(rCore * 0.15, a, center).y)
@@ -132,8 +148,11 @@ export function generateMandalaLayers(doc, opts) {
 
     } else if (coreVariant === "star_multi") {
       // Overlapping multi-pointed stars
-      addStar(pb, center.x, center.y, rCore * 0.82, rCore * 0.35, 8, 0);
-      addStar(pb, center.x, center.y, rCore * 0.5, rCore * 0.2, 6, Math.PI / 6);
+      // Puntas alineadas con petals para no imponer una simetría ajena al núcleo
+      const nOuter = petals >= 6 ? petals : petals * 2;
+      const nInner = nOuter % 2 === 0 && nOuter / 2 >= 3 ? nOuter / 2 : nOuter;
+      addStar(pb, center.x, center.y, rCore * 0.82, rCore * 0.35, nOuter, 0);
+      addStar(pb, center.x, center.y, rCore * 0.5, rCore * 0.2, nInner, Math.PI / nInner);
       addCircle(pb, center.x, center.y, rCore * 0.19, 10);
       if (layer1Intensity > 0.5) {
         addStar(pb, center.x, center.y, rCore * 0.27, rCore * 0.11, 4, Math.PI / 4);
@@ -161,7 +180,7 @@ export function generateMandalaLayers(doc, opts) {
       }
       if (layer1Intensity > 0.5) {
         addCircle(pb, center.x, center.y, rCore * 0.55, 20);
-        const miniCount = Math.max(8, petals);
+        const miniCount = petals * Math.ceil(8 / petals);
         for (let i = 0; i < miniCount; i++) {
           const a = (i / miniCount) * Math.PI * 2;
           const tipR = rCore * 0.82;
@@ -178,7 +197,7 @@ export function generateMandalaLayers(doc, opts) {
 
     // Pearl ring (all variants) - reduced density for coloring space
     if (layer1Intensity > 0.7) {
-      addPearlRing(pb, center.x, center.y, rCore * 1.08, Math.max(12, petals), rCore * 0.04);
+      addPearlRing(pb, center.x, center.y, rCore * 1.08, petals * Math.ceil(12 / petals), rCore * 0.04);
     }
 
     // Yantra always gets interlocked triangles on top
@@ -192,18 +211,38 @@ export function generateMandalaLayers(doc, opts) {
     pushPath(pb, detailW);
   }
 
+  // Radio del anillo de transición A: justo por fuera del límite de L2.
+  const ringARadius = R * R2 + Math.max(1.2, R * 0.02);
+  const ringAOuter = ringARadius + (Math.min(layer2Intensity, layer3Intensity) > 0.5 ? 2.4 : 0);
+  // Anillo B (frontera exterior de la banda L3/L7)
+  const ringBRadius = R * 0.52;
+
+  // Banda L3/L7: motivos culturales y hojas intercaladas comparten radio medio.
+  const l3Mid = R * R3;
+  const l3Count = symmetricCount(petals, petals * 0.7 * _lerp(0.5, 1.0, cFactor), 4);
+  const bandGap = Math.max(1.0, R * 0.012);
+  const l3MaxSize = Math.max(0, Math.min(
+    ringBRadius - bandGap - l3Mid,
+    l3Mid - ringAOuter - bandGap,
+    l3Mid * Math.sin(Math.PI / l3Count) * 0.92
+  ));
+
   // ==================== L2: PÉTALOS INTERNOS (Compound) - Simplified for coloring ====================
   if (layer2Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const rIn = R * R1 + 2; 
     const rOut = rIn + (R * R2 - rIn) * layer2Intensity;
     const count = petals;
     const angStep = (Math.PI * 2) / count;
 
+    // La alternancia A/B solo cierra el círculo con un conteo par; con impares
+    // quedarían dos pétalos iguales contiguos entre el último y el primero.
+    const alternate = kaleidoscope && count % 2 === 0;
+
     for (let i = 0; i < count; i++) {
       const aC = (i / count) * Math.PI * 2;
       // Kaleidoscope: alternate petal scale for visual rhythm
-      const kScale = kaleidoscope && i % 2 === 1 ? 0.82 : 1.0;
+      const kScale = alternate && i % 2 === 1 ? 0.82 : 1.0;
       const kROut = rIn + (rOut - rIn) * kScale;
 
       if (style === "islamico") {
@@ -237,7 +276,7 @@ export function generateMandalaLayers(doc, opts) {
 
       } else {
         // Kaleidoscope alternates between two seeded petal shapes for visual rhythm
-        const vType = kaleidoscope && i % 2 === 1 ? altPetalV : petalVariant;
+        const vType = alternate && i % 2 === 1 ? altPetalV : petalVariant;
         if (vType === "heart") {
           addHeartPetal(pb, center, rIn, kROut, aC, angStep);
         } else if (vType === "fleur") {
@@ -266,10 +305,10 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== RING A: Transition ring (between L2 and L3) - Simplified ====================
   {
-    const rRing = R * (R1 + R2) / 2 + 5;
+    const rRing = ringARadius;
     const intensity = Math.min(layer2Intensity, layer3Intensity);
     if (intensity > 0.3) {
-      const pb = new PathBuilder();
+      const pb = newPB();
       addCircle(pb, center.x, center.y, rRing, 64);
 
       // Scalloped decoration - reduced density
@@ -283,22 +322,12 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L3: PATRÓN CULTURAL (Simplified for coloring) ====================
   if (layer3Intensity > 0.05) {
-    const pb = new PathBuilder();
-    const rMid = R * R3;
-    const fSize = R * 0.11 * layer3Intensity;
-
-    // Complexity scales element count per motif ring - reduced for coloring space
-    const cMul = _lerp(0.5, 1.0, cFactor);
-    const countMap = {
-      sashiko: Math.max(6, Math.round(petals * 0.7 * cMul)),
-      islamico: Math.max(6, Math.round(petals * 0.7 * cMul)),
-      azteca: Math.max(5, Math.round(petals * 0.6 * cMul)),
-      yantra: Math.max(5, Math.round(petals * 0.6 * cMul)),
-      celtico: Math.max(4, Math.round(petals * 0.5 * cMul)),
-      floral: Math.max(4, Math.round(petals / 2.5 * cMul)),
-      geometric: Math.max(4, Math.round(petals / 2.5 * cMul)),
-    };
-    const count = countMap[style] ?? Math.max(4, Math.round(petals / 2.5 * cMul));
+    const pb = newPB();
+    const rMid = l3Mid;
+    // Tamaño acotado por los anillos vecinos y por el espacio angular entre motivos
+    const fSize = Math.min(R * 0.11 * layer3Intensity, l3MaxSize);
+    // Conteo armónico con petals (divisor o múltiplo) para no romper la simetría
+    const count = l3Count;
 
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
@@ -364,10 +393,10 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== RING B: Between L3 and L4 ====================
   {
-    const rRing = R * 0.52;
+    const rRing = ringBRadius;
     const intensity = Math.min(layer3Intensity, layer4Intensity);
     if (intensity > 0.15) {
-      const pb = new PathBuilder();
+      const pb = newPB();
       addCircle(pb, center.x, center.y, rRing, 80);
 
       if (intensity > 0.35) {
@@ -390,10 +419,10 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L4: ANILLO GEOMÉTRICO (Simplified for coloring) ====================
   if (layer4Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const r1 = R * 0.56;
     const r2 = r1 + R * 0.1 * layer4Intensity;
-    const count = Math.max(petals, Math.round(petals * 1.5 * _lerp(0.7, 1.1, cFactor)));
+    const count = petals * Math.max(1, Math.round(1.5 * _lerp(0.7, 1.1, cFactor)));
 
     // Inner ring only - no outer ring for more coloring space
     addCircle(pb, center.x, center.y, r1, 80);
@@ -448,7 +477,7 @@ export function generateMandalaLayers(doc, opts) {
     const rRing = R * 0.68;
     const intensity = Math.min(layer4Intensity, layer5Intensity);
     if (intensity > 0.3) {
-      const pb = new PathBuilder();
+      const pb = newPB();
       addCircle(pb, center.x, center.y, rRing, 80);
 
       pushPath(pb, fineW);
@@ -457,20 +486,18 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L5: DETALLES FINOS (Simplified for coloring) ====================
   if (layer5Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const rStart = R * 0.7;
-    const rEnd = rStart + R * 0.1 * layer5Intensity;
-    const count = Math.max(petals, Math.round(petals * 2 * _lerp(0.6, 1.0, cFactor)));
+    const rEnd = rStart + R * 0.08 * layer5Intensity;
+    // Múltiplo de petals: el patrón previo (dibujar solo índices pares de un
+    // conteo arbitrario) dejaba dos marcas contiguas cuando el conteo era impar.
+    const count = petals * (cFactor > 0.5 ? 2 : 1);
 
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
-
-      if (i % 2 === 0) {
-        // Simple line instead of teardrop
-        const p1 = _p(rStart, a, center);
-        const p2 = _p(rEnd, a, center);
-        addCapsule(pb, p1.x, p1.y, p2.x, p2.y, fineW);
-      }
+      const p1 = _p(rStart, a, center);
+      const p2 = _p(rEnd, a, center);
+      addCapsule(pb, p1.x, p1.y, p2.x, p2.y, fineW);
     }
 
     pushPath(pb, fineW);
@@ -478,19 +505,26 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L7: NATURAL / HOJAS / CULTURAL (Simplified for coloring) ====================
   if (layer7Intensity > 0.05 && style !== "geometric") {
-    const pb = new PathBuilder();
-    // Position L7 in the mid-ring zone (between L3 and L4), above L2/L3 content
-    const rInner = R * (R3 + 0.06);
-    const rOuter = rInner + R * 0.18 * layer7Intensity;
-    const count = petals;
+    const pb = newPB();
+    // L7 se intercala entre los motivos de L3, dentro de la misma banda
+    // (entre el anillo A y el anillo B): antes se solapaba con L3, el anillo B y L4.
+    const count = l3Count;
+    const fSize3 = layer3Intensity > 0.05 ? Math.min(R * 0.11 * layer3Intensity, l3MaxSize) : 0;
+    const halfBand = Math.min(ringBRadius - bandGap - l3Mid, l3Mid - ringAOuter - bandGap);
+    const halfSpan = Math.min(R * 0.09 * layer7Intensity, halfBand);
+    const rInner = l3Mid - halfSpan;
+    const rOuter = l3Mid + halfSpan;
+    // Medio paso angular menos lo que ocupa el motivo de L3 (y un margen)
+    const freeAng = (Math.PI / count) - Math.asin(_clamp((fSize3 + bandGap) / l3Mid, 0, 1));
+    const l7Fits = halfSpan > 1.5 && freeAng > 0.04;
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; l7Fits && i < count; i++) {
       const a = (i / count) * Math.PI * 2 + (Math.PI / count);
 
       if (style === "islamico") {
         // Simplified tessellation element - single star only
         const pC = _p((rInner + rOuter) * 0.5, a, center);
-        const dR = (rOuter - rInner) * 0.32 * layer7Intensity;
+        const dR = Math.min((rOuter - rInner) * 0.32 * layer7Intensity, l3Mid * Math.sin(freeAng) * 0.9);
         addStar(pb, pC.x, pC.y, dR, dR * 0.42, 8, a);
 
       } else if (style === "azteca") {
@@ -498,8 +532,9 @@ export function generateMandalaLayers(doc, opts) {
         const p1 = _p(rInner, a, center);
         const p2 = _p(rOuter, a, center);
         const pMid = _p((rInner + rOuter) * 0.5, a, center);
-        const stepL = _p((rInner + rOuter) * 0.5, a - 0.25, center);
-        const stepR = _p((rInner + rOuter) * 0.5, a + 0.25, center);
+        const stepW = Math.min(0.25, freeAng * 0.85);
+        const stepL = _p((rInner + rOuter) * 0.5, a - stepW, center);
+        const stepR = _p((rInner + rOuter) * 0.5, a + stepW, center);
         pb.moveTo(p1.x, p1.y).lineTo(stepL.x, stepL.y).lineTo(p2.x, p2.y)
           .lineTo(stepR.x, stepR.y).close();
 
@@ -507,8 +542,9 @@ export function generateMandalaLayers(doc, opts) {
         // Energy diamond - simplified without inner detail
         const pTop = _p(rOuter, a, center);
         const pBot = _p(rInner, a, center);
-        const pL = _p((rInner + rOuter) * 0.5, a - 0.3 * layer7Intensity, center);
-        const pR = _p((rInner + rOuter) * 0.5, a + 0.3 * layer7Intensity, center);
+        const dW = Math.min(0.3 * layer7Intensity, freeAng * 0.85);
+        const pL = _p((rInner + rOuter) * 0.5, a - dW, center);
+        const pR = _p((rInner + rOuter) * 0.5, a + dW, center);
         pb.moveTo(pTop.x, pTop.y).lineTo(pL.x, pL.y).lineTo(pBot.x, pBot.y)
           .lineTo(pR.x, pR.y).close();
 
@@ -516,8 +552,10 @@ export function generateMandalaLayers(doc, opts) {
         // Simplified interlaced curves without knotwork
         const p1 = _p(rInner, a, center);
         const p2 = _p(rOuter, a, center);
-        const cpA = _p((rInner + rOuter) * 0.5, a - 0.55 * layer7Intensity, center);
-        const cpB = _p((rInner + rOuter) * 0.5, a + 0.55 * layer7Intensity, center);
+        // Un punto de control quadrático a ±w deja la curva a ±w/2 del eje
+        const cW = Math.min(0.55 * layer7Intensity, freeAng * 1.7);
+        const cpA = _p((rInner + rOuter) * 0.5, a - cW, center);
+        const cpB = _p((rInner + rOuter) * 0.5, a + cW, center);
         pb.moveTo(p1.x, p1.y).quadTo(cpA.x, cpA.y, p2.x, p2.y);
         pb.moveTo(p1.x, p1.y).quadTo(cpB.x, cpB.y, p2.x, p2.y);
 
@@ -526,7 +564,7 @@ export function generateMandalaLayers(doc, opts) {
         const p1 = _p(rInner, a, center);
         const p2 = _p(rOuter, a, center);
         // Scale leaf width by angular spacing so leaves don't overlap at high petal counts
-        const leafW = Math.min(0.45, (Math.PI / count) * 0.7) * layer7Intensity;
+        const leafW = Math.min(0.45 * layer7Intensity, freeAng * 1.7);
         const cp1 = _p(rInner + (rOuter - rInner) * 0.5, a - leafW, center);
         const cp2 = _p(rInner + (rOuter - rInner) * 0.5, a + leafW, center);
         // Leaf outline only - no midrib or side veins
@@ -545,7 +583,7 @@ export function generateMandalaLayers(doc, opts) {
     const rRing = R * 0.80;
     const intensity = Math.min(Math.max(layer5Intensity, layer7Intensity), layer6Intensity);
     if (intensity > 0.2) {
-      const pb = new PathBuilder();
+      const pb = newPB();
       addCircle(pb, center.x, center.y, rRing, 96);
 
       pushPath(pb, fineW);
@@ -554,7 +592,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L6: BORDE DECORATIVO (Simplified for coloring) ====================
   if (layer6Intensity > 0.05) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const rBase = R * 0.83;
     const rTop = rBase + R * 0.13 * layer6Intensity;
     const count = petals;
@@ -620,7 +658,7 @@ export function generateMandalaLayers(doc, opts) {
         pb.moveTo(p1.x, p1.y).quadTo(pArc.x, pArc.y, p2.x, p2.y);
 
         if (i % 2 === 0) {
-          const pearl = _p(rTop + 1.6, am, center);
+          const pearl = _p(Math.min(rTop + 1.6, R - pearlR - 1), am, center);
           addCircle(pb, pearl.x, pearl.y, pearlR, 8);
         }
       }
@@ -644,7 +682,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== L8: TEXTURAS CULTURALES (Enhanced) ====================
   if (layer8Intensity > 0.1 && textures) {
-    const pb = new PathBuilder();
+    const pb = newPB();
 
     if (style === "sashiko") {
       // Enhanced sashiko stitching with pattern variation
@@ -783,7 +821,7 @@ export function generateMandalaLayers(doc, opts) {
 
   // ==================== FRAMES ====================
   if (includeFrames) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     addCircle(pb, center.x, center.y, R, 128);
     addCircle(pb, center.x, center.y, R + 3, 128);
 
@@ -799,7 +837,7 @@ export function generateMandalaLayers(doc, opts) {
   }
 
   if (pageBorder) {
-    const pb = new PathBuilder();
+    const pb = newPB();
     const m = marginMm;
     pb.moveTo(m, m).lineTo(page.wMm - m, m)
       .lineTo(page.wMm - m, page.hMm - m)
