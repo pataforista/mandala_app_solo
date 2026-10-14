@@ -1,7 +1,7 @@
 import { getStateFromURL, setStateToURL, randomSeed32 } from "./core/urlState.js";
 import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
-import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSvgElement, svgStringToImageData } from "./core/export.js";
+import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, downloadBookPdf, bookPageCount, flattenSvgElement, svgStringToImageData } from "./core/export.js";
 import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
 import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
@@ -1445,6 +1445,104 @@ function bindUI() {
 
   if (downloadPdfSidebar) {
     downloadPdfSidebar.addEventListener("click", downloadManualPdf);
+  }
+
+  // Libro completo (Amazon KDP): N mandalas con semillas consecutivas, a página completa
+  const bookBtn = document.getElementById("downloadBook");
+  const bookPagesEl = document.getElementById("bookPages");
+  const bookTitleEl = document.getElementById("bookTitle");
+  const bookVaryEl = document.getElementById("bookVary");
+  const bookBlankBackEl = document.getElementById("bookBlankBack");
+  const bookTitlePageEl = document.getElementById("bookTitlePage");
+  const bookPageNumbersEl = document.getElementById("bookPageNumbers");
+  const bookSummaryEl = document.getElementById("bookSummary");
+
+  const bookCount = () => Math.min(120, Math.max(1, parseInt(bookPagesEl?.value, 10) || 1));
+
+  const updateBookSummary = () => {
+    if (!bookSummaryEl) return;
+    const total = bookPageCount({
+      mandalas: bookCount(),
+      blankBack: bookBlankBackEl.checked,
+      titlePage: bookTitlePageEl.checked,
+    });
+    const { wMm, hMm } = getCurrentDoc().page;
+    bookSummaryEl.textContent = `${total} páginas en total · ${wMm}×${hMm} mm · ` +
+      (total < 24 ? "⚠️ KDP exige mínimo 24 páginas: sube el número de mandalas." : "✅ cumple el mínimo de KDP (24).");
+  };
+
+  const downloadBook = async () => {
+    const count = bookCount();
+    const total = bookPageCount({
+      mandalas: count, blankBack: bookBlankBackEl.checked, titlePage: bookTitlePageEl.checked,
+    });
+    if (total < 24 && !confirm(`El libro tendría ${total} páginas y KDP exige mínimo 24. ¿Crear de todos modos?`)) return;
+
+    const baseSeed = state.seed >>> 0;
+    const generatorFn = state.generatorType === "radial" ? generateMandalaRadial : generateMandalaLayers;
+    const makeOpts = (i) => {
+      // Mismo redondeo de pétalos que la vista previa en calidad alta (WYSIWYG)
+      const o = { ...buildOpts(state), seed: (baseSeed + i) >>> 0,
+        petals: Math.max(6, Math.round(state.petals / 2) * 2) };
+      if (bookVaryEl.checked) {
+        // Variación reproducible: mismas semillas ⇒ mismo libro
+        const rng = mulberry32(((baseSeed + i) ^ 0x9E3779B1) >>> 0);
+        o.petals = [8, 10, 12, 14, 16, 18, 20, 24][rInt(rng, 0, 7)];
+        o.complexity = Math.max(20, Math.round(o.complexity * (0.75 + rng() * 0.5)));
+        if (state.generatorType !== "radial") {
+          o.styleMode = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"][rInt(rng, 0, 6)];
+        }
+      }
+      if (state.generatorType === "radial") {
+        return { ...o, spiroEnabled: state.spiroEnabled, alternation: 0.3, harmony: 0.5, taper: 0.2,
+          spiroR: 60, spiror: 25, spiroDistance: 30, spiroResolution: 500, spiroMode: "hypo" };
+      }
+      return { ...o, imagePoints: currentImagePoints, imageScale: state.imageScale,
+        imageIntensity: state.imageIntensity, imageMirror: state.imageMirror };
+    };
+
+    bookBtn.loading = true;
+    bookBtn.disabled = true;
+    if (progressDialog) {
+      if (progressBar) progressBar.value = 0;
+      if (progressStatus) progressStatus.textContent = "Creando libro...";
+      progressDialog.show();
+    }
+    try {
+      const filename = `libro_${state.preset}_${count}mandalas_semilla${baseSeed}.pdf`;
+      await downloadBookPdf(filename, generatorFn, count, {
+        preset: state.preset,
+        genOpts: makeOpts,
+        title: (bookTitleEl.value || "").trim() || "Mandalas para Colorear",
+        titlePage: bookTitlePageEl.checked,
+        blankBack: bookBlankBackEl.checked,
+        pageNumbers: bookPageNumbersEl.checked,
+        dpi: 300,
+        onProgress: (done, tot, label) => {
+          if (progressBar && progressStatus) {
+            const percent = Math.round((done / tot) * 100);
+            progressBar.value = percent;
+            progressStatus.textContent = `${label} (${percent}%)`;
+          }
+        },
+      });
+      alert(`✅ Libro creado (${total} páginas). Súbelo a KDP como manuscrito PDF.`);
+    } catch (error) {
+      console.error("Book PDF error:", error);
+      alert("❌ Error al crear el libro: " + (error.message || "Intenta de nuevo"));
+    } finally {
+      bookBtn.loading = false;
+      bookBtn.disabled = false;
+      if (progressDialog) setTimeout(() => progressDialog.hide(), 500);
+    }
+  };
+
+  if (bookBtn) {
+    bookBtn.addEventListener("click", downloadBook);
+    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, presetEl].forEach(el =>
+      el && el.addEventListener("sl-change", updateBookSummary));
+    bookPagesEl.addEventListener("sl-input", updateBookSummary);
+    updateBookSummary();
   }
 
   if (shareBtn) {

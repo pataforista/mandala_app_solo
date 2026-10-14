@@ -1,4 +1,6 @@
 // js/core/export.js
+import { createDoc } from "./svgDoc.js";
+import { renderDocToSvgString } from "./svgRender.js";
 
 const RENDER_PX_PER_MM = 300 / 25.4; // 300 DPI: estándar de imprenta para libros
 
@@ -342,6 +344,82 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
   }
 }
 
+/**
+ * Páginas totales de un libro (para avisar del mínimo de 24 de KDP).
+ */
+export function bookPageCount({ mandalas, blankBack = true, titlePage = true }) {
+  return (titlePage ? (blankBack ? 2 : 1) : 0) + mandalas * (blankBack ? 2 : 1);
+}
+
+/**
+ * Libro completo para imprimir (p. ej. Amazon KDP): cada mandala ocupa la página
+ * entera al tamaño de corte elegido, tal como se ve en la vista previa.
+ * Orden con reverso en blanco: [título][blanco][m1][blanco][m2][blanco]…
+ * opts: { preset, genOpts(i) -> opciones del generador, title, titlePage, blankBack,
+ *         pageNumbers, dpi, onProgress }
+ */
+export async function downloadBookPdf(filename, generateFn, count, opts) {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    throw new Error("jsPDF no está cargado correctamente");
+  }
+  const {
+    preset, genOpts, title = "Mandalas para Colorear", titlePage = true,
+    blankBack = true, pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
+  } = opts;
+
+  const { wMm, hMm } = createDoc({ preset }).page;
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({
+    orientation: wMm > hMm ? "landscape" : "portrait",
+    unit: "mm",
+    format: [wMm, hMm],
+  });
+
+  const wPx = Math.ceil(wMm * dpi / 25.4);
+  const hPx = Math.ceil(hMm * dpi / 25.4);
+  const total = bookPageCount({ mandalas: count, blankBack, titlePage });
+  const yieldUI = () => new Promise(r => setTimeout(r, 0));
+  let pdfPage = 0;
+  const newPage = () => { if (pdfPage++ > 0) pdf.addPage([wMm, hMm]); };
+  const num = () => {
+    if (!pageNumbers) return;
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(120, 120, 120);
+    pdf.text(String(pdfPage), wMm / 2, hMm - 6, { align: "center" });
+    pdf.setTextColor(0, 0, 0);
+  };
+  const report = async (label) => {
+    if (onProgress) { onProgress(pdfPage, total, label); await yieldUI(); }
+  };
+
+  if (titlePage) {
+    newPage();
+    pdf.setFont("times", "bold");
+    pdf.setFontSize(Math.round(Math.min(wMm, hMm) / 6));
+    pdf.setTextColor(0, 0, 0);
+    const lines = pdf.splitTextToSize(title, wMm * 0.8);
+    pdf.text(lines, wMm / 2, hMm * 0.42, { align: "center" });
+    if (blankBack) newPage();
+    await report("Hoja de título");
+  }
+
+  for (let i = 0; i < count; i++) {
+    const doc = createDoc({ preset, seed: i, marginMm });
+    const o = genOpts(i);
+    doc.seed = o.seed >>> 0;
+    generateFn(doc, o);
+    const img = await svgStringToImageData(renderDocToSvgString(doc), wPx, hPx);
+    newPage();
+    pdf.addImage(img, "PNG", 0, 0, wMm, hMm, undefined, "FAST");
+    num();
+    if (blankBack) { newPage(); num(); }
+    await report(`Mandala ${i + 1} de ${count}`);
+  }
+
+  pdf.save(filename);
+  return { pages: pdfPage, wMm, hMm };
+}
 
 function saveBlob(blob, filename) {
   const url = URL.createObjectURL(blob);

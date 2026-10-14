@@ -350,6 +350,10 @@
             <sl-select id="preset" label="Formato de Papel" size="small" value="A4">
               <sl-option value="A4">A4</sl-option>
               <sl-option value="LETTER">Carta</sl-option>
+              <sl-option value="KDP_8_5x8_5">KDP 8.5×8.5 in (cuadrado)</sl-option>
+              <sl-option value="KDP_8_5x11">KDP 8.5×11 in</sl-option>
+              <sl-option value="KDP_8x10">KDP 8×10 in</sl-option>
+              <sl-option value="KDP_6x9">KDP 6×9 in</sl-option>
             </sl-select>
             <sl-range id="petals" label="Pétalos" min="6" max="96" value="12"></sl-range>
             <sl-range id="complexity" label="Complejidad" min="20" max="320" value="130"></sl-range>
@@ -456,6 +460,29 @@
         </sl-accordion-item>
       </sl-accordion>
       
+      <sl-divider></sl-divider>
+
+      <!-- Libro completo para Amazon KDP -->
+      <div class="control-group">
+        <div class="section-title">
+          <sl-icon name="book"></sl-icon> Libro para Amazon KDP
+        </div>
+        <p style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;">
+          Crea el interior completo: cada página es un mandala distinto con tu estilo actual. Elige el tamaño en «Formato de Papel».
+        </p>
+        <sl-input id="bookTitle" label="Título (hoja de título)" size="small" placeholder="Mandalas para Colorear"></sl-input>
+        <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="30"></sl-input>
+        <sl-checkbox id="bookVary" checked>Variar pétalos, complejidad y estilo entre páginas</sl-checkbox>
+        <sl-checkbox id="bookBlankBack" checked>Página en blanco al reverso (evita que el marcador traspase)</sl-checkbox>
+        <sl-checkbox id="bookTitlePage" checked>Incluir hoja de título</sl-checkbox>
+        <sl-checkbox id="bookPageNumbers">Numerar páginas</sl-checkbox>
+        <p id="bookSummary" style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;"></p>
+        <sl-button id="downloadBook" variant="success" size="medium" pill style="width: 100%;">
+          <sl-icon slot="prefix" name="journal-bookmark"></sl-icon>
+          Crear libro (PDF)
+        </sl-button>
+      </div>
+
       <sl-divider></sl-divider>
 
       <!-- Layout de Exportación -->
