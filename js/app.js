@@ -1,11 +1,12 @@
 import { getStateFromURL, setStateToURL, randomSeed32 } from "./core/urlState.js";
 import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
-import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, flattenSvgElement, svgStringToImageData } from "./core/export.js";
+import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, downloadBookPdf, bookPageCount, flattenSvgElement, svgStringToImageData } from "./core/export.js";
 import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
 import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
 import { generateMandalaRadial } from "./generators/mandalaRadial.js";
+import { generateMandalaClassic } from "./generators/mandalaClassic.js";
 import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
@@ -100,8 +101,15 @@ const showGuidesEl = document.getElementById("showGuides");
 const imageUploadEl = document.getElementById("imageUpload");
 const uploadBtn = document.getElementById("uploadBtn");
 
+// Motor "classic": gramática de libro comercial (bandas llenas, pétalos en capas)
+function getGeneratorFn(type) {
+  if (type === "radial") return generateMandalaRadial;
+  if (type === "layers") return generateMandalaLayers;
+  return generateMandalaClassic;
+}
+
 const DEFAULTS = {
-  generatorType: "layers",
+  generatorType: "classic",
   spiroEnabled: false,
   preset: "A4",
   petals: 12,
@@ -207,10 +215,10 @@ const STRUCTURE_PRESETS = {
 const COLORING_PRESETS = {
   ninos: {
     // Niños pequeños (5-8 años) - Muy simple
-    // El motor radial simplificado da formas grandes y pocas (≈30-80 zonas);
-    // en "layers" la intensidad controla el TAMAÑO, así que se mantiene alta
+    // Motor clásico en modo contornos: pocas bandas y formas grandes.
+    // En "layers" la intensidad controla el TAMAÑO, así que se mantiene alta
     // y solo se apagan las capas de detalle fino (L5 ranuras, L8 texturas).
-    generatorType: "radial",
+    generatorType: "classic",
     complexity: 40,
     organic: 0.1,
     strokeWidth: 0.8,
@@ -233,7 +241,7 @@ const COLORING_PRESETS = {
   },
   ninos_grande: {
     // Niños grandes (9-12 años) - Simple
-    generatorType: "radial",
+    generatorType: "classic",
     complexity: 70,
     organic: 0.15,
     strokeWidth: 0.7,
@@ -300,7 +308,7 @@ const COLORING_PRESETS = {
   },
   zen: {
     // Zen - Minimalista
-    generatorType: "radial",
+    generatorType: "classic",
     complexity: 50,
     organic: 0.2,
     strokeWidth: 0.9,
@@ -338,7 +346,7 @@ if (!state.pngDpi) state.pngDpi = 300;
 if (!state.previewQuality) state.previewQuality = "high";
 if (!state.layoutMode) state.layoutMode = "single";
 if (!state.layerPreset) state.layerPreset = "custom";
-if (!state.generatorType) state.generatorType = "layers";
+if (!state.generatorType) state.generatorType = "classic";
 if (!state.structurePreset || !STRUCTURE_PRESETS[state.structurePreset]) state.structurePreset = "custom";
 if (!state.coloringPreset || !COLORING_PRESETS[state.coloringPreset]) state.coloringPreset = "adulto";
 
@@ -415,15 +423,16 @@ function getCurrentDoc() {
 
 function updateGeneratorUI() {
   const isRadial = state.generatorType === "radial";
-  
-  if (layersAccordionItem) layersAccordionItem.style.display = isRadial ? "none" : "block";
+  const isLayers = state.generatorType === "layers";
+
+  if (layersAccordionItem) layersAccordionItem.style.display = isLayers ? "block" : "none";
   
   if (styleModeEl) {
     const styleModeGroup = styleModeEl.closest('.control-group > sl-select') || styleModeEl;
     styleModeGroup.style.display = isRadial ? "none" : "block";
   }
 
-  if (imageAccordionItem) imageAccordionItem.style.display = isRadial ? "none" : "block";
+  if (imageAccordionItem) imageAccordionItem.style.display = isLayers ? "block" : "none";
   
   if (spiroEnabledEl) spiroEnabledEl.style.display = isRadial ? "block" : "none";
 }
@@ -504,7 +513,7 @@ function render() {
     const allDefs = [];
     let bodiesHtml = "";
 
-    const generatorFn = state.generatorType === "radial" ? generateMandalaRadial : generateMandalaLayers;
+    const generatorFn = getGeneratorFn(state.generatorType);
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -584,6 +593,8 @@ function render() {
       spiroResolution: 500,
       spiroMode: "hypo"
     });
+  } else if (state.generatorType === "classic") {
+    generateMandalaClassic(doc, opts);
   } else {
     generateMandalaLayers(doc, {
       ...opts,
@@ -899,7 +910,7 @@ function bindUI() {
 
   if (generatorTypeEl) {
     generatorTypeEl.addEventListener("sl-change", () => {
-      state.generatorType = generatorTypeEl.value || "layers";
+      state.generatorType = generatorTypeEl.value || "classic";
       updateImmediate();
     });
   }
@@ -1229,7 +1240,7 @@ function bindUI() {
       const shuffleRng = mulberry32((state.seed ^ 0x9E3779B9) >>> 0);
       
       // Randomize motor
-      state.generatorType = pick(shuffleRng, ["layers", "radial"]);
+      state.generatorType = pick(shuffleRng, ["classic", "classic", "classic", "radial"]);
       if (state.generatorType === "radial") {
         state.spiroEnabled = pick(shuffleRng, [true, false]);
       }
@@ -1411,7 +1422,7 @@ function bindUI() {
       await downloadBatchPdf(
         filename,
         batchOpts,
-        state.generatorType === "radial" ? generateMandalaRadial : generateMandalaLayers,
+        getGeneratorFn(state.generatorType),
         wMm,
         hMm,
         layout,
@@ -1445,6 +1456,104 @@ function bindUI() {
 
   if (downloadPdfSidebar) {
     downloadPdfSidebar.addEventListener("click", downloadManualPdf);
+  }
+
+  // Libro completo (Amazon KDP): N mandalas con semillas consecutivas, a página completa
+  const bookBtn = document.getElementById("downloadBook");
+  const bookPagesEl = document.getElementById("bookPages");
+  const bookTitleEl = document.getElementById("bookTitle");
+  const bookVaryEl = document.getElementById("bookVary");
+  const bookBlankBackEl = document.getElementById("bookBlankBack");
+  const bookTitlePageEl = document.getElementById("bookTitlePage");
+  const bookPageNumbersEl = document.getElementById("bookPageNumbers");
+  const bookSummaryEl = document.getElementById("bookSummary");
+
+  const bookCount = () => Math.min(120, Math.max(1, parseInt(bookPagesEl?.value, 10) || 1));
+
+  const updateBookSummary = () => {
+    if (!bookSummaryEl) return;
+    const total = bookPageCount({
+      mandalas: bookCount(),
+      blankBack: bookBlankBackEl.checked,
+      titlePage: bookTitlePageEl.checked,
+    });
+    const { wMm, hMm } = getCurrentDoc().page;
+    bookSummaryEl.textContent = `${total} páginas en total · ${wMm}×${hMm} mm · ` +
+      (total < 24 ? "⚠️ KDP exige mínimo 24 páginas: sube el número de mandalas." : "✅ cumple el mínimo de KDP (24).");
+  };
+
+  const downloadBook = async () => {
+    const count = bookCount();
+    const total = bookPageCount({
+      mandalas: count, blankBack: bookBlankBackEl.checked, titlePage: bookTitlePageEl.checked,
+    });
+    if (total < 24 && !confirm(`El libro tendría ${total} páginas y KDP exige mínimo 24. ¿Crear de todos modos?`)) return;
+
+    const baseSeed = state.seed >>> 0;
+    const generatorFn = getGeneratorFn(state.generatorType);
+    const makeOpts = (i) => {
+      // Mismo redondeo de pétalos que la vista previa en calidad alta (WYSIWYG)
+      const o = { ...buildOpts(state), seed: (baseSeed + i) >>> 0,
+        petals: Math.max(6, Math.round(state.petals / 2) * 2) };
+      if (bookVaryEl.checked) {
+        // Variación reproducible: mismas semillas ⇒ mismo libro
+        const rng = mulberry32(((baseSeed + i) ^ 0x9E3779B1) >>> 0);
+        o.petals = [8, 10, 12, 14, 16, 18, 20, 24][rInt(rng, 0, 7)];
+        o.complexity = Math.max(20, Math.round(o.complexity * (0.75 + rng() * 0.5)));
+        if (state.generatorType !== "radial") {
+          o.styleMode = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"][rInt(rng, 0, 6)];
+        }
+      }
+      if (state.generatorType === "radial") {
+        return { ...o, spiroEnabled: state.spiroEnabled, alternation: 0.3, harmony: 0.5, taper: 0.2,
+          spiroR: 60, spiror: 25, spiroDistance: 30, spiroResolution: 500, spiroMode: "hypo" };
+      }
+      return { ...o, imagePoints: currentImagePoints, imageScale: state.imageScale,
+        imageIntensity: state.imageIntensity, imageMirror: state.imageMirror };
+    };
+
+    bookBtn.loading = true;
+    bookBtn.disabled = true;
+    if (progressDialog) {
+      if (progressBar) progressBar.value = 0;
+      if (progressStatus) progressStatus.textContent = "Creando libro...";
+      progressDialog.show();
+    }
+    try {
+      const filename = `libro_${state.preset}_${count}mandalas_semilla${baseSeed}.pdf`;
+      await downloadBookPdf(filename, generatorFn, count, {
+        preset: state.preset,
+        genOpts: makeOpts,
+        title: (bookTitleEl.value || "").trim() || "Mandalas para Colorear",
+        titlePage: bookTitlePageEl.checked,
+        blankBack: bookBlankBackEl.checked,
+        pageNumbers: bookPageNumbersEl.checked,
+        dpi: 300,
+        onProgress: (done, tot, label) => {
+          if (progressBar && progressStatus) {
+            const percent = Math.round((done / tot) * 100);
+            progressBar.value = percent;
+            progressStatus.textContent = `${label} (${percent}%)`;
+          }
+        },
+      });
+      alert(`✅ Libro creado (${total} páginas). Súbelo a KDP como manuscrito PDF.`);
+    } catch (error) {
+      console.error("Book PDF error:", error);
+      alert("❌ Error al crear el libro: " + (error.message || "Intenta de nuevo"));
+    } finally {
+      bookBtn.loading = false;
+      bookBtn.disabled = false;
+      if (progressDialog) setTimeout(() => progressDialog.hide(), 500);
+    }
+  };
+
+  if (bookBtn) {
+    bookBtn.addEventListener("click", downloadBook);
+    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, presetEl].forEach(el =>
+      el && el.addEventListener("sl-change", updateBookSummary));
+    bookPagesEl.addEventListener("sl-input", updateBookSummary);
+    updateBookSummary();
   }
 
   if (shareBtn) {

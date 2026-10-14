@@ -5,6 +5,7 @@ import { createDoc } from "../js/core/svgDoc.js";
 import { renderDocToSvgString } from "../js/core/svgRender.js";
 import { generateMandalaLayers } from "../js/generators/mandalaLayers.js";
 import { generateMandalaRadial } from "../js/generators/mandalaRadial.js";
+import { generateMandalaClassic } from "../js/generators/mandalaClassic.js";
 import { PathBuilder, coloringCullArea } from "../js/core/pathBuilder.js";
 
 const STYLES = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
@@ -87,8 +88,8 @@ function asymmetryRatio(segs, n, tol = 0.15) {
   return miss / Math.max(1, segs.length);
 }
 
-test("ambos generadores son deterministas y no emiten NaN/undefined", () => {
-  for (const gen of [generateMandalaLayers, generateMandalaRadial]) {
+test("los generadores son deterministas y no emiten NaN/undefined", () => {
+  for (const gen of [generateMandalaLayers, generateMandalaRadial, generateMandalaClassic]) {
     for (let s = 1; s <= 40; s++) {
       for (const petals of [3, 5, 6, 7, 10, 12, 16, 24]) {
         const opts = { ...BASE, seed: (s * 2654435761) >>> 0, petals, styleMode: STYLES[s % STYLES.length],
@@ -175,4 +176,40 @@ test("perfil de coloreo: adulto/experto intactos, niños filtra y simplifica", (
   const adult = count({ minCellAreaMm2: 3, detailSimplification: 0.5 });
   const kids = count({ complexity: 40, minCellAreaMm2: 6, detailSimplification: 0.85, outlineMode: true, textures: false });
   assert.ok(kids < adult * 0.6, `niños (${kids}) debería ser mucho más simple que adulto (${adult})`);
+});
+
+test("clásico: cada banda tiene simetría de orden petals (o petals/2, armónico)", () => {
+  for (const petals of [5, 7, 8, 12]) {
+    for (const styleMode of STYLES) {
+      for (const seed of [1, 99, 4242]) {
+        for (const o of [{}, { outlineMode: true, complexity: 20 }, { complexity: 300, detailSimplification: 0.2 }]) {
+          const { doc } = render(generateMandalaClassic, { ...BASE, seed, petals, styleMode, pageBorder: false, ...o });
+          const orders = petals % 2 === 0 ? [petals, petals / 2] : [petals];
+          doc.body.forEach((frag, i) => {
+            const segs = segmentsOf([frag]);
+            assert.ok(orders.some(n => asymmetryRatio(segs, n) === 0),
+              `fragmento ${i} asimétrico petals=${petals} ${styleMode} seed=${seed}`);
+          });
+        }
+      }
+    }
+  }
+});
+
+test("clásico: todo cabe en la página y respeta el grosor mínimo de impresión", () => {
+  for (const preset of ["A4", "KDP_8_5x8_5", "KDP_6x9"]) {
+    for (let seed = 1; seed <= 30; seed++) {
+      const doc = createDoc({ preset, seed, marginMm: 10 });
+      generateMandalaClassic(doc, { ...BASE, seed, petals: 6 + (seed % 10) * 2, styleMode: STYLES[seed % STYLES.length], strokeWidthMm: 0.2 });
+      const { wMm, hMm } = doc.page;
+      for (const [x0, y0, x1, y1] of segmentsOf(doc.body)) {
+        for (const [x, y] of [[x0, y0], [x1, y1]]) {
+          assert.ok(x >= 9.9 && x <= wMm - 9.9 && y >= 9.9 && y <= hMm - 9.9, `${preset} seed=${seed}: punto fuera del margen (${x}, ${y})`);
+        }
+      }
+      for (const m of doc.body.join("").matchAll(/stroke-width="([\d.]+)"/g)) {
+        assert.ok(+m[1] >= 0.3, `${preset} seed=${seed}: línea de ${m[1]} mm, demasiado fina para imprimir`);
+      }
+    }
+  }
 });
