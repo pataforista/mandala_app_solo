@@ -121,7 +121,7 @@ export function composePage(doc, opts, drawMandala) {
     complexity: 20,
     includeFrames: false,
     outlineMode: outlineMode || r < 30,
-    maxBands: r < 12 ? 2 : r < 20 ? 3 : r < 30 ? 4 : undefined,
+    maxBands: r < 16 ? 2 : r < 24 ? 3 : r < 32 ? 4 : undefined,
     detailSimplification: 0.7,
     strokeWidthMm: Math.max(0.3, strokeWidthMm * 0.75),
     centerArt: null,
@@ -237,18 +237,23 @@ export function composePage(doc, opts, drawMandala) {
       break;
     }
     case "gigante": {
-      // Recorte interior: el mandala desborda el marco y la página parece un acercamiento
-      const R = Math.hypot(aw, ah) / 2 * (0.78 + rng() * 0.12);
-      const ox = aw * (rng() - 0.5) * 0.16, oy = ah * (rng() - 0.5) * 0.16;
+      // Recorte interior: el mandala desborda el marco y la página parece un acercamiento.
+      // El radio supera la semidiagonal: el diseño cubre también las esquinas. Con un
+      // radio menor sólo se recortaban las puntas de los pétalos exteriores y la página
+      // parecía un mandala mal encuadrado, con esquinas vacías.
+      const ox = aw * (rng() - 0.5) * 0.08, oy = ah * (rng() - 0.5) * 0.08;
+      const R = Math.hypot(aw / 2 + Math.abs(ox), ah / 2 + Math.abs(oy)) * (1.04 + rng() * 0.12);
       content.push(...sub(acx + ox, acy + oy, R));
       clip = true;
       break;
     }
     case "medio": {
-      // Medio mandala que nace del borde inferior (o superior): un amanecer
+      // Medio mandala que nace del borde inferior (o superior): un amanecer.
+      // Cabe a lo ancho (sólo lo corta la línea de base); si además se cortaba por los
+      // lados, quedaba un fragmento sin forma reconocible.
       const top = rng() < 0.3;
       const y = top ? A.y0 : A.y1;
-      const R = Math.min(aw * 0.62, ah * 0.78);
+      const R = Math.min(aw * 0.48, ah * 0.62);
       content.push(...sub(acx, y, R));
       obstacles.push({ x: acx, y, r: R });
       clip = true;
@@ -273,6 +278,12 @@ export function composePage(doc, opts, drawMandala) {
     const id = `frameclip-${(seed >>> 0).toString(36)}-${doc.defs.length}`;
     doc.defs.push(`<clipPath id="${id}"><rect x="${A.x0 - gap + 0.01}" y="${A.y0 - gap + 0.01}" width="${aw + 2 * gap - 0.02}" height="${ah + 2 * gap - 0.02}" /></clipPath>`);
     doc.body.push(`<g clip-path="url(#${id})">`, ...body, `</g>`);
+    // Sin marco, el recorte dejaba celdas abiertas en el borde: una línea las cierra
+    if (style === "ninguno") {
+      const pb = new PathBuilder();
+      rect(pb, A.x0 - gap, A.y0 - gap, A.x1 + gap, A.y1 + gap, 0);
+      emit(frameItems, pb, mainW);
+    }
   } else {
     doc.body.push(...body);
   }

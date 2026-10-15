@@ -60,8 +60,10 @@ export function generateMandalaClassic(doc, opts) {
   const mainW = Math.max(MIN_LINE_MM, strokeWidthMm);
   const detailW = Math.max(MIN_LINE_MM, strokeWidthMm * 0.7);
   const cull = coloringCullArea(opts);
-  // Escala: el diseño debe verse igual en 6×9 que en 8.5×11
-  const minCell = Math.max(cull, 2.5 * (R / 90) ** 2);
+  // Escala: el diseño debe verse igual en 6×9 que en 8.5×11. Pero un mandala pequeño
+  // (relleno de constelación, esquinas) no es una copia reducida: por debajo de ~2 mm²
+  // la celda ya no se colorea, mida lo que mida el disco.
+  const minCell = Math.max(cull, 2.5 * (R / 90) ** 2, 2);
 
   const P = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   const out = [];
@@ -81,7 +83,9 @@ export function generateMandalaClassic(doc, opts) {
   if (art) B = Math.max(3, B - Math.round(artFrac * 6));
   // Mandalas pequeños de relleno: pocas bandas o las celdas se vuelven incoloreables
   if (opts.maxBands) B = Math.max(2, Math.min(B, opts.maxBands));
-  const rCore = art ? R * artFrac : R * (0.11 + rng() * 0.05);
+  // Núcleo con tamaño absoluto mínimo: en los mini mandalas un núcleo de 1–2 mm
+  // se imprime como una mancha negra
+  const rCore = art ? R * artFrac : Math.max(R * (0.11 + rng() * 0.05), Math.min(R * 0.3, 3.5));
   const weights = Array.from({ length: B }, (_, k) => {
     let w = 0.75 + rng() * 0.7;
     if (k === B - 1) w *= 1.9;          // banda exterior: silueta protagonista
@@ -114,13 +118,13 @@ export function generateMandalaClassic(doc, opts) {
   for (const b of bands) {
     const h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
     if (b.k === B - 1) b.motif = SILHOUETTE[Math.floor(rng() * SILHOUETTE.length)];
-    else if (beadSlots.has(b.k)) b.motif = "beads";
+    else if (beadSlots.has(b.k) && h >= 3) b.motif = "beads"; // cuentas de <1 mm = puntos negros
     else b.motif = pickMotif(prev);
     prev = b.motif;
     // Conteo armónico cuyo ancho de celda se acerca a la proporción ideal del motivo
     const target = ASPECT[b.motif] * h;
     // Celda mínima ~4.5 mm (a escala de página): más estrecha no se colorea bien
-    const minArc = 4.5 * (R / 90);
+    const minArc = Math.max(4.5 * (R / 90), 3.2);
     const ok = harmonics.filter(n => TAU * rm / n >= minArc);
     const pool = ok.length ? ok : [harmonics[0]];
     b.n = pool.reduce((best, n) =>
@@ -379,7 +383,20 @@ export function generateMandalaClassic(doc, opts) {
 
   // ---------- Núcleo: flor central ----------
   {
-    const nC = N >= 12 && N % 2 === 0 ? N / 2 : N;
+    // Pétalos del núcleo: el mayor divisor de N cuyo pétalo mida ≥ 2 mm de ancho;
+    // si ni 4 caben, el núcleo queda como un disco liso con un anillo
+    let nC = N >= 12 && N % 2 === 0 ? N / 2 : N;
+    const fits = (n) => TAU * rCore * 0.6 / n >= 2;
+    if (!fits(nC)) {
+      const divs = [];
+      for (let k = 2; N / k >= 4; k++) if (N % k === 0) divs.push(N / k);
+      nC = divs.find(fits) ?? 0;
+    }
+    if (!nC) {
+      const c = mainPB(); circle(c, cx, cy, rCore * 0.55); emit(c, mainW, "#fff");
+      doc.body.push(...out);
+      return doc;
+    }
     const step = TAU / nC, w = fitW(step, 0.95);
     const roundCore = rng() < 0.5;
     const m = mainPB(), d = detailPB();

@@ -8,13 +8,33 @@ El modo libro planifica ahora cada página antes de dibujarla (`js/core/bookPlan
 | Dimensión | Opciones | Regla |
 |---|---|---|
 | Estilo | sashiko, floral, geométrico, islámico, azteca, yantra, céltico | bolsa barajada: se agotan todos antes de repetir; nunca dos iguales seguidos |
-| Composición | centrado, fondo decorado, constelación, cuartos en esquinas, gigante recortado, medio mandala | «centrado» pesa más (es el más coloreable) |
+| Composición | centrado, fondo decorado, constelación, cuartos en esquinas, gigante (cubre la hoja), medio mandala | «centrado» pesa más (es el más coloreable); en «Libro KDP» eliges cuáles pueden salir |
 | Marco | redondeado, doble con rombos, festón, sin marco | sin repetición consecutiva |
 | Pétalos | 8–24 | bolsa barajada |
 | Dificultad | mixta, progresiva (fácil → difícil), fija | |
 | Mis imágenes | uso elegido **a mano** por imagen: figura rellena, anillos o medallón | cada imagen elegida aparece una vez, repartida de forma uniforme |
 
 Misma semilla ⇒ mismo libro (reproducible).
+
+### Revisar páginas antes de crear el PDF
+
+El sorteo no siempre acierta. En la pestaña **Libro KDP → Revisar páginas antes de crear** se ven
+todas las páginas en miniatura; en cada una:
+
+- **Otro diseño**: mismo encuadre, mandala nuevo (sólo cambia la semilla de esa página).
+- **Otro encuadre**: pasa a la siguiente composición permitida.
+
+Los cambios se guardan mientras no cambies la semilla, las composiciones permitidas o la dificultad,
+y se aplican al pulsar «Crear libro».
+
+### Composiciones corregidas (revisión del libro de 30 mandalas, semilla 3164907524)
+
+| Problema visto en el PDF | Causa | Corrección |
+|---|---|---|
+| «Gigante»: pétalos exteriores apenas cortados y esquinas vacías; parecía un mandala mal encuadrado | radio entre 0,78 y 0,90 de la semidiagonal | radio > semidiagonal: el diseño cubre toda la hoja y se lee como un acercamiento |
+| «Medio mandala» cortado también por los lados | radio de 0,62 × ancho | radio ≤ 0,48 × ancho: sólo lo corta la línea de base |
+| Celdas abiertas en el borde de las páginas recortadas sin marco | el recorte no dejaba línea | una línea cierra el borde del recorte |
+| Mini mandalas con el centro como una mancha negra | los límites de celda escalaban con el radio: un disco de 15 mm tenía celdas de 1 mm | mínimos absolutos: celda ≥ 2 mm², ancho de celda ≥ 3,2 mm, núcleo ≥ 3,5 mm, cuentas sólo en bandas ≥ 3 mm |
 
 ## 2. Requisitos de KDP que el PDF cumple
 

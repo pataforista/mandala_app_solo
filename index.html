@@ -155,6 +155,50 @@
       opacity: 0.3;
     }
 
+    .hint {
+      font-size: 0.75rem;
+      color: var(--m3-on-surface-variant);
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .comp-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--m3-surface-variant);
+      border-radius: 12px;
+    }
+
+    .comp-box > .hint { grid-column: 1 / -1; }
+
+    #sideTabs sl-tab::part(base) { padding: 10px 10px; font-size: 0.85rem; }
+    #sideTabs sl-tab-panel::part(base) { padding: 16px 0 8px; }
+
+    #reviewGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .review-card {
+      border: 1px solid var(--m3-surface-variant);
+      border-radius: 12px;
+      padding: 6px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .review-card.changed { border-color: var(--m3-primary); box-shadow: 0 0 0 2px var(--m3-primary-container); }
+    .review-card .thumb { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
+    .review-card .thumb svg { width: 100%; height: 100%; }
+    .review-card .meta { font-size: 0.7rem; color: var(--m3-on-surface-variant); }
+    .review-card .actions { display: flex; flex-direction: column; gap: 4px; }
+    .review-card .actions sl-button::part(base) { width: 100%; }
+
     .control-group {
       display: flex;
       flex-direction: column;
@@ -292,73 +336,57 @@
 
   <main>
     <div id="sidebar">
-      <!-- Generación -->
+      <!-- Formato: lo usan la vista previa, la descarga y el libro -->
       <div class="control-group">
-        <div class="section-title">
-          <sl-icon name="lightning-charge"></sl-icon> Rápido
-        </div>
-        <div style="display:flex; gap:12px; align-items: flex-end;">
-          <sl-input id="seed" type="number" label="Semilla" size="small" style="flex:1;" value="1"></sl-input>
-          <div style="display:flex; gap:2px;">
-            <sl-icon-button id="prevSeed" name="chevron-left" label="Anterior"></sl-icon-button>
-            <sl-icon-button id="nextSeed" name="chevron-right" label="Siguiente"></sl-icon-button>
-            <sl-icon-button id="regen" name="dice-5" label="Aleatorio" style="font-size: 1.5rem; color: var(--m3-primary);"></sl-icon-button>
-          </div>
-        </div>
-        <sl-button id="magicShuffle" variant="primary" size="medium" pill style="width: 100%; --sl-color-primary-600: #d81b60; --sl-color-primary-500: #e91e63;">
-          <sl-icon slot="prefix" name="magic"></sl-icon>
-          Mezcla Mágica
-        </sl-button>
-        <sl-select id="structurePreset" label="Plantilla" size="small" value="custom">
-          <sl-option value="custom">Personalizada</sl-option>
-          <sl-option value="simple">Simple</sl-option>
-          <sl-option value="balanced">Equilibrada</sl-option>
-          <sl-option value="detailed">Detallada</sl-option>
-          <sl-option value="botanical">Botánica</sl-option>
-          <sl-option value="geometric">Geométrica</sl-option>
-          <sl-option value="islamico">Islámica</sl-option>
+        <sl-select id="preset" label="Formato de papel" size="small" value="A4" help-text="Se usa en la vista previa, en las descargas y en el libro.">
+          <sl-option value="A4">A4</sl-option>
+          <sl-option value="LETTER">Carta</sl-option>
+          <sl-option value="KDP_8_5x8_5">KDP 8.5×8.5 in (cuadrado)</sl-option>
+          <sl-option value="KDP_8_5x11">KDP 8.5×11 in</sl-option>
+          <sl-option value="KDP_8x10">KDP 8×10 in</sl-option>
+          <sl-option value="KDP_6x9">KDP 6×9 in</sl-option>
         </sl-select>
-        <sl-button id="applyStructure" variant="secondary" size="small" pill style="width: 100%;">Aplicar Plantilla</sl-button>
       </div>
 
-      <sl-divider></sl-divider>
+      <sl-tab-group id="sideTabs" no-scroll-controls>
+        <sl-tab slot="nav" panel="disenar"><sl-icon name="brush" style="margin-right:6px;"></sl-icon>Diseñar</sl-tab>
+        <sl-tab slot="nav" panel="libro"><sl-icon name="book" style="margin-right:6px;"></sl-icon>Libro KDP</sl-tab>
+        <sl-tab slot="nav" panel="imagenes"><sl-icon name="image" style="margin-right:6px;"></sl-icon>Imágenes</sl-tab>
 
-      <!-- Configuración -->
-      <sl-accordion>
-        <sl-accordion-item open>
-          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="aspect-ratio"></sl-icon> Geometría</span>
-          <div class="control-group" style="padding: 12px 0;">
-            <sl-select id="generatorType" label="Tipo de Motor" size="small" value="classic">
-              <sl-option value="classic">Clásico (calidad libro comercial) ★</sl-option>
-              <sl-option value="layers">Modular (8 Capas)</sl-option>
-              <sl-option value="radial">Radial (Editorial)</sl-option>
+        <!-- ===== Diseñar ===== -->
+        <sl-tab-panel name="disenar">
+          <div class="control-group">
+            <div style="display:flex; gap:12px; align-items: flex-end;">
+              <sl-input id="seed" type="number" label="Semilla" size="small" style="flex:1; min-width:0;" value="1"></sl-input>
+              <div style="display:flex; gap:2px;">
+                <sl-icon-button id="prevSeed" name="chevron-left" label="Anterior"></sl-icon-button>
+                <sl-icon-button id="nextSeed" name="chevron-right" label="Siguiente"></sl-icon-button>
+                <sl-icon-button id="regen" name="dice-5" label="Aleatorio" style="font-size: 1.5rem; color: var(--m3-primary);"></sl-icon-button>
+              </div>
+            </div>
+            <sl-button id="magicShuffle" variant="primary" size="medium" pill style="width: 100%; --sl-color-primary-600: #d81b60; --sl-color-primary-500: #e91e63;">
+              <sl-icon slot="prefix" name="magic"></sl-icon>
+              Mezcla Mágica
+            </sl-button>
+            <p class="hint">Atajos: <b>R</b> o espacio = otro diseño · <b>←</b> <b>→</b> = semilla anterior/siguiente · <b>S</b> = guardar.</p>
+
+            <div class="section-title" style="margin:8px 0 0;"><sl-icon name="sliders"></sl-icon> Lo esencial</div>
+            <sl-select id="coloringPreset" label="Nivel de dificultad" size="small" value="adulto" help-text="Se aplica al elegirlo.">
+              <sl-option value="ninos">Niños (5-8 años) - Muy simple</sl-option>
+              <sl-option value="ninos_grande">Niños grandes (9-12) - Simple</sl-option>
+              <sl-option value="adulto">Adulto - Balanceado</sl-option>
+              <sl-option value="experto">Experto - Detallado</sl-option>
+              <sl-option value="zen">Zen - Minimalista</sl-option>
             </sl-select>
-            <sl-select id="layoutMode" label="Modo Lienzo" size="small" value="single">
-              <sl-option value="single">Individual</sl-option>
-              <sl-option value="grid2x2">Collage 2×2</sl-option>
-              <sl-option value="grid3x3">Collage 3×3</sl-option>
+            <sl-select id="structurePreset" label="Plantilla" size="small" value="custom" help-text="Se aplica al elegirla.">
+              <sl-option value="custom">Personalizada</sl-option>
+              <sl-option value="simple">Simple</sl-option>
+              <sl-option value="balanced">Equilibrada</sl-option>
+              <sl-option value="detailed">Detallada</sl-option>
+              <sl-option value="botanical">Botánica</sl-option>
+              <sl-option value="geometric">Geométrica</sl-option>
+              <sl-option value="islamico">Islámica</sl-option>
             </sl-select>
-            <sl-select id="previewQuality" label="Calidad de Vista Previa" size="small" value="high">
-              <sl-option value="low">Baja (Rápido)</sl-option>
-              <sl-option value="medium">Media</sl-option>
-              <sl-option value="high">Alta (Detallado)</sl-option>
-            </sl-select>
-            <sl-select id="pngDpi" label="Resolución PNG" size="small" value="300">
-              <sl-option value="150">150 DPI</sl-option>
-              <sl-option value="300">300 DPI</sl-option>
-              <sl-option value="600">600 DPI</sl-option>
-            </sl-select>
-            <sl-select id="preset" label="Formato de Papel" size="small" value="A4">
-              <sl-option value="A4">A4</sl-option>
-              <sl-option value="LETTER">Carta</sl-option>
-              <sl-option value="KDP_8_5x8_5">KDP 8.5×8.5 in (cuadrado)</sl-option>
-              <sl-option value="KDP_8_5x11">KDP 8.5×11 in</sl-option>
-              <sl-option value="KDP_8x10">KDP 8×10 in</sl-option>
-              <sl-option value="KDP_6x9">KDP 6×9 in</sl-option>
-            </sl-select>
-            <sl-range id="petals" label="Pétalos" min="6" max="96" value="12"></sl-range>
-            <sl-range id="complexity" label="Complejidad" min="20" max="320" value="130"></sl-range>
-            <sl-range id="organic" label="Nivel Orgánico" min="0" max="1" step="0.05" value="0.25"></sl-range>
             <sl-select id="styleMode" label="Estilo" size="small">
               <sl-option value="sashiko">Sashiko</sl-option>
               <sl-option value="floral">Floral</sl-option>
@@ -373,7 +401,7 @@
               <sl-option value="fondo">Fondo decorado (flores, corazones, estrellas)</sl-option>
               <sl-option value="constelacion">Constelación de mandalas</sl-option>
               <sl-option value="esquinas">Cuartos de mandala en las esquinas</sl-option>
-              <sl-option value="gigante">Gigante (recortado por el marco)</sl-option>
+              <sl-option value="gigante">Gigante (cubre toda la hoja)</sl-option>
               <sl-option value="medio">Medio mandala (amanecer)</sl-option>
             </sl-select>
             <sl-select id="frameStyle" label="Marco" size="small" value="redondeado">
@@ -382,53 +410,53 @@
               <sl-option value="feston">Festón</sl-option>
               <sl-option value="ninguno">Sin marco</sl-option>
             </sl-select>
-            <sl-checkbox id="kaleidoscope" checked>Simetría (Kaleidoscopio)</sl-checkbox>
-            <sl-checkbox id="showGuides">Mostrar Guías Estructurales</sl-checkbox>
-            <sl-checkbox id="spiroEnabled" style="display: none;">Espirógrafo (Spirograph)</sl-checkbox>
-          </div>
-        </sl-accordion-item>
-
-        <sl-accordion-item>
-          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="palette"></sl-icon> Trazo & Detalle</span>
-          <div class="control-group" style="padding: 12px 0;">
-            <sl-select id="coloringPreset" label="Nivel de Dificultad" size="small" value="adulto">
-              <sl-option value="ninos">Niños (5-8 años) - Muy Simple</sl-option>
-              <sl-option value="ninos_grande">Niños Grandes (9-12) - Simple</sl-option>
-              <sl-option value="adulto">Adulto - Balanceado</sl-option>
-              <sl-option value="experto">Experto - Detallado</sl-option>
-              <sl-option value="zen">Zen - Minimalista</sl-option>
-            </sl-select>
-            
-            <sl-button id="applyColoringPreset" variant="secondary" size="small" pill style="width: 100%;">Aplicar Nivel</sl-button>
-            
-            <sl-divider></sl-divider>
-            
-            <sl-checkbox id="outlineMode" style="--sl-toggle-size: 20px;">
-              <span style="font-weight: 600; color: var(--m3-primary);">🎨 Modo Solo Contornos</span>
+            <sl-range id="petals" label="Pétalos" min="6" max="96" value="12"></sl-range>
+            <sl-range id="complexity" label="Complejidad" min="20" max="320" value="130"></sl-range>
+            <sl-checkbox id="outlineMode">
+              <span style="font-weight: 600; color: var(--m3-primary);">Sólo contornos</span>
+              <span class="hint" style="display:block;">Sin texturas internas: formas grandes, fáciles de colorear.</span>
             </sl-checkbox>
-            <p style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 4px 0 0 0; padding-left: 24px;">
-              Elimina texturas internas y deja solo los contornos principales para colorear fácilmente
-            </p>
-            
-            <sl-divider></sl-divider>
-            
-            <sl-range id="strokeWidth" label="Grosor de Línea (mm)" min="0.1" max="2.0" step="0.05" value="0.55" title="Líneas más gruesas son mejores para imprimir y colorear"></sl-range>
-            
-            <!-- Phase 5: Coloring Book Controls -->
-            <sl-divider></sl-divider>
-            <div class="section-title" style="font-size:0.75rem; margin:8px 0;"><sl-icon name="book"></sl-icon> Espacio para Colorear</div>
-            <sl-range id="spacing" label="Espaciado entre Elementos" min="0" max="1" step="0.05" value="0.3" title="Controla el espacio negativo entre formas. Valores altos = más espacio para colorear"></sl-range>
-            <sl-range id="densityFactor" label="Densidad de Patrones" min="0.2" max="1.5" step="0.05" value="0.7" title="Reduce la cantidad de elementos decorativos. Valores bajos = patrones más simples"></sl-range>
-            <sl-range id="minCellArea" label="Área Mínima de Celda" min="1" max="8" step="0.5" value="3.0" title="Tamaño mínimo de las áreas cerradas. Valores altos evitan espacios demasiado pequeños"></sl-range>
-            <sl-range id="detailSimplification" label="Simplificación de Detalles" min="0" max="1" step="0.05" value="0.5" title="Elimina detalles internos complejos. Valores altos = formas más limpias para colorear"></sl-range>
-            
-            <sl-divider></sl-divider>
-            
-            <sl-checkbox id="textures" checked>Texturas avanzadas</sl-checkbox>
-            <sl-checkbox id="frames" checked>Marcos interiores</sl-checkbox>
-            <sl-checkbox id="pageBorder" checked>Borde de página</sl-checkbox>
           </div>
-        </sl-accordion-item>
+
+          <sl-accordion style="margin-top:16px;">
+            <sl-accordion-item>
+              <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="palette"></sl-icon> Trazo y detalle</span>
+              <div class="control-group" style="padding: 12px 0;">
+                <sl-range id="strokeWidth" label="Grosor de línea (mm)" min="0.1" max="2.0" step="0.05" value="0.55" help-text="Mínimo recomendado para imprimir: 0.3 mm."></sl-range>
+                <sl-range id="spacing" label="Espacio entre elementos" min="0" max="1" step="0.05" value="0.3" help-text="Más alto = más aire para colorear."></sl-range>
+                <sl-range id="densityFactor" label="Densidad de patrones" min="0.2" max="1.5" step="0.05" value="0.7" help-text="Más bajo = patrones más simples."></sl-range>
+                <sl-range id="minCellArea" label="Área mínima de celda (mm²)" min="1" max="8" step="0.5" value="3.0" help-text="Más alto = sin huecos diminutos."></sl-range>
+                <sl-range id="detailSimplification" label="Simplificación de detalles" min="0" max="1" step="0.05" value="0.5" help-text="Más alto = formas más limpias."></sl-range>
+                <sl-checkbox id="textures" checked>Texturas avanzadas</sl-checkbox>
+                <sl-checkbox id="frames" checked>Marcos interiores</sl-checkbox>
+                <sl-checkbox id="pageBorder" checked>Borde de página</sl-checkbox>
+              </div>
+            </sl-accordion-item>
+
+            <sl-accordion-item>
+              <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="gear"></sl-icon> Motor y vista previa</span>
+              <div class="control-group" style="padding: 12px 0;">
+                <sl-select id="generatorType" label="Tipo de motor" size="small" value="classic" help-text="El clásico es el único con composiciones, marcos e imágenes.">
+                  <sl-option value="classic">Clásico (calidad libro comercial) ★</sl-option>
+                  <sl-option value="layers">Modular (8 capas)</sl-option>
+                  <sl-option value="radial">Radial (editorial)</sl-option>
+                </sl-select>
+                <sl-select id="layoutMode" label="Modo lienzo" size="small" value="single">
+                  <sl-option value="single">Individual</sl-option>
+                  <sl-option value="grid2x2">Collage 2×2</sl-option>
+                  <sl-option value="grid3x3">Collage 3×3</sl-option>
+                </sl-select>
+                <sl-select id="previewQuality" label="Calidad de vista previa" size="small" value="high">
+                  <sl-option value="low">Baja (rápido)</sl-option>
+                  <sl-option value="medium">Media</sl-option>
+                  <sl-option value="high">Alta (igual al PDF)</sl-option>
+                </sl-select>
+                <sl-range id="organic" label="Nivel orgánico" min="0" max="1" step="0.05" value="0.25"></sl-range>
+                <sl-checkbox id="kaleidoscope" checked>Simetría (caleidoscopio)</sl-checkbox>
+                <sl-checkbox id="showGuides">Mostrar guías estructurales</sl-checkbox>
+                <sl-checkbox id="spiroEnabled" style="display: none;">Espirógrafo</sl-checkbox>
+              </div>
+            </sl-accordion-item>
 
         <sl-accordion-item id="layersAccordionItem">
           <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="layers"></sl-icon> Capas (8)</span>
@@ -451,9 +479,108 @@
           </div>
         </sl-accordion-item>
 
-        <sl-accordion-item id="centerArtAccordionItem">
-          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Mis imágenes (figuras)</span>
+        <sl-accordion-item id="imageAccordionItem">
+          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Integración de Imagen</span>
           <div class="control-group" style="padding: 12px 0;">
+            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+            <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+              <sl-button id="uploadBtn" variant="primary" size="small" pill style="flex: 1;">
+                <sl-icon slot="prefix" name="upload"></sl-icon>
+                Subir Foto/Líneas
+              </sl-button>
+              <sl-spinner id="imageSpinner" style="display: none; font-size: 1.2rem;"></sl-spinner>
+            </div>
+            <sl-range id="imageThreshold" label="Sensibilidad (Bordes)" min="10" max="240" value="128"></sl-range>
+            <sl-range id="imageZoom" label="Zoom" min="0.1" max="3" step="0.05" value="1.0"></sl-range>
+            <sl-range id="imageScale" label="Escala en Mandala" min="0.5" max="2.5" step="0.1" value="1.0"></sl-range>
+            <div style="display: flex; gap: 8px;">
+               <sl-range id="imageOffsetX" label="X" min="-100" max="100" value="0" style="flex:1;"></sl-range>
+               <sl-range id="imageOffsetY" label="Y" min="-100" max="100" value="0" style="flex:1;"></sl-range>
+            </div>
+            <sl-range id="imageIntensity" label="Intensidad de Capa" min="0" max="1" step="0.05" value="1.0"></sl-range>
+            <sl-checkbox id="imageMirror" checked>Simetría de Espejo (Caleidoscopio)</sl-checkbox>
+          </div>
+        </sl-accordion-item>
+
+            <sl-accordion-item>
+              <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="file-earmark-pdf"></sl-icon> Exportar esta página</span>
+              <div class="control-group" style="padding: 12px 0;">
+                <sl-select id="pageLayout" label="Distribución del PDF" value="classic" size="small">
+                  <sl-option value="classic">Clásico (1 solo)</sl-option>
+                  <sl-option value="duo">Dúo (2 mandalas)</sl-option>
+                  <sl-option value="mirror">Espejo (2 simétricos)</sl-option>
+                  <sl-option value="trio">Trío (3 mandalas)</sl-option>
+                  <sl-option value="inspirational">Inspiracional (frase)</sl-option>
+                  <sl-option value="collage">Collage (4 por página)</sl-option>
+                </sl-select>
+                <sl-select id="pngDpi" label="Resolución PNG" size="small" value="300">
+                  <sl-option value="150">150 DPI</sl-option>
+                  <sl-option value="300">300 DPI</sl-option>
+                  <sl-option value="600">600 DPI</sl-option>
+                </sl-select>
+                <sl-button id="downloadPdfSidebar" variant="primary" size="medium" pill style="width: 100%;">
+                  <sl-icon slot="prefix" name="download"></sl-icon>
+                  Descargar PDF
+                </sl-button>
+              </div>
+            </sl-accordion-item>
+          </sl-accordion>
+        </sl-tab-panel>
+
+        <!-- ===== Libro KDP ===== -->
+        <sl-tab-panel name="libro">
+          <div class="control-group">
+            <p class="hint">
+              Interior completo (sin sangrado, B/N): cada página es un mandala distinto. Márgenes, páginas pares y
+              texto sin fuentes externas se ajustan solos a las reglas de KDP. Parte de la semilla y el nivel de «Diseñar».
+            </p>
+            <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="30"></sl-input>
+            <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="mixta">
+              <sl-option value="mixta">Mixta (alterna)</sl-option>
+              <sl-option value="progresiva">Progresiva (de fácil a difícil)</sl-option>
+              <sl-option value="fija">Fija (la complejidad actual)</sl-option>
+            </sl-select>
+            <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco</sl-checkbox>
+            <div id="bookCompBox" class="comp-box">
+              <div class="hint" style="font-weight:600;">Composiciones que pueden salir</div>
+              <sl-checkbox class="bookComp" value="centro" checked>Centrado</sl-checkbox>
+              <sl-checkbox class="bookComp" value="fondo" checked>Fondo decorado</sl-checkbox>
+              <sl-checkbox class="bookComp" value="constelacion" checked>Constelación</sl-checkbox>
+              <sl-checkbox class="bookComp" value="esquinas" checked>Esquinas</sl-checkbox>
+              <sl-checkbox class="bookComp" value="gigante" checked>Gigante</sl-checkbox>
+              <sl-checkbox class="bookComp" value="medio" checked>Medio mandala</sl-checkbox>
+            </div>
+            <sl-button id="reviewBook" variant="default" size="medium" pill style="width: 100%;">
+              <sl-icon slot="prefix" name="grid-3x3-gap"></sl-icon>
+              Revisar páginas antes de crear
+            </sl-button>
+            <p id="bookReviewInfo" class="hint"></p>
+
+            <sl-details summary="Textos y páginas extra">
+              <div class="control-group">
+                <sl-input id="bookTitle" label="Título (hoja de título)" size="small" placeholder="Mandalas para Colorear"></sl-input>
+                <sl-input id="bookSubtitle" label="Subtítulo (opcional)" size="small" placeholder="50 diseños antiestrés"></sl-input>
+                <sl-input id="bookAuthor" label="Autor / sello (opcional)" size="small"></sl-input>
+                <sl-checkbox id="bookBlankBack" checked>Página en blanco al reverso (evita que el marcador traspase)</sl-checkbox>
+                <sl-checkbox id="bookTitlePage" checked>Incluir hoja de título</sl-checkbox>
+                <sl-checkbox id="bookCopyright" checked>Incluir página de derechos de autor</sl-checkbox>
+                <sl-checkbox id="bookColorTest">Incluir página para probar colores</sl-checkbox>
+                <sl-checkbox id="bookPageNumbers">Numerar páginas</sl-checkbox>
+              </div>
+            </sl-details>
+            <p id="bookImagesInfo" class="hint"></p>
+            <div id="bookSummary" class="hint"></div>
+            <sl-button id="downloadBook" variant="success" size="medium" pill style="width: 100%;">
+              <sl-icon slot="prefix" name="journal-bookmark"></sl-icon>
+              Crear libro (PDF)
+            </sl-button>
+          </div>
+        </sl-tab-panel>
+
+        <!-- ===== Mis imágenes ===== -->
+        <sl-tab-panel name="imagenes">
+          <p id="imagesNeedClassic" class="hint" style="display:none;">Las imágenes sólo funcionan con el motor <b>Clásico</b> (Diseñar → Motor y vista previa).</p>
+          <div id="centerArtAccordionItem" class="control-group">
             <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 0;">
               Sube caricaturas, grabados o pinturas: se convierten en contorno y su interior se rellena con mandalas.
               Para lotes grandes, recortes y ajustes por imagen usa <a href="preprocesar.html" target="_blank">preprocesar.html</a>
@@ -506,89 +633,8 @@
               (Minions, Pokémon, Disney moderno) están protegidos. Ver <code>docs/libro-kdp.md</code>.
             </p>
           </div>
-        </sl-accordion-item>
-
-        <sl-accordion-item id="imageAccordionItem">
-          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Integración de Imagen</span>
-          <div class="control-group" style="padding: 12px 0;">
-            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
-            <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
-              <sl-button id="uploadBtn" variant="primary" size="small" pill style="flex: 1;">
-                <sl-icon slot="prefix" name="upload"></sl-icon>
-                Subir Foto/Líneas
-              </sl-button>
-              <sl-spinner id="imageSpinner" style="display: none; font-size: 1.2rem;"></sl-spinner>
-            </div>
-            <sl-range id="imageThreshold" label="Sensibilidad (Bordes)" min="10" max="240" value="128"></sl-range>
-            <sl-range id="imageZoom" label="Zoom" min="0.1" max="3" step="0.05" value="1.0"></sl-range>
-            <sl-range id="imageScale" label="Escala en Mandala" min="0.5" max="2.5" step="0.1" value="1.0"></sl-range>
-            <div style="display: flex; gap: 8px;">
-               <sl-range id="imageOffsetX" label="X" min="-100" max="100" value="0" style="flex:1;"></sl-range>
-               <sl-range id="imageOffsetY" label="Y" min="-100" max="100" value="0" style="flex:1;"></sl-range>
-            </div>
-            <sl-range id="imageIntensity" label="Intensidad de Capa" min="0" max="1" step="0.05" value="1.0"></sl-range>
-            <sl-checkbox id="imageMirror" checked>Simetría de Espejo (Caleidoscopio)</sl-checkbox>
-          </div>
-        </sl-accordion-item>
-      </sl-accordion>
-      
-      <sl-divider></sl-divider>
-
-      <!-- Libro completo para Amazon KDP -->
-      <div class="control-group">
-        <div class="section-title">
-          <sl-icon name="book"></sl-icon> Libro para Amazon KDP
-        </div>
-        <p style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;">
-          Crea el interior completo (sin sangrado, B/N): cada página es un mandala distinto. Elige el tamaño en «Formato de Papel». Márgenes, número par de páginas y texto sin fuentes externas se ajustan solos a las reglas de KDP.
-        </p>
-        <sl-input id="bookTitle" label="Título (hoja de título)" size="small" placeholder="Mandalas para Colorear"></sl-input>
-        <sl-input id="bookSubtitle" label="Subtítulo (opcional)" size="small" placeholder="50 diseños antiestrés"></sl-input>
-        <sl-input id="bookAuthor" label="Autor / sello (opcional)" size="small"></sl-input>
-        <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="30"></sl-input>
-        <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco (sin repetir en páginas seguidas)</sl-checkbox>
-        <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="mixta">
-          <sl-option value="mixta">Mixta (alterna)</sl-option>
-          <sl-option value="progresiva">Progresiva (de fácil a difícil)</sl-option>
-          <sl-option value="fija">Fija (la complejidad actual)</sl-option>
-        </sl-select>
-        <p id="bookImagesInfo" style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;"></p>
-        <sl-checkbox id="bookBlankBack" checked>Página en blanco al reverso (evita que el marcador traspase)</sl-checkbox>
-        <sl-checkbox id="bookTitlePage" checked>Incluir hoja de título</sl-checkbox>
-        <sl-checkbox id="bookCopyright" checked>Incluir página de derechos de autor</sl-checkbox>
-        <sl-checkbox id="bookColorTest">Incluir página para probar colores</sl-checkbox>
-        <sl-checkbox id="bookPageNumbers">Numerar páginas</sl-checkbox>
-        <div id="bookSummary" style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;"></div>
-        <sl-button id="downloadBook" variant="success" size="medium" pill style="width: 100%;">
-          <sl-icon slot="prefix" name="journal-bookmark"></sl-icon>
-          Crear libro (PDF)
-        </sl-button>
-      </div>
-
-      <sl-divider></sl-divider>
-
-      <!-- Layout de Exportación -->
-      <div class="control-group">
-        <div class="section-title">
-          <sl-icon name="file-earmark-pdf"></sl-icon> Layout PDF
-        </div>
-        <sl-select id="pageLayout" value="classic" size="small" pill>
-          <sl-option value="classic">Cásico (1 solo)</sl-option>
-          <sl-option value="duo">Dúo (2 mandalas)</sl-option>
-          <sl-option value="mirror">Espejo (2 simétricos)</sl-option>
-          <sl-option value="trio">Trío (3 mandalas)</sl-option>
-          <sl-option value="inspirational">Inspiracional (Frase)</sl-option>
-          <sl-option value="collage">Collage (4 por página)</sl-option>
-        </sl-select>
-        <sl-button id="downloadPdfSidebar" variant="primary" size="medium" pill style="width: 100%;">
-          <sl-icon slot="prefix" name="download"></sl-icon>
-          Descargar PDF
-        </sl-button>
-      </div>
-
-      <div style="margin-top: auto; padding-top: 24px; text-align: center; color: var(--m3-on-surface-variant); font-size: 0.8rem;">
-        Desarrollado con ❤️ para Mandala Studio
-      </div>
+        </sl-tab-panel>
+      </sl-tab-group>
     </div>
 
     <div id="stage-container">
@@ -617,6 +663,18 @@
     </div>
     <sl-button slot="footer" variant="primary" id="closeGallery">Cerrar</sl-button>
   </sl-drawer>
+
+  <!-- Revisión del libro: cambiar las páginas que no sirven antes de crear el PDF -->
+  <sl-dialog id="reviewDialog" label="Revisar páginas del libro" style="--width: min(1100px, 96vw);">
+    <p class="hint" style="margin-bottom:12px;">
+      Si una página no te convence, pulsa <b>Otro diseño</b> (mismo encuadre, mandala nuevo) o <b>Otro encuadre</b>.
+      Los cambios se aplican al crear el libro y se mantienen mientras no cambies la semilla.
+    </p>
+    <div id="reviewGrid"></div>
+    <sl-button slot="footer" id="reviewReset" variant="text">Deshacer todos los cambios</sl-button>
+    <sl-button slot="footer" id="reviewCreate" variant="success">Crear libro (PDF)</sl-button>
+    <sl-button slot="footer" id="reviewClose" variant="primary">Listo</sl-button>
+  </sl-dialog>
 
   <!-- Progress Dialog for Exports -->
   <sl-dialog id="progressDialog" label="Exportando PDF..." no-header style="--width: 320px;">
