@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preprocesar figuras</title>
+  <link rel="icon" href="favicon.ico" />
+  <style>
+    :root {
+      --bg: #f6f4f9; --card: #ffffff; --ink: #1d1b20; --muted: #625b71; --line: #d9d3e3;
+      --accent: #6750a4; --accent-ink: #ffffff; --inside: rgba(80, 150, 255, 0.28); --small: rgba(255, 196, 0, 0.35);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #141218; --card: #1f1c24; --ink: #e6e0e9; --muted: #b8afc6; --line: #3a3541;
+        --accent: #cfbcff; --accent-ink: #381e72;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    header { padding: 20px 16px 8px; max-width: 1200px; margin: 0 auto; }
+    h1 { margin: 0 0 4px; font-size: 1.4rem; }
+    header p { margin: 0; color: var(--muted); max-width: 70ch; }
+    main { max-width: 1200px; margin: 0 auto; padding: 8px 16px 48px; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 12px 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--muted); }
+    label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--ink); }
+    select, input[type=range] { min-width: 170px; }
+    select { padding: 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+    button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+    button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+    button:disabled { opacity: .5; cursor: default; }
+    #drop { border: 2px dashed var(--line); border-radius: 12px; padding: 22px; text-align: center; color: var(--muted); cursor: pointer; }
+    #drop.over { border-color: var(--accent); color: var(--ink); }
+    #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .card h3 { margin: 0; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .pair canvas { width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #fff; border-radius: 6px; border: 1px solid var(--line); }
+    .pair canvas.orig { cursor: crosshair; }
+    .hint { font-size: .75rem; color: var(--muted); margin: 0; }
+    .crop { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+    .crop input { min-width: 0; width: 100%; }
+    .legend { font-size: .78rem; color: var(--muted); }
+    .card.ready { border-color: #2e7d32; }
+    .card.notready { border-color: #c62828; }
+    .rights { display: grid; gap: 4px; }
+    .rights input[type=text] { padding: 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+    summary { cursor: pointer; }
+    .legend span { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; margin: 0 3px 0 8px; }
+    .status { font-size: .8rem; color: var(--muted); min-height: 1.2em; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Preprocesar figuras</h1>
+    <p>Convierte caricaturas, grabados o pinturas en figuras limpias —sin fondo, sin texto y con pocos detalles— listas para rellenar con mandalas. Todo ocurre en tu navegador: las imágenes no se suben a ningún servidor.
+      Elige a mano el uso de cada imagen (figura rellena, anillos o medallón); las que dejes en «No usar todavía» no entran al libro.
+      Al terminar, exporta el paquete e impórtalo en <a href="index.html">Mandala Studio</a> → «Mis imágenes» → «Importar paquete».</p>
+  </header>
+  <main>
+    <details class="panel" open>
+      <summary><b>Requisitos para que una imagen esté lista</b> (se comprueban solos en cada tarjeta)</summary>
+      <div id="requirements"></div>
+    </details>
+    <div class="panel">
+      <div id="drop">Arrastra aquí tus imágenes o haz clic para elegirlas (puedes elegir varias)</div>
+      <input type="file" id="files" accept="image/*" multiple hidden />
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <label>Tipo de imagen (para nuevas imágenes)
+          <select id="mode">
+            <option value="colores">Caricatura / cartel de colores planos</option>
+            <option value="lineas">Dibujo o grabado en blanco y negro</option>
+            <option value="bordes">Pintura o fotografía</option>
+          </select>
+        </label>
+        <label>Umbral de tinta <input type="range" id="threshold" min="30" max="230" value="110" /></label>
+        <label>Detalle (pinturas) <input type="range" id="detail" min="0" max="1" step="0.05" value="0.5" /></label>
+        <label>Tolerancia del fondo <input type="range" id="bgTol" min="8" max="60" value="26" /></label>
+        <label>Simplificar (menos detalle) <input type="range" id="simplify" min="0" max="1" step="0.05" value="0.3" /></label>
+        <label class="check"><input type="checkbox" id="removeBg" checked /> Quitar fondo</label>
+        <label class="check"><input type="checkbox" id="keepMain" checked /> Sólo la figura principal (quita textos y restos)</label>
+        <label class="check"><input type="checkbox" id="bgBottom" /> El fondo toca el borde inferior</label>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button id="applyAll">Aplicar ajustes a todas</button>
+        <button id="exportPack" class="primary" disabled>Exportar paquete (.json)</button>
+        <button id="exportPng" disabled>Descargar contornos (PNG)</button>
+        <span class="legend">Vista de regiones: <span style="background:var(--inside)"></span>se rellenará <span style="background:var(--small)"></span>se queda en blanco</span>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div id="grid"></div>
+  </main>
+
+  <script type="module">
+    import { loadImageFile, figureFromImage } from "./js/core/figureImport.js";
+    import { packFigures } from "./js/core/figurePack.js";
+    import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./js/core/figureChecks.js";
+    document.head.insertAdjacentHTML("beforeend", `<style>${CHECKLIST_CSS}</style>`);
+    document.getElementById("requirements").innerHTML = REQUIREMENTS_HTML;
+
+    // Lista de verificación de la tarjeta según el uso elegido
+    function renderChecks(it) {
+      const box = it.card.querySelector(".checks");
+      it.card.classList.remove("ready", "notready");
+      if (!it.fig) { box.innerHTML = ""; return; }
+      const r = checkFigure(it.fig, it.use, { rightsConfirmed: it.rightsConfirmed, source: it.source });
+      it.ready = r.ready;
+      box.innerHTML = checklistHtml(r, it.use);
+      if (it.use !== "ninguno") it.card.classList.add(r.ready ? "ready" : "notready");
+      refreshButtons();
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const items = []; // { name, img, url, settings, crop, fig, card }
+
+    const settingsFromUI = () => ({
+      mode: $("mode").value,
+      threshold: +$("threshold").value,
+      detail: +$("detail").value,
+      bgTol: +$("bgTol").value,
+      simplify: +$("simplify").value,
+      keepMain: $("keepMain").checked,
+      removeBackground: $("removeBg").checked,
+      bgFromBottom: $("bgBottom").checked,
+    });
+
+    function setStatus(t) { $("status").textContent = t; }
+    function refreshButtons() {
+      const ready = items.some(it => it.fig);
+      $("exportPack").disabled = !ready;
+      $("exportPng").disabled = !ready;
+    }
+
+    // Contorno + regiones teñidas para revisar qué se rellenará
+    function drawPreview(canvas, fig) {
+      const scale = Math.min(1, 600 / Math.max(fig.w, fig.h));
+      const w = Math.round(fig.w * scale), h = Math.round(fig.h * scale);
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      img.onload = () => {
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const c = fig.cls[Math.floor(y / scale) * fig.w + Math.floor(x / scale)];
+          if (c !== 1 && c !== 3) continue;
+          const i = (y * w + x) * 4;
+          const [r, g, b] = c === 1 ? [80, 150, 255] : [255, 196, 0];
+          data.data[i] = data.data[i] * 0.72 + r * 0.28;
+          data.data[i + 1] = data.data[i + 1] * 0.72 + g * 0.28;
+          data.data[i + 2] = data.data[i + 2] * 0.72 + b * 0.28;
+        }
+        ctx.putImageData(data, 0, 0);
+      };
+      img.src = fig.href;
+    }
+
+    // Original con el recorte sombreado y los clics de fondo marcados
+    function drawOriginal(canvas, it) {
+      const k = Math.min(1, 600 / Math.max(it.img.naturalWidth, it.img.naturalHeight));
+      const w = Math.round(it.img.naturalWidth * k), h = Math.round(it.img.naturalHeight * k);
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(it.img, 0, 0, w, h);
+      const { left = 0, top = 0, right = 0, bottom = 0 } = it.crop;
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(0, 0, w, h * top);
+      ctx.fillRect(0, h * (1 - bottom), w, h * bottom);
+      ctx.fillRect(0, h * top, w * left, h * (1 - top - bottom));
+      ctx.fillRect(w * (1 - right), h * top, w * right, h * (1 - top - bottom));
+      for (const [x, y] of it.seeds) {
+        ctx.beginPath(); ctx.arc(x * w, y * h, Math.max(4, w / 80), 0, Math.PI * 2);
+        ctx.fillStyle = "#e53935"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
+      }
+    }
+
+    async function process(it) {
+      it.card.querySelector(".status").textContent = "Procesando…";
+      await new Promise(r => setTimeout(r, 0));
+      try {
+        it.fig = await figureFromImage(it.img, it.settings, it.crop, it.seeds);
+        drawPreview(it.card.querySelector("canvas.out"), it.fig);
+        it.card.querySelector(".status").textContent = `Original ${it.fig.srcLong} px · salida ${it.fig.w}×${it.fig.h} px`;
+        renderChecks(it);
+      } catch (err) {
+        it.card.querySelector(".status").textContent = "❌ " + (err.message || err);
+      }
+      refreshButtons();
+    }
+
+    function makeCard(it) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <h3 title="${it.name}">${it.name}</h3>
+        <div class="pair"><canvas class="orig" aria-label="Original: haz clic sobre el fondo"></canvas><canvas class="out" aria-label="Resultado"></canvas></div>
+        <p class="hint">Haz clic sobre el fondo que quieras borrar (puntos rojos). El recorte se ve sombreado.</p>
+        <label>Simplificar <input type="range" class="simp" min="0" max="1" step="0.05" /></label>
+        <label>Tolerancia del fondo <input type="range" class="tol" min="8" max="60" /></label>
+        <label>Uso en el libro (se elige a mano)
+          <select class="use">
+            <option value="ninguno">No usar todavía</option>
+            <option value="figura">Figura rellena de mandalas</option>
+            <option value="anillos">Anillos alrededor de un mandala</option>
+            <option value="medallon">Medallón central</option>
+          </select>
+        </label>
+        <label>Tipo de imagen
+          <select class="mode">
+            <option value="colores">Colores planos</option>
+            <option value="lineas">Dibujo / grabado</option>
+            <option value="bordes">Pintura / foto</option>
+          </select>
+        </label>
+        <div class="crop">
+          ${["left:Recorte izq.", "right:Recorte der.", "top:Recorte arriba", "bottom:Recorte abajo"].map(s => {
+            const [k, t] = s.split(":");
+            return `<label>${t} <input type="range" data-crop="${k}" min="0" max="0.45" step="0.01" value="0" /></label>`;
+          }).join("")}
+        </div>
+        <div class="row"><button class="undo">Deshacer clic</button><button class="redo">Reprocesar</button><button class="remove">Quitar</button></div>
+        <div class="rights">
+          <label>Fuente (URL, libro o «obra propia»)<input type="text" class="source" placeholder="https://… o título del libro y año" /></label>
+          <label class="check"><input type="checkbox" class="rightsOk" /> Confirmo que es de dominio público o mía</label>
+        </div>
+        <div class="checks"></div>
+        <div class="status"></div>`;
+      const orig = card.querySelector("canvas.orig");
+      drawOriginal(orig, it);
+      orig.onclick = (e) => {
+        const r = orig.getBoundingClientRect();
+        // El lienzo conserva la proporción de la imagen dentro de la caja (object-fit: contain)
+        const k = Math.min(r.width / orig.width, r.height / orig.height);
+        const ox = (r.width - orig.width * k) / 2, oy = (r.height - orig.height * k) / 2;
+        const fx = (e.clientX - r.left - ox) / (orig.width * k), fy = (e.clientY - r.top - oy) / (orig.height * k);
+        if (fx < 0 || fy < 0 || fx > 1 || fy > 1) return;
+        it.seeds.push([fx, fy]);
+        drawOriginal(orig, it);
+        process(it);
+      };
+      card.querySelector(".undo").onclick = () => { it.seeds.pop(); drawOriginal(orig, it); process(it); };
+      const simp = card.querySelector(".simp"), tol = card.querySelector(".tol");
+      simp.value = it.settings.simplify; tol.value = it.settings.bgTol;
+      simp.onchange = () => { it.settings = { ...it.settings, simplify: +simp.value }; process(it); };
+      tol.onchange = () => { it.settings = { ...it.settings, bgTol: +tol.value }; process(it); };
+      const useSel = card.querySelector(".use");
+      useSel.value = it.use;
+      useSel.onchange = () => { it.use = useSel.value; renderChecks(it); };
+      const src = card.querySelector(".source"), ok = card.querySelector(".rightsOk");
+      src.oninput = () => { it.source = src.value; renderChecks(it); };
+      ok.onchange = () => { it.rightsConfirmed = ok.checked; renderChecks(it); };
+      const modeSel = card.querySelector(".mode");
+      modeSel.value = it.settings.mode;
+      modeSel.onchange = () => { it.settings = { ...it.settings, mode: modeSel.value }; process(it); };
+      card.querySelectorAll("[data-crop]").forEach(inp => {
+        inp.onchange = () => { it.crop[inp.dataset.crop] = +inp.value; drawOriginal(orig, it); process(it); };
+      });
+      card.querySelector(".redo").onclick = () => process(it);
+      card.querySelector(".remove").onclick = () => {
+        items.splice(items.indexOf(it), 1);
+        card.remove();
+        URL.revokeObjectURL(it.url);
+        refreshButtons();
+      };
+      it.card = card;
+      $("grid").appendChild(card);
+    }
+
+    async function addFiles(files) {
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        try {
+          const img = await loadImageFile(file);
+          const it = { name: file.name, img, url: URL.createObjectURL(file), settings: settingsFromUI(), crop: {}, seeds: [], use: "ninguno", source: "", rightsConfirmed: false, ready: false, fig: null };
+          items.push(it);
+          makeCard(it);
+          await process(it);
+        } catch (err) {
+          setStatus("❌ " + (err.message || err));
+        }
+      }
+      setStatus(`${items.length} imagen(es) cargada(s).`);
+    }
+
+    const drop = $("drop");
+    drop.onclick = () => $("files").click();
+    $("files").onchange = (e) => { addFiles(Array.from(e.target.files || [])); e.target.value = ""; };
+    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+    drop.ondragleave = () => drop.classList.remove("over");
+    drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); addFiles(Array.from(e.dataTransfer.files || [])); };
+
+    $("applyAll").onclick = async () => {
+      const s = settingsFromUI();
+      for (const it of items) {
+        it.settings = { ...s };
+        it.card.querySelector(".mode").value = s.mode;
+        it.card.querySelector(".simp").value = s.simplify;
+        it.card.querySelector(".tol").value = s.bgTol;
+        await process(it);
+      }
+    };
+
+    const save = (blob, name) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    $("exportPack").onclick = () => {
+      const pending = items.filter(it => it.fig && it.use !== "ninguno" && !it.ready);
+      if (pending.length && !confirm(`${pending.length} imagen(es) con uso elegido no están listas (marcadas en rojo). ` +
+        "Se exportan igual, pero la app no las pondrá en el libro hasta corregirlas. ¿Exportar?")) return;
+      const figs = items.filter(it => it.fig).map(it => ({ name: it.name, use: it.use, source: it.source, rightsConfirmed: it.rightsConfirmed, ...it.fig }));
+      save(new Blob([JSON.stringify(packFigures(figs))], { type: "application/json" }), "figuras.json");
+      const ready = items.filter(it => it.ready).length;
+      setStatus(`Paquete con ${figs.length} figura(s) exportado · ${ready} lista(s) para el libro.`);
+    };
+    $("exportPng").onclick = async () => {
+      for (const it of items.filter(it => it.fig)) {
+        const blob = await (await fetch(it.fig.href)).blob();
+        save(blob, it.name.replace(/\.[^.]+$/, "") + "_contorno.png");
+        await new Promise(r => setTimeout(r, 250));
+      }
+    };
+  </script>
+</body>
+</html>

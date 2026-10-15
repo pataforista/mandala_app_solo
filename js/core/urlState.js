@@ -13,9 +13,9 @@ const FLOAT_PARAMS = ["organic", "strokeWidth",
   "layer1Intensity", "layer2Intensity", "layer3Intensity", "layer4Intensity",
   "layer5Intensity", "layer6Intensity", "layer7Intensity", "layer8Intensity",
   // Perfil de libro para colorear
-  "densityFactor", "minCellArea", "detailSimplification", "spacing"];
-const STRING_PARAMS = ["preset", "styleMode", "structurePreset", "generatorType", "previewQuality", "layoutMode", "layerPreset", "coloringPreset"];
-const BOOL_PARAMS = ["frames", "pageBorder", "kaleidoscope", "textures", "spiroEnabled", "outlineMode"];
+  "densityFactor", "minCellArea", "detailSimplification", "spacing", "centerArtScale", "figureDensity"];
+const STRING_PARAMS = ["preset", "styleMode", "structurePreset", "generatorType", "previewQuality", "layoutMode", "layerPreset", "coloringPreset", "composition", "frameStyle", "centerArt"];
+const BOOL_PARAMS = ["frames", "pageBorder", "kaleidoscope", "textures", "spiroEnabled", "outlineMode", "figureFillInside", "figureFillOutside"];
 
 export function getStateFromURL(defaults) {
   try {

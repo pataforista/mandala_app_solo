@@ -11,11 +11,20 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
+import { planBook } from "./core/bookPlan.js";
+import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
+import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
+import { packFigures, unpackFigures } from "./core/figurePack.js";
+import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 
 const historyMan = new StateHistory();
 const imgProc = new ImageProcessor();
 let currentImage = null;
 let currentImagePoints = [];
+// Imágenes del usuario ya procesadas: [{ name, img (original o null si vino de un paquete),
+// fig: { href, cls, w, h } }]. La activa es la que se ve en la vista previa.
+let userFigures = [];
+let activeFigure = 0;
 let listenersBound = false;
 
 const stage = document.getElementById("stage");
@@ -99,6 +108,11 @@ const imageIntensityEl = document.getElementById("imageIntensity");
 const imageMirrorEl = document.getElementById("imageMirror");
 const showGuidesEl = document.getElementById("showGuides");
 const imageUploadEl = document.getElementById("imageUpload");
+const compositionEl = document.getElementById("composition");
+const frameStyleEl = document.getElementById("frameStyle");
+const centerArtEl = document.getElementById("centerArt");
+const centerArtScaleEl = document.getElementById("centerArtScale");
+const centerArtAccordionItem = document.getElementById("centerArtAccordionItem");
 const uploadBtn = document.getElementById("uploadBtn");
 
 // Motor "classic": gramática de libro comercial (bandas llenas, pétalos en capas)
@@ -151,6 +165,14 @@ const DEFAULTS = {
   // New coloring book features
   outlineMode: false,
   coloringPreset: "adulto",
+  // Composición de página y medallón (motor clásico)
+  composition: "centro",
+  frameStyle: "redondeado",
+  centerArt: "ninguno",
+  centerArtScale: 0.42,
+  figureDensity: 0.3,
+  figureFillInside: true,
+  figureFillOutside: true,
 };
 
 const STRUCTURE_PRESETS = {
@@ -410,7 +432,32 @@ function buildOpts(s) {
     minCellAreaMm2: s.minCellArea,
     detailSimplification: s.detailSimplification,
     outlineMode: s.outlineMode,
+    composition: s.composition,
+    frameStyle: s.frameStyle,
+    ...resolveUserImage(s),
   };
+}
+
+const FIGURE_USES = [
+  ["ninguno", "No usar"],
+  ["figura", "Figura rellena de mandalas"],
+  ["anillos", "Anillos alrededor de un mandala"],
+  ["medallon", "Medallón central"],
+];
+
+// Imagen del usuario según el uso que ELIGIÓ para ella (nada es automático):
+// figura rellena, anillos de copias alrededor de un mandala o medallón central.
+// La vista previa usa la imagen seleccionada (borde morado) con su uso.
+function resolveUserImage(s, entry = userFigures[activeFigure]) {
+  const out = { figure: null, centerArt: null, figureRing: null,
+    figureDensity: s.figureDensity, figureFillInside: s.figureFillInside, figureFillOutside: s.figureFillOutside };
+  const fig = entry?.fig;
+  if (!fig || !entry.use || entry.use === "ninguno") return out;
+  const stamp = fig.stampHref || fig.href;
+  if (entry.use === "figura") out.figure = fig;
+  else if (entry.use === "anillos") out.figureRing = { href: stamp, centerHref: stamp, w: fig.w, h: fig.h };
+  else if (entry.use === "medallon") out.centerArt = { type: "image", href: stamp, scale: s.centerArtScale };
+  return out;
 }
 
 function getCurrentDoc() {
@@ -433,6 +480,11 @@ function updateGeneratorUI() {
   }
 
   if (imageAccordionItem) imageAccordionItem.style.display = isLayers ? "block" : "none";
+  // Composición, marco y medallón sólo existen en el motor clásico
+  const isClassic = state.generatorType === "classic";
+  if (centerArtAccordionItem) centerArtAccordionItem.style.display = isClassic ? "block" : "none";
+  if (compositionEl) compositionEl.style.display = isClassic ? "block" : "none";
+  if (frameStyleEl) frameStyleEl.style.display = isClassic ? "block" : "none";
   
   if (spiroEnabledEl) spiroEnabledEl.style.display = isRadial ? "block" : "none";
 }
@@ -740,6 +792,87 @@ async function refreshGallery() {
   });
 }
 
+function figureSettings() {
+  const val = (id, d) => { const el = document.getElementById(id); return el ? el.value : d; };
+  return {
+    mode: val("medallionMode", "colores"),
+    threshold: parseFloat(val("medallionThreshold", 110)) || 110,
+    detail: parseFloat(val("medallionDetail", 0.5)),
+    bgTol: parseFloat(val("figureBgTol", 26)) || 26,
+    removeBackground: document.getElementById("figureRemoveBg")?.checked ?? true,
+    bgFromBottom: document.getElementById("figureBgBottom")?.checked ?? false,
+    simplify: parseFloat(val("figureSimplify", 0.3)),
+    keepMain: document.getElementById("figureKeepMain")?.checked ?? true,
+  };
+}
+
+// ¿Lista para el uso elegido? (resolución, fondo, texto, detalle, interior, derechos)
+function figureStatus(m) {
+  return checkFigure(m.fig, m.use || "ninguno", { rightsConfirmed: m.rightsConfirmed, source: m.source });
+}
+
+// Lista de verificación de la imagen seleccionada, con fuente y derechos editables
+function renderFigureChecks() {
+  const box = document.getElementById("figureChecks");
+  if (!box) return;
+  const m = userFigures[activeFigure];
+  if (!m) { box.innerHTML = ""; return; }
+  const esc = (t) => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  box.innerHTML = `<div style="font-weight:600;margin-top:6px;">${esc(m.name)}</div>
+    <label style="display:block;margin:4px 0;">Fuente (URL, libro u «obra propia»)
+      <input id="figSource" type="text" value="${esc(m.source)}" style="width:100%;padding:4px;border-radius:6px;border:1px solid #bbb;"></label>
+    <label style="display:flex;gap:6px;align-items:center;"><input id="figRights" type="checkbox" ${m.rightsConfirmed ? "checked" : ""}> Confirmo que es de dominio público o mía</label>
+    ${checklistHtml(figureStatus(m), m.use || "ninguno")}`;
+  const refresh = () => { renderFigureList(); document.dispatchEvent(new Event("figures-changed")); };
+  box.querySelector("#figSource").onchange = (e) => { m.source = e.target.value; refresh(); };
+  box.querySelector("#figRights").onchange = (e) => { m.rightsConfirmed = e.target.checked; refresh(); };
+}
+
+function renderFigureList() {
+  const list = document.getElementById("medallionList");
+  if (!list) return;
+  const req = document.getElementById("figureRequirements");
+  if (req && !req.innerHTML) {
+    req.innerHTML = REQUIREMENTS_HTML;
+    document.head.insertAdjacentHTML("beforeend", `<style>${CHECKLIST_CSS}</style>`);
+  }
+  list.innerHTML = "";
+  userFigures.forEach((m, i) => {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:96px;";
+    const thumb = document.createElement("img");
+    thumb.src = m.fig.href;
+    thumb.title = `${m.name} — clic para verla en la vista previa`;
+    thumb.style.cssText = `width:52px;height:52px;border-radius:8px;object-fit:contain;background:#fff;cursor:pointer;border:2px solid ${i === activeFigure ? "var(--m3-primary, #6750a4)" : "#ccc"};`;
+    thumb.onclick = () => { activeFigure = i; renderFigureList(); update(); };
+    const del = document.createElement("button");
+    del.textContent = "×";
+    del.title = "Quitar";
+    del.style.cssText = "position:absolute;top:-6px;right:16px;width:18px;height:18px;border-radius:50%;border:none;background:#b3261e;color:#fff;font-size:12px;line-height:18px;padding:0;cursor:pointer;";
+    del.onclick = () => {
+      userFigures.splice(i, 1);
+      activeFigure = Math.min(activeFigure, Math.max(0, userFigures.length - 1));
+      renderFigureList();
+      update();
+    };
+    // Uso elegido a mano para esta imagen (también decide si entra en el libro)
+    const sel = document.createElement("select");
+    sel.title = "Uso de esta imagen";
+    sel.style.cssText = "width:96px;font-size:11px;padding:2px;border-radius:6px;";
+    for (const [v, t] of FIGURE_USES) sel.add(new Option(t, v, false, (m.use || "ninguno") === v));
+    sel.onchange = () => { m.use = sel.value; activeFigure = i; renderFigureList(); update(); document.dispatchEvent(new Event("figures-changed")); };
+    // Semáforo: verde lista, rojo no lista, gris sin uso
+    const st = figureStatus(m);
+    const dot = document.createElement("span");
+    const used = (m.use || "ninguno") !== "ninguno";
+    dot.textContent = !used ? "· sin uso" : st.ready ? "✅ lista" : "❌ revisar";
+    dot.style.cssText = `font-size:10px;color:${!used ? "#777" : st.ready ? "#2e7d32" : "#c62828"};`;
+    wrap.append(thumb, del, sel, dot);
+    list.appendChild(wrap);
+  });
+  renderFigureChecks();
+}
+
 async function reprocessImage() {
   if (currentImage) {
     if (imageSpinner) imageSpinner.style.display = "inline-block";
@@ -821,6 +954,17 @@ function bindUI() {
   if (outlineModeEl) outlineModeEl.checked = state.outlineMode;
 
   styleModeEl.value = state.styleMode;
+  if (compositionEl) compositionEl.value = state.composition;
+  if (frameStyleEl) frameStyleEl.value = state.frameStyle;
+  if (centerArtEl) centerArtEl.value = state.centerArt;
+  if (centerArtScaleEl) centerArtScaleEl.value = String(state.centerArtScale);
+  const fd = document.getElementById("figureDensity");
+  if (fd) fd.value = String(state.figureDensity);
+  const fi = document.getElementById("figureFillInside");
+  if (fi) fi.checked = state.figureFillInside;
+  const fo = document.getElementById("figureFillOutside");
+  if (fo) fo.checked = state.figureFillOutside;
+  if (!["ninguno", "figura", "medallon"].includes(state.centerArt)) state.centerArt = "ninguno";
   layer1IntensityEl.value = String(state.layer1Intensity);
   layer2IntensityEl.value = String(state.layer2Intensity);
   layer3IntensityEl.value = String(state.layer3Intensity);
@@ -1040,6 +1184,14 @@ function bindUI() {
     updateImmediate();
   });
 
+  for (const [el, key] of [[compositionEl, "composition"], [frameStyleEl, "frameStyle"], [centerArtEl, "centerArt"]]) {
+    if (el) el.addEventListener("sl-change", () => { state[key] = el.value; updateImmediate(); });
+  }
+  if (centerArtScaleEl) centerArtScaleEl.addEventListener("sl-input", () => {
+    state.centerArtScale = clampFloat(centerArtScaleEl.value, 0.3, 0.55);
+    update();
+  });
+
   layer1IntensityEl.addEventListener("sl-input", () => {
     state.layer1Intensity = clampFloat(layer1IntensityEl.value, 0, 1);
     state.structurePreset = "custom";
@@ -1161,6 +1313,85 @@ function bindUI() {
   });
 
   uploadBtn.onclick = () => imageUploadEl.click();
+
+  // Mis imágenes: se convierten a contorno y se rellenan con mandalas
+  const figUploadEl = document.getElementById("medallionUpload");
+  const figUploadBtn = document.getElementById("medallionUploadBtn");
+  const packUploadEl = document.getElementById("figurePackUpload");
+  const packBtn = document.getElementById("figurePackBtn");
+  // Subir o importar NO cambia la página: cada imagen entra como "No usar" hasta que
+  // se elige su uso a mano (un paquete conserva el uso elegido en preprocesar.html)
+  const useFigures = () => {
+    renderFigureList();
+    updateImmediate();
+    document.dispatchEvent(new Event("figures-changed"));
+  };
+  if (figUploadBtn && figUploadEl) {
+    figUploadBtn.onclick = () => figUploadEl.click();
+    figUploadEl.onchange = async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      figUploadBtn.loading = true;
+      try {
+        for (const file of files) {
+          const img = await loadImageFile(file);
+          userFigures.push({ name: file.name, img, use: "ninguno", source: "", rightsConfirmed: false, fig: await figureFromImage(img, figureSettings()) });
+        }
+        activeFigure = userFigures.length - 1;
+        useFigures();
+      } catch (err) {
+        console.error("Figure image error:", err);
+        alert("❌ No se pudo procesar la imagen: " + (err.message || err));
+      } finally {
+        figUploadBtn.loading = false;
+        figUploadEl.value = "";
+      }
+    };
+  }
+  if (packBtn && packUploadEl) {
+    packBtn.onclick = () => packUploadEl.click();
+    packUploadEl.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const figs = unpackFigures(await file.text());
+        for (const f of figs) userFigures.push({ name: f.name, img: null, use: f.use || "ninguno", source: f.source, rightsConfirmed: f.rightsConfirmed, fig: await withStamp(f) });
+        activeFigure = Math.max(0, userFigures.length - figs.length);
+        useFigures();
+      } catch (err) {
+        alert("❌ Paquete no válido: " + (err.message || err));
+      } finally {
+        packUploadEl.value = "";
+      }
+    };
+  }
+  // Cambiar el tipo de imagen o la tolerancia reprocesa las imágenes subidas aquí
+  // (las de un paquete ya vienen ajustadas desde preprocesar.html)
+  let figTimer;
+  const reprocessFigures = () => {
+    clearTimeout(figTimer);
+    figTimer = setTimeout(async () => {
+      for (const m of userFigures) if (m.img) m.fig = await figureFromImage(m.img, figureSettings());
+      document.dispatchEvent(new Event("figures-changed"));
+      renderFigureList();
+      update();
+    }, 300);
+  };
+  ["medallionMode", "medallionThreshold", "medallionDetail", "figureBgTol", "figureRemoveBg", "figureBgBottom", "figureSimplify", "figureKeepMain"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("sl-change", reprocessFigures);
+  });
+  const densityEl = document.getElementById("figureDensity");
+  if (densityEl) densityEl.addEventListener("sl-change", () => { state.figureDensity = clampFloat(densityEl.value, 0, 1); update(); });
+  for (const [id, key] of [["figureFillInside", "figureFillInside"], ["figureFillOutside", "figureFillOutside"]]) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("sl-change", () => { state[key] = el.checked; update(); });
+  }
+  const exportPackBtn = document.getElementById("figurePackExport");
+  if (exportPackBtn) exportPackBtn.onclick = () => {
+    if (!userFigures.length) return;
+    downloadTextFile("figuras.json", JSON.stringify(packFigures(userFigures.map(m => ({ name: m.name, use: m.use, source: m.source, rightsConfirmed: m.rightsConfirmed, ...m.fig })))));
+  };
   imageUploadEl.onchange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -1458,55 +1689,104 @@ function bindUI() {
     downloadPdfSidebar.addEventListener("click", downloadManualPdf);
   }
 
-  // Libro completo (Amazon KDP): N mandalas con semillas consecutivas, a página completa
+  // Libro completo (Amazon KDP): N mandalas planificados para no repetirse
   const bookBtn = document.getElementById("downloadBook");
   const bookPagesEl = document.getElementById("bookPages");
   const bookTitleEl = document.getElementById("bookTitle");
+  const bookSubtitleEl = document.getElementById("bookSubtitle");
+  const bookAuthorEl = document.getElementById("bookAuthor");
   const bookVaryEl = document.getElementById("bookVary");
+  const bookDifficultyEl = document.getElementById("bookDifficulty");
+  // Sólo las imágenes con uso elegido a mano Y que pasan la lista de verificación
+  const chosenFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && figureStatus(m).ready);
+  const pendingFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && !figureStatus(m).ready);
   const bookBlankBackEl = document.getElementById("bookBlankBack");
   const bookTitlePageEl = document.getElementById("bookTitlePage");
+  const bookCopyrightEl = document.getElementById("bookCopyright");
+  const bookColorTestEl = document.getElementById("bookColorTest");
   const bookPageNumbersEl = document.getElementById("bookPageNumbers");
   const bookSummaryEl = document.getElementById("bookSummary");
 
   const bookCount = () => Math.min(120, Math.max(1, parseInt(bookPagesEl?.value, 10) || 1));
+  const bookLayoutOpts = () => ({
+    mandalas: bookCount(),
+    blankBack: bookBlankBackEl.checked,
+    titlePage: bookTitlePageEl.checked,
+    copyrightPage: !!bookCopyrightEl?.checked,
+    colorTest: !!bookColorTestEl?.checked,
+  });
+  // El margen depende del grosor del libro (medianil de KDP): se calcula con el total
+  const bookMargin = (total) => kdpSafeMarginMm(total, 10);
 
   const updateBookSummary = () => {
     if (!bookSummaryEl) return;
-    const total = bookPageCount({
-      mandalas: bookCount(),
-      blankBack: bookBlankBackEl.checked,
-      titlePage: bookTitlePageEl.checked,
-    });
+    const total = bookPageCount(bookLayoutOpts());
+    const margin = bookMargin(total);
     const { wMm, hMm } = getCurrentDoc().page;
-    bookSummaryEl.textContent = `${total} páginas en total · ${wMm}×${hMm} mm · ` +
-      (total < 24 ? "⚠️ KDP exige mínimo 24 páginas: sube el número de mandalas." : "✅ cumple el mínimo de KDP (24).");
+    const checks = kdpChecklist({ pages: total, marginMm: margin, dpi: 300 });
+    const bad = checks.filter(c => !c.ok);
+    bookSummaryEl.innerHTML =
+      `${total} páginas · ${wMm}×${hMm} mm · margen ${margin.toFixed(1)} mm<br>` +
+      (bad.length ? bad.map(c => `⚠️ ${c.msg}`).join("<br>") : "✅ Cumple los requisitos de interior de KDP (sin sangrado).");
+    const chosen = chosenFigures();
+    const info = document.getElementById("bookImagesInfo");
+    if (info) {
+      info.innerHTML = chosen.length
+        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano: ` + chosen.map(m => `${m.name} (${FIGURE_USES.find(u => u[0] === m.use)[1].toLowerCase()})`).join(", ")
+        : "Ninguna imagen lista: el libro será sólo de mandalas. Para incluir una, elige su uso en «Mis imágenes».";
+      const pend = pendingFigures();
+      if (pend.length) info.innerHTML += `<br>❌ No entran (no están listas): ${pend.map(m => m.name).join(", ")}. Revisa su lista de verificación.`;
+    }
+    if (chosen.length > bookCount()) bookSummaryEl.innerHTML += `<br>⚠️ Hay ${chosen.length} imágenes elegidas y sólo ${bookCount()} páginas: sobran ${chosen.length - bookCount()}.`;
   };
 
   const downloadBook = async () => {
     const count = bookCount();
-    const total = bookPageCount({
-      mandalas: count, blankBack: bookBlankBackEl.checked, titlePage: bookTitlePageEl.checked,
-    });
+    const layoutOpts = bookLayoutOpts();
+    const total = bookPageCount(layoutOpts);
     if (total < 24 && !confirm(`El libro tendría ${total} páginas y KDP exige mínimo 24. ¿Crear de todos modos?`)) return;
+    const marginMm = bookMargin(total);
 
     const baseSeed = state.seed >>> 0;
     const generatorFn = getGeneratorFn(state.generatorType);
+    const isClassic = state.generatorType === "classic";
+    const chosen = isClassic ? chosenFigures() : [];
+    // Registro de fuentes: qué imagen va en qué página (trazabilidad de derechos)
+    const sourceLog = [];
+    const vary = bookVaryEl.checked;
+    const base = buildOpts(state);
+    // Plan de todo el libro antes de dibujar: sin rachas de estilos ni encuadres repetidos
+    const plan = planBook({
+      count, seed: baseSeed,
+      styles: vary ? undefined : [state.styleMode],
+      compositions: vary && isClassic ? undefined : [state.composition || "centro"],
+      // "centro" sigue siendo el encuadre más frecuente: es el que más se colorea
+      compositionWeights: vary && isClassic ? [3, 2, 2, 1, 1, 1] : null,
+      frames: vary && isClassic ? undefined : [state.frameStyle || "redondeado"],
+      difficulty: bookDifficultyEl?.value || "mixta",
+      baseComplexity: base.complexity,
+      images: chosen.length,
+    });
+
     const makeOpts = (i) => {
+      const pg = plan[i];
       // Mismo redondeo de pétalos que la vista previa en calidad alta (WYSIWYG)
-      const o = { ...buildOpts(state), seed: (baseSeed + i) >>> 0,
-        petals: Math.max(6, Math.round(state.petals / 2) * 2) };
-      if (bookVaryEl.checked) {
-        // Variación reproducible: mismas semillas ⇒ mismo libro
-        const rng = mulberry32(((baseSeed + i) ^ 0x9E3779B1) >>> 0);
-        o.petals = [8, 10, 12, 14, 16, 18, 20, 24][rInt(rng, 0, 7)];
-        o.complexity = Math.max(20, Math.round(o.complexity * (0.75 + rng() * 0.5)));
-        if (state.generatorType !== "radial") {
-          o.styleMode = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"][rInt(rng, 0, 6)];
-        }
-      }
+      const o = { ...base, seed: pg.seed, complexity: pg.complexity,
+        petals: vary ? pg.petals : Math.max(6, Math.round(state.petals / 2) * 2) };
+      if (vary) o.styleMode = pg.styleMode;
       if (state.generatorType === "radial") {
         return { ...o, spiroEnabled: state.spiroEnabled, alternation: 0.3, harmony: 0.5, taper: 0.2,
           spiroR: 60, spiror: 25, spiroDistance: 30, spiroResolution: 500, spiroMode: "hypo" };
+      }
+      if (isClassic) {
+        o.composition = pg.composition;
+        o.frameStyle = pg.frameStyle;
+        // Cada imagen elegida aparece una vez, con el uso que se le asignó a mano;
+        // el resto de páginas son mandalas sin imagen
+        const entry = pg.centerArt ? chosen[pg.centerArt.imageIndex] : null;
+        Object.assign(o, resolveUserImage(state, entry));
+        sourceLog[i] = { mandala: i + 1, composition: entry ? entry.use : pg.composition, style: o.styleMode, image: entry ? entry.name : "", source: entry ? entry.source : "" };
+        return o;
       }
       return { ...o, imagePoints: currentImagePoints, imageScale: state.imageScale,
         imageIntensity: state.imageIntensity, imageMirror: state.imageMirror };
@@ -1525,9 +1805,11 @@ function bindUI() {
         preset: state.preset,
         genOpts: makeOpts,
         title: (bookTitleEl.value || "").trim() || "Mandalas para Colorear",
-        titlePage: bookTitlePageEl.checked,
-        blankBack: bookBlankBackEl.checked,
+        subtitle: (bookSubtitleEl?.value || "").trim(),
+        author: (bookAuthorEl?.value || "").trim(),
+        ...layoutOpts,
         pageNumbers: bookPageNumbersEl.checked,
+        marginMm,
         dpi: 300,
         onProgress: (done, tot, label) => {
           if (progressBar && progressStatus) {
@@ -1537,7 +1819,21 @@ function bindUI() {
           }
         },
       });
-      alert(`✅ Libro creado (${total} páginas). Súbelo a KDP como manuscrito PDF.`);
+      // Registro de fuentes (CSV) junto al PDF, si el libro lleva imágenes del usuario
+      if (sourceLog.some(r => r && r.image)) {
+        const layout = bookLayout({ ...layoutOpts, mandalas: count + (layoutOpts.colorTest ? 1 : 0) });
+        const off = layoutOpts.colorTest ? 1 : 0;
+        const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const rows = [["pagina_pdf", "mandala", "composicion_o_uso", "estilo", "imagen_origen", "fuente"].join(",")];
+        sourceLog.forEach((r, i) => {
+          if (!r) return;
+          const page = layout.findIndex(p => p.kind === "mandala" && p.index === i + off) + 1;
+          rows.push([page, r.mandala, q(r.composition), q(r.style), q(r.image), q(r.source)].join(","));
+        });
+        downloadTextFile(filename.replace(/\.pdf$/, "_registro_fuentes.csv"), rows.join("\n"));
+      }
+      alert(`✅ Libro creado (${total} páginas, margen ${marginMm.toFixed(1)} mm). ` +
+        "En KDP elige: tinta negra, papel blanco, sin sangrado, y el mismo tamaño de corte.");
     } catch (error) {
       console.error("Book PDF error:", error);
       alert("❌ Error al crear el libro: " + (error.message || "Intenta de nuevo"));
@@ -1550,7 +1846,8 @@ function bindUI() {
 
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
-    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, presetEl].forEach(el =>
+    document.addEventListener("figures-changed", updateBookSummary);
+    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     updateBookSummary();

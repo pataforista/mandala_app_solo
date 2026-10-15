@@ -7,6 +7,7 @@
 //  - Celdas cerradas de tamaño coloreable; los detalles finos respetan minCellArea.
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder, coloringCullArea } from "../core/pathBuilder.js";
+import { wantsComposition, composePage } from "./pageComposer.js";
 
 const TAU = Math.PI * 2;
 const MIN_LINE_MM = 0.3; // por debajo, la imprenta lo reproduce gris o lo pierde
@@ -27,6 +28,8 @@ const ASPECT = { petal: 0.75, round: 0.85, lotus: 0.8, leaf: 0.6, scallop: 1.5, 
 const SILHOUETTE = ["lotus", "lotus", "round", "petal", "scallop", "ogee"];
 
 export function generateMandalaClassic(doc, opts) {
+  // Encuadres de página (fondo, constelación, esquinas…): dibujan el disco con esta misma función
+  if (wantsComposition(opts)) return composePage(doc, opts, generateMandalaClassic);
   const {
     seed = 1,
     petals = 12,
@@ -71,8 +74,14 @@ export function generateMandalaClassic(doc, opts) {
 
   // ---------- Reparto de bandas ----------
   // Modo contornos (niños / zen): menos bandas y formas grandes
-  const B = outlineMode ? 4 + Math.round(cF * 2 + rng() * 0.8) : 5 + Math.round(cF * 4 + rng() * 1.2);
-  const rCore = R * (0.11 + rng() * 0.05);
+  // Medallón central con una imagen subida (ya convertida a líneas): núcleo grande, menos bandas
+  const art = opts.centerArt && opts.centerArt.href ? opts.centerArt : null;
+  const artFrac = art ? Math.max(0.25, Math.min(0.6, art.scale ?? 0.42)) : 0;
+  let B = outlineMode ? 4 + Math.round(cF * 2 + rng() * 0.8) : 5 + Math.round(cF * 4 + rng() * 1.2);
+  if (art) B = Math.max(3, B - Math.round(artFrac * 6));
+  // Mandalas pequeños de relleno: pocas bandas o las celdas se vuelven incoloreables
+  if (opts.maxBands) B = Math.max(2, Math.min(B, opts.maxBands));
+  const rCore = art ? R * artFrac : R * (0.11 + rng() * 0.05);
   const weights = Array.from({ length: B }, (_, k) => {
     let w = 0.75 + rng() * 0.7;
     if (k === B - 1) w *= 1.9;          // banda exterior: silueta protagonista
@@ -352,6 +361,20 @@ export function generateMandalaClassic(doc, opts) {
     if (includeFrames && detail && k > 0 && b.motif !== "beads" && bands[k - 1].motif !== "beads" && (b.r1 - b.r0) > 9 && rng() < 0.35) {
       const inner = mainPB(); circle(inner, cx, cy, b.r0 - Math.max(2.4, (b.r1 - b.r0) * 0.16)); emit(inner, detailW);
     }
+  }
+
+  // ---------- Núcleo: medallón con la imagen ----------
+  if (art) {
+    const rIn = rCore - Math.max(1.8, rCore * 0.05);
+    const ring = mainPB(); circle(ring, cx, cy, rIn); emit(ring, detailW, "#fff");
+    const id = `art-${(seed >>> 0).toString(36)}-${doc.defs.length}`;
+    doc.defs.push(`<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${rIn - detailW / 2}" /></clipPath>`);
+    // Se encaja sin deformarla
+    const s = rIn * 2 * (art.zoom ?? 1);
+    const inner = [`<image href="${art.href}" x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid meet" />`];
+    out.push(`<g clip-path="url(#${id})">`, ...inner, `</g>`);
+    doc.body.push(...out);
+    return doc;
   }
 
   // ---------- Núcleo: flor central ----------

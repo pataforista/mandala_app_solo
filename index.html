@@ -368,6 +368,20 @@
               <sl-option value="yantra">Yantra</sl-option>
               <sl-option value="celtico">Céltico</sl-option>
             </sl-select>
+            <sl-select id="composition" label="Composición de página" size="small" value="centro">
+              <sl-option value="centro">Centrado</sl-option>
+              <sl-option value="fondo">Fondo decorado (flores, corazones, estrellas)</sl-option>
+              <sl-option value="constelacion">Constelación de mandalas</sl-option>
+              <sl-option value="esquinas">Cuartos de mandala en las esquinas</sl-option>
+              <sl-option value="gigante">Gigante (recortado por el marco)</sl-option>
+              <sl-option value="medio">Medio mandala (amanecer)</sl-option>
+            </sl-select>
+            <sl-select id="frameStyle" label="Marco" size="small" value="redondeado">
+              <sl-option value="redondeado">Redondeado</sl-option>
+              <sl-option value="doble">Doble con rombos</sl-option>
+              <sl-option value="feston">Festón</sl-option>
+              <sl-option value="ninguno">Sin marco</sl-option>
+            </sl-select>
             <sl-checkbox id="kaleidoscope" checked>Simetría (Kaleidoscopio)</sl-checkbox>
             <sl-checkbox id="showGuides">Mostrar Guías Estructurales</sl-checkbox>
             <sl-checkbox id="spiroEnabled" style="display: none;">Espirógrafo (Spirograph)</sl-checkbox>
@@ -437,6 +451,63 @@
           </div>
         </sl-accordion-item>
 
+        <sl-accordion-item id="centerArtAccordionItem">
+          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Mis imágenes (figuras)</span>
+          <div class="control-group" style="padding: 12px 0;">
+            <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 0;">
+              Sube caricaturas, grabados o pinturas: se convierten en contorno y su interior se rellena con mandalas.
+              Para lotes grandes, recortes y ajustes por imagen usa <a href="preprocesar.html" target="_blank">preprocesar.html</a>
+              e importa aquí el paquete.
+            </p>
+            <input type="file" id="medallionUpload" accept="image/*" multiple style="display: none;">
+            <input type="file" id="figurePackUpload" accept=".json,application/json" style="display: none;">
+            <div style="display:flex; gap:8px;">
+              <sl-button id="medallionUploadBtn" variant="primary" size="small" pill style="flex:1;">
+                <sl-icon slot="prefix" name="upload"></sl-icon> Subir imágenes
+              </sl-button>
+              <sl-button id="figurePackBtn" variant="default" size="small" pill style="flex:1;">
+                <sl-icon slot="prefix" name="box-arrow-in-down"></sl-icon> Importar paquete
+              </sl-button>
+            </div>
+            <div id="medallionList" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+            <div id="figureChecks" style="font-size:0.78rem;"></div>
+            <details style="font-size:0.8rem;">
+              <summary style="cursor:pointer;"><b>Requisitos y herramientas alternativas</b></summary>
+              <div id="figureRequirements"></div>
+            </details>
+            <sl-button id="figurePackExport" variant="text" size="small">Guardar mis imágenes procesadas (paquete .json)</sl-button>
+            <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 0;">
+              Nada se aplica solo: bajo cada imagen elige su uso (figura rellena, anillos o medallón).
+              Clic en la miniatura para verla en la vista previa. Sólo las imágenes con uso elegido entran al libro.
+            </p>
+            <sl-checkbox id="figureFillInside" checked>Rellenar el interior con mandalas</sl-checkbox>
+            <sl-checkbox id="figureFillOutside" checked>Decorar el fondo alrededor</sl-checkbox>
+            <sl-range id="figureDensity" label="Densidad del relleno (menos = más fácil de colorear)" min="0" max="1" step="0.05" value="0.3"></sl-range>
+            <sl-range id="centerArtScale" label="Tamaño del medallón" min="0.3" max="0.55" step="0.01" value="0.42"></sl-range>
+            <sl-divider></sl-divider>
+            <sl-select id="medallionMode" label="Tipo de imagen" size="small" value="colores">
+              <sl-option value="colores">Caricatura / cartel de colores planos</sl-option>
+              <sl-option value="lineas">Dibujo o grabado en blanco y negro</sl-option>
+              <sl-option value="bordes">Pintura o fotografía</sl-option>
+            </sl-select>
+            <sl-checkbox id="figureRemoveBg" checked>Quitar el fondo de la imagen</sl-checkbox>
+            <sl-checkbox id="figureBgBottom">El fondo también toca el borde inferior</sl-checkbox>
+            <sl-range id="medallionThreshold" label="Umbral de tinta" min="30" max="230" value="110"></sl-range>
+            <sl-range id="medallionDetail" label="Detalle (pinturas)" min="0" max="1" step="0.05" value="0.5"></sl-range>
+            <sl-range id="figureBgTol" label="Tolerancia del fondo" min="8" max="60" value="26"></sl-range>
+            <sl-range id="figureSimplify" label="Simplificar (menos detalle)" min="0" max="1" step="0.05" value="0.3"></sl-range>
+            <sl-checkbox id="figureKeepMain" checked>Sólo la figura principal (quita textos y restos)</sl-checkbox>
+            <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 0;">
+              ¿Fotos antiguas con fondo oscuro o marcos? En <a href="preprocesar.html" target="_blank">preprocesar.html</a>
+              haz clic sobre el fondo para borrarlo y recorta textos.
+            </p>
+            <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 0;">
+              Para vender el libro usa sólo obras de <b>dominio público</b> o tuyas. Personajes actuales
+              (Minions, Pokémon, Disney moderno) están protegidos. Ver <code>docs/libro-kdp.md</code>.
+            </p>
+          </div>
+        </sl-accordion-item>
+
         <sl-accordion-item id="imageAccordionItem">
           <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Integración de Imagen</span>
           <div class="control-group" style="padding: 12px 0;">
@@ -469,15 +540,25 @@
           <sl-icon name="book"></sl-icon> Libro para Amazon KDP
         </div>
         <p style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;">
-          Crea el interior completo: cada página es un mandala distinto con tu estilo actual. Elige el tamaño en «Formato de Papel».
+          Crea el interior completo (sin sangrado, B/N): cada página es un mandala distinto. Elige el tamaño en «Formato de Papel». Márgenes, número par de páginas y texto sin fuentes externas se ajustan solos a las reglas de KDP.
         </p>
         <sl-input id="bookTitle" label="Título (hoja de título)" size="small" placeholder="Mandalas para Colorear"></sl-input>
+        <sl-input id="bookSubtitle" label="Subtítulo (opcional)" size="small" placeholder="50 diseños antiestrés"></sl-input>
+        <sl-input id="bookAuthor" label="Autor / sello (opcional)" size="small"></sl-input>
         <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="30"></sl-input>
-        <sl-checkbox id="bookVary" checked>Variar pétalos, complejidad y estilo entre páginas</sl-checkbox>
+        <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco (sin repetir en páginas seguidas)</sl-checkbox>
+        <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="mixta">
+          <sl-option value="mixta">Mixta (alterna)</sl-option>
+          <sl-option value="progresiva">Progresiva (de fácil a difícil)</sl-option>
+          <sl-option value="fija">Fija (la complejidad actual)</sl-option>
+        </sl-select>
+        <p id="bookImagesInfo" style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;"></p>
         <sl-checkbox id="bookBlankBack" checked>Página en blanco al reverso (evita que el marcador traspase)</sl-checkbox>
         <sl-checkbox id="bookTitlePage" checked>Incluir hoja de título</sl-checkbox>
+        <sl-checkbox id="bookCopyright" checked>Incluir página de derechos de autor</sl-checkbox>
+        <sl-checkbox id="bookColorTest">Incluir página para probar colores</sl-checkbox>
         <sl-checkbox id="bookPageNumbers">Numerar páginas</sl-checkbox>
-        <p id="bookSummary" style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;"></p>
+        <div id="bookSummary" style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;"></div>
         <sl-button id="downloadBook" variant="success" size="medium" pill style="width: 100%;">
           <sl-icon slot="prefix" name="journal-bookmark"></sl-icon>
           Crear libro (PDF)
