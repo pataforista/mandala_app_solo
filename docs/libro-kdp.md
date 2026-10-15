@@ -21,11 +21,28 @@ Misma semilla ⇒ mismo libro (reproducible).
 El sorteo no siempre acierta. En la pestaña **Libro KDP → Revisar páginas antes de crear** se ven
 todas las páginas en miniatura; en cada una:
 
-- **Otro diseño**: mismo encuadre, mandala nuevo (sólo cambia la semilla de esa página).
+- **Borrar y crear otro**: descarta la página y dibuja al instante un mandala nuevo en su lugar
+  (mismo encuadre, otra semilla).
 - **Otro encuadre**: pasa a la siguiente composición permitida.
 
 Los cambios se guardan mientras no cambies la semilla, las composiciones permitidas o la dificultad,
 y se aplican al pulsar «Crear libro».
+
+### Perfil «Los más vendidos para este formato» (por defecto)
+
+No se basa en datos de ventas (la app no los tiene). Resume las convenciones de los libros de
+mandalas mejor posicionados: un mandala grande y centrado por página, impreso a una sola cara,
+con simetría alta y sin marcos pesados (`bestSellerProfile` en `js/core/bookPlan.js`).
+
+| | 8.5×8.5 (cuadrado) | Formatos verticales |
+|---|---|---|
+| Composición (peso) | centrado 6 · fondo 2 · gigante 1 · constelación 1 | centrado 5 · fondo 2 · constelación 2 · esquinas 1 · gigante 1 |
+| Medio mandala | nunca | nunca |
+| Estilo (peso) | floral 3 · geométrico, islámico, yantra 2 · resto 1 | igual |
+| Pétalos | 12, 16, 18, 20, 24 | igual |
+| Marco | sin marco 3 · redondeado 1 | igual |
+
+Para usar tus propias composiciones elige «Elegir yo las composiciones».
 
 ### Composiciones corregidas (revisión del libro de 30 mandalas, semilla 3164907524)
 

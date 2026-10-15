@@ -7,7 +7,7 @@ import { createDoc } from "../js/core/svgDoc.js";
 import { renderDocToSvgString } from "../js/core/svgRender.js";
 import { generateMandalaClassic } from "../js/generators/mandalaClassic.js";
 import { COMPOSITIONS, FRAME_STYLES } from "../js/generators/pageComposer.js";
-import { planBook, shuffleBag, BOOK_STYLES } from "../js/core/bookPlan.js";
+import { planBook, shuffleBag, BOOK_STYLES, bestSellerProfile } from "../js/core/bookPlan.js";
 import { kdpGutterMm, kdpSafeMarginMm, bookLayout, kdpChecklist } from "../js/core/kdp.js";
 import { encodeGrayPng, rgbaToGray } from "../js/core/grayPng.js";
 import { stampRaster } from "../js/core/lineArt.js";
@@ -374,5 +374,17 @@ test("mini mandalas: sin celdas diminutas que se impriman como manchas negras", 
       const small = closedAreas(doc.body).filter(a => a < 1.2);
       assert.equal(small.length, 0, `pétalos ${petals} semilla ${seed}: ${small.length} celdas < 1.2 mm² (${small.slice(0, 4).map(a => a.toFixed(2))})`);
     }
+  }
+});
+
+test("perfil «más vendidos»: centrado domina, sin medios mandalas, simetría alta", () => {
+  for (const preset of ["KDP_8_5x8_5", "KDP_8_5x11"]) {
+    const prof = bestSellerProfile(preset);
+    const plan = planBook({ count: 60, seed: 42, ...prof });
+    const n = (c) => plan.filter(p => p.composition === c).length;
+    assert.equal(n("medio"), 0, preset);
+    assert.ok(n("centro") >= 0.45 * plan.length, `${preset}: centrado ${n("centro")}/60`);
+    assert.ok(plan.every(p => p.petals >= 12), preset);
+    assert.ok(plan.filter(p => p.styleMode === "floral").length > plan.filter(p => p.styleMode === "azteca").length, preset);
   }
 });

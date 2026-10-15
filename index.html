@@ -172,6 +172,7 @@
     }
 
     .comp-box > .hint { grid-column: 1 / -1; }
+    .comp-box.hidden-by-profile { display: none !important; }
 
     #sideTabs sl-tab::part(base) { padding: 10px 10px; font-size: 0.85rem; }
     #sideTabs sl-tab-panel::part(base) { padding: 16px 0 8px; }
@@ -541,6 +542,11 @@
               <sl-option value="fija">Fija (la complejidad actual)</sl-option>
             </sl-select>
             <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco</sl-checkbox>
+            <sl-select id="bookProfile" label="Patrones del libro" size="small" value="rentable">
+              <sl-option value="rentable">Los más vendidos para este formato (recomendado)</sl-option>
+              <sl-option value="personalizada">Elegir yo las composiciones</sl-option>
+            </sl-select>
+            <p id="bookProfileInfo" class="hint"></p>
             <div id="bookCompBox" class="comp-box">
               <div class="hint" style="font-weight:600;">Composiciones que pueden salir</div>
               <sl-checkbox class="bookComp" value="centro" checked>Centrado</sl-checkbox>
@@ -667,7 +673,8 @@
   <!-- Revisión del libro: cambiar las páginas que no sirven antes de crear el PDF -->
   <sl-dialog id="reviewDialog" label="Revisar páginas del libro" style="--width: min(1100px, 96vw);">
     <p class="hint" style="margin-bottom:12px;">
-      Si una página no te convence, pulsa <b>Otro diseño</b> (mismo encuadre, mandala nuevo) o <b>Otro encuadre</b>.
+      ¿Una página se ve mal? Pulsa <b>Borrar y crear otro</b>: se descarta y aparece al instante un mandala nuevo en su lugar.
+      <b>Otro encuadre</b> cambia la composición de esa página.
       Los cambios se aplican al crear el libro y se mantienen mientras no cambies la semilla.
     </p>
     <div id="reviewGrid"></div>
