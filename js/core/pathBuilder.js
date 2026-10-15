@@ -7,39 +7,53 @@ export class PathBuilder {
     this._d = "";
     this._minClosedArea = minClosedArea;
     this._subStart = 0;
-    this._pts = [];
+    this._open = false;
+    this._sx = 0; this._sy = 0; // inicio del subpath
+    this._x = 0; this._y = 0;   // punto actual
+    this._area2 = 0;            // 2·área con signo (teorema de Green), exacta para L/Q/C
   }
 
   moveTo(x, y) {
     this._subStart = this._d.length;
-    this._pts = [[x, y]];
+    this._open = true;
+    this._sx = this._x = x; this._sy = this._y = y;
+    this._area2 = 0;
     this._d += `M ${fmt(x)} ${fmt(y)} `;
     return this;
   }
-  lineTo(x, y) { this._pts.push([x, y]); this._d += `L ${fmt(x)} ${fmt(y)} `; return this; }
+  lineTo(x, y) {
+    this._area2 += this._x * y - x * this._y;
+    this._x = x; this._y = y;
+    this._d += `L ${fmt(x)} ${fmt(y)} `;
+    return this;
+  }
   quadTo(cx, cy, x, y) {
-    // Punto medio de la curva (no el de control) para estimar el área
-    const [px, py] = this._pts[this._pts.length - 1] ?? [x, y];
-    this._pts.push([0.25 * px + 0.5 * cx + 0.25 * x, 0.25 * py + 0.5 * cy + 0.25 * y], [x, y]);
+    // ∮(x dy − y dx) sobre una Bézier cuadrática, forma cerrada
+    const x0 = this._x, y0 = this._y;
+    this._area2 += (x0 * (2 * cy + y) - cx * (2 * y0 - 2 * y) - x * (y0 + 2 * cy)) / 3;
+    this._x = x; this._y = y;
     this._d += `Q ${fmt(cx)} ${fmt(cy)} ${fmt(x)} ${fmt(y)} `;
     return this;
   }
   cubicTo(cx1, cy1, cx2, cy2, x, y) {
-    const [px, py] = this._pts[this._pts.length - 1] ?? [x, y];
-    const b = (t, a, c1, c2, e) => (1 - t) ** 3 * a + 3 * (1 - t) ** 2 * t * c1 + 3 * (1 - t) * t * t * c2 + t ** 3 * e;
-    this._pts.push(
-      [b(1 / 3, px, cx1, cx2, x), b(1 / 3, py, cy1, cy2, y)],
-      [b(2 / 3, px, cx1, cx2, x), b(2 / 3, py, cy1, cy2, y)],
-      [x, y]
-    );
+    // ∮(x dy − y dx) sobre una Bézier cúbica, forma cerrada
+    const x0 = this._x, y0 = this._y;
+    this._area2 += (
+      x0 * (6 * cy1 + 3 * cy2 + y) + 3 * cx1 * (-2 * y0 + cy2 + y) - 3 * cx2 * (y0 + cy1 - 2 * y) - x * (y0 + 3 * cy1 + 6 * cy2)
+    ) / 10;
+    this._x = x; this._y = y;
     this._d += `C ${fmt(cx1)} ${fmt(cy1)} ${fmt(cx2)} ${fmt(cy2)} ${fmt(x)} ${fmt(y)} `;
     return this;
   }
   close() {
-    if (this._minClosedArea > 0 && this._pts.length > 0 && polygonArea(this._pts) < this._minClosedArea) {
-      this._d = this._d.slice(0, this._subStart);
-      this._pts = [];
-      return this;
+    if (this._open) {
+      const area = Math.abs(this._area2 + this._x * this._sy - this._sx * this._y) / 2;
+      if (this._minClosedArea > 0 && area < this._minClosedArea) {
+        this._d = this._d.slice(0, this._subStart);
+        this._open = false;
+        return this;
+      }
+      this._x = this._sx; this._y = this._sy;
     }
     this._d += "Z ";
     return this;
@@ -65,14 +79,6 @@ export function coloringCullArea({ outlineMode = false, minCellAreaMm2 = 0, deta
   if (outlineMode) return minArea;
   const s = Number.isFinite(detailSimplification) ? detailSimplification : 0;
   return minArea * Math.max(0, Math.min(1, (s - 0.5) * 2));
-}
-
-function polygonArea(pts) {
-  let a = 0;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    a += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]);
-  }
-  return Math.abs(a / 2);
 }
 
 function fmt(n) {

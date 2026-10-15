@@ -162,6 +162,23 @@ test("PathBuilder descarta formas cerradas menores que minClosedArea", () => {
   assert.equal(pb.d, "M 10 10 L 13 10 L 13 13 L 10 13 Z M 20 20 L 21 21");
 });
 
+test("PathBuilder mide el área de curvas Bézier de forma exacta", () => {
+  // Disco de radio 1 con 4 cúbicas (k = 4/3·tan(π/8)): área ≈ π (error < 0.03 %).
+  // El muestreo poligonal anterior daba ~3.0 y descartaba este disco con umbral 3.1.
+  const k = (4 / 3) * Math.tan(Math.PI / 8);
+  const pb = new PathBuilder({ minClosedArea: 3.1 });
+  pb.moveTo(1, 0).cubicTo(1, k, k, 1, 0, 1).cubicTo(-k, 1, -1, k, -1, 0)
+    .cubicTo(-1, -k, -k, -1, 0, -1).cubicTo(k, -1, 1, -k, 1, 0).close();
+  assert.ok(pb.d.endsWith("Z"), "un disco de área π no debe descartarse con umbral 3.1");
+  // Semidisco con cuadrática: área exacta 4/3 (parábola y = 1 − x², base [-1, 1])
+  const q = new PathBuilder({ minClosedArea: 1.3 });
+  q.moveTo(-1, 0).quadTo(0, 2, 1, 0).close();
+  assert.ok(q.d.endsWith("Z"), "la región parabólica mide 4/3 > 1.3");
+  const q2 = new PathBuilder({ minClosedArea: 1.34 });
+  q2.moveTo(-1, 0).quadTo(0, 2, 1, 0).close();
+  assert.equal(q2.d, "", "y 4/3 < 1.34: se descarta");
+});
+
 test("perfil de coloreo: adulto/experto intactos, niños filtra y simplifica", () => {
   assert.equal(coloringCullArea({ minCellAreaMm2: 3, detailSimplification: 0.5 }), 0);
   assert.equal(coloringCullArea({ minCellAreaMm2: 2, detailSimplification: 0.2 }), 0);
@@ -211,5 +228,53 @@ test("clásico: todo cabe en la página y respeta el grosor mínimo de impresió
         assert.ok(+m[1] >= 0.3, `${preset} seed=${seed}: línea de ${m[1]} mm, demasiado fina para imprimir`);
       }
     }
+  }
+});
+
+test("espirógrafo: periodo exacto de cierre y trazo único", async () => {
+  const { trochoidTurns } = await import("../js/core/geometry.js");
+  assert.equal(trochoidTurns(60, 25), 5);   // 60/25 = 12/5
+  assert.equal(trochoidTurns(5, 3), 3);
+  assert.equal(trochoidTurns(40, 40), 1);
+  assert.ok(trochoidTurns(Math.PI, 1) <= 20); // irracional: mejor aproximación acotada
+
+  const { doc } = render(generateMandalaRadial, { ...BASE, seed: 3, petals: 12, spiroEnabled: true });
+  const spiro = doc.body[doc.body.length - 1];
+  const nums = spiro.match(/ d="([^"]+)"/)[1].match(/-?\d+(\.\d+)?/g).map(Number);
+  const pts = [];
+  for (let i = 0; i < nums.length; i += 2) pts.push([nums[i], nums[i + 1]]);
+  const [first, last] = [pts[0], pts[pts.length - 1]];
+  assert.ok(Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.02, "la curva debe cerrarse");
+  // Un solo recorrido: el punto inicial no reaparece a mitad del trazo
+  const revisits = pts.slice(1, -1).filter(p => Math.hypot(p[0] - first[0], p[1] - first[1]) < 0.02).length;
+  assert.equal(revisits, 0, "no debe volver a trazar la misma curva");
+});
+
+test("espirógrafo: lóbulos múltiplo de los pétalos y alineados con sus ejes", async () => {
+  const { harmonicTrochoid } = await import("../js/core/geometry.js");
+  assert.deepEqual(harmonicTrochoid(12, 60, 25), { r: 25, lobes: 12, turns: 5 }); // la figura por defecto no cambia
+  for (const p of [5, 6, 7, 8, 10, 16, 24, 32]) assert.equal(harmonicTrochoid(p, 60, 25).lobes % p, 0, `${p} pétalos`);
+
+  const spiroPts = (petals, spiroMode) => {
+    const { doc } = render(generateMandalaRadial, { ...BASE, seed: 3, petals, spiroEnabled: true, spiroMode });
+    const nums = doc.body[doc.body.length - 1].match(/ d="([^"]+)"/)[1].match(/-?\d+(\.\d+)?/g).map(Number);
+    const pts = [];
+    for (let i = 0; i < nums.length; i += 2) pts.push([nums[i] - CENTER.x, nums[i + 1] - CENTER.y]);
+    return pts;
+  };
+  const near = (pts, [x, y]) => {
+    let best = Infinity;
+    for (let i = 1; i < pts.length; i++) best = Math.min(best, distToSeg(x, y, [...pts[i - 1], ...pts[i]]));
+    return best;
+  };
+  for (const spiroMode of ["hypo", "epi"]) for (const petals of [8, 10, 12]) {
+    const pts = spiroPts(petals, spiroMode);
+    const a = (2 * Math.PI) / petals, sample = pts.filter((_, i) => i % 23 === 0);
+    // Giro de una cuña: la curva cae sobre sí misma
+    const rotErr = Math.max(...sample.map(([x, y]) => near(pts, [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)])));
+    // Espejo sobre el eje vertical (eje de la cuña 0, −90°): simetría de pétalo
+    const mirErr = Math.max(...sample.map(([x, y]) => near(pts, [-x, y])));
+    assert.ok(rotErr < 0.08, `${spiroMode}/${petals}: simetría rotacional (${rotErr.toFixed(3)} mm)`);
+    assert.ok(mirErr < 0.08, `${spiroMode}/${petals}: alineado con el eje de pétalo (${mirErr.toFixed(3)} mm)`);
   }
 });
