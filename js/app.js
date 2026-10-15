@@ -11,11 +11,19 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
+import { planBook } from "./core/bookPlan.js";
+import { kdpSafeMarginMm, kdpChecklist } from "./core/kdp.js";
+import { loadImageFile, figureFromImage } from "./core/figureImport.js";
+import { packFigures, unpackFigures } from "./core/figurePack.js";
 
 const historyMan = new StateHistory();
 const imgProc = new ImageProcessor();
 let currentImage = null;
 let currentImagePoints = [];
+// Imágenes del usuario ya procesadas: [{ name, img (original o null si vino de un paquete),
+// fig: { href, cls, w, h } }]. La activa es la que se ve en la vista previa.
+let userFigures = [];
+let activeFigure = 0;
 let listenersBound = false;
 
 const stage = document.getElementById("stage");
@@ -99,6 +107,11 @@ const imageIntensityEl = document.getElementById("imageIntensity");
 const imageMirrorEl = document.getElementById("imageMirror");
 const showGuidesEl = document.getElementById("showGuides");
 const imageUploadEl = document.getElementById("imageUpload");
+const compositionEl = document.getElementById("composition");
+const frameStyleEl = document.getElementById("frameStyle");
+const centerArtEl = document.getElementById("centerArt");
+const centerArtScaleEl = document.getElementById("centerArtScale");
+const centerArtAccordionItem = document.getElementById("centerArtAccordionItem");
 const uploadBtn = document.getElementById("uploadBtn");
 
 // Motor "classic": gramática de libro comercial (bandas llenas, pétalos en capas)
@@ -151,6 +164,14 @@ const DEFAULTS = {
   // New coloring book features
   outlineMode: false,
   coloringPreset: "adulto",
+  // Composición de página y medallón (motor clásico)
+  composition: "centro",
+  frameStyle: "redondeado",
+  centerArt: "ninguno",
+  centerArtScale: 0.42,
+  figureDensity: 0.3,
+  figureFillInside: true,
+  figureFillOutside: true,
 };
 
 const STRUCTURE_PRESETS = {
@@ -410,7 +431,20 @@ function buildOpts(s) {
     minCellAreaMm2: s.minCellArea,
     detailSimplification: s.detailSimplification,
     outlineMode: s.outlineMode,
+    composition: s.composition,
+    frameStyle: s.frameStyle,
+    ...resolveUserImage(s),
   };
+}
+
+// Imagen del usuario: figura grande rellena de mandalas, o dentro del medallón
+function resolveUserImage(s, fig = userFigures[activeFigure]?.fig) {
+  const out = { figure: null, centerArt: null,
+    figureDensity: s.figureDensity, figureFillInside: s.figureFillInside, figureFillOutside: s.figureFillOutside };
+  if (!fig) return out;
+  if (s.centerArt === "figura") out.figure = fig;
+  else if (s.centerArt === "medallon") out.centerArt = { type: "image", href: fig.href, scale: s.centerArtScale };
+  return out;
 }
 
 function getCurrentDoc() {
@@ -433,6 +467,11 @@ function updateGeneratorUI() {
   }
 
   if (imageAccordionItem) imageAccordionItem.style.display = isLayers ? "block" : "none";
+  // Composición, marco y medallón sólo existen en el motor clásico
+  const isClassic = state.generatorType === "classic";
+  if (centerArtAccordionItem) centerArtAccordionItem.style.display = isClassic ? "block" : "none";
+  if (compositionEl) compositionEl.style.display = isClassic ? "block" : "none";
+  if (frameStyleEl) frameStyleEl.style.display = isClassic ? "block" : "none";
   
   if (spiroEnabledEl) spiroEnabledEl.style.display = isRadial ? "block" : "none";
 }
@@ -740,6 +779,46 @@ async function refreshGallery() {
   });
 }
 
+function figureSettings() {
+  const val = (id, d) => { const el = document.getElementById(id); return el ? el.value : d; };
+  return {
+    mode: val("medallionMode", "colores"),
+    threshold: parseFloat(val("medallionThreshold", 110)) || 110,
+    detail: parseFloat(val("medallionDetail", 0.5)),
+    bgTol: parseFloat(val("figureBgTol", 26)) || 26,
+    removeBackground: document.getElementById("figureRemoveBg")?.checked ?? true,
+    bgFromBottom: document.getElementById("figureBgBottom")?.checked ?? false,
+  };
+}
+
+function renderFigureList() {
+  const list = document.getElementById("medallionList");
+  if (!list) return;
+  list.innerHTML = "";
+  userFigures.forEach((m, i) => {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:relative;";
+    const thumb = document.createElement("img");
+    thumb.src = m.fig.href;
+    thumb.title = `${m.name} — clic para usarla en la vista previa`;
+    thumb.style.cssText = `width:52px;height:52px;border-radius:8px;object-fit:contain;background:#fff;cursor:pointer;border:2px solid ${i === activeFigure ? "var(--m3-primary, #6750a4)" : "#ccc"};`;
+    thumb.onclick = () => { activeFigure = i; renderFigureList(); update(); };
+    const del = document.createElement("button");
+    del.textContent = "×";
+    del.title = "Quitar";
+    del.style.cssText = "position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;border:none;background:#b3261e;color:#fff;font-size:12px;line-height:18px;padding:0;cursor:pointer;";
+    del.onclick = () => {
+      userFigures.splice(i, 1);
+      activeFigure = Math.min(activeFigure, Math.max(0, userFigures.length - 1));
+      if (!userFigures.length) { state.centerArt = "ninguno"; if (centerArtEl) centerArtEl.value = "ninguno"; }
+      renderFigureList();
+      update();
+    };
+    wrap.append(thumb, del);
+    list.appendChild(wrap);
+  });
+}
+
 async function reprocessImage() {
   if (currentImage) {
     if (imageSpinner) imageSpinner.style.display = "inline-block";
@@ -821,6 +900,17 @@ function bindUI() {
   if (outlineModeEl) outlineModeEl.checked = state.outlineMode;
 
   styleModeEl.value = state.styleMode;
+  if (compositionEl) compositionEl.value = state.composition;
+  if (frameStyleEl) frameStyleEl.value = state.frameStyle;
+  if (centerArtEl) centerArtEl.value = state.centerArt;
+  if (centerArtScaleEl) centerArtScaleEl.value = String(state.centerArtScale);
+  const fd = document.getElementById("figureDensity");
+  if (fd) fd.value = String(state.figureDensity);
+  const fi = document.getElementById("figureFillInside");
+  if (fi) fi.checked = state.figureFillInside;
+  const fo = document.getElementById("figureFillOutside");
+  if (fo) fo.checked = state.figureFillOutside;
+  if (!["ninguno", "figura", "medallon"].includes(state.centerArt)) state.centerArt = "ninguno";
   layer1IntensityEl.value = String(state.layer1Intensity);
   layer2IntensityEl.value = String(state.layer2Intensity);
   layer3IntensityEl.value = String(state.layer3Intensity);
@@ -1040,6 +1130,14 @@ function bindUI() {
     updateImmediate();
   });
 
+  for (const [el, key] of [[compositionEl, "composition"], [frameStyleEl, "frameStyle"], [centerArtEl, "centerArt"]]) {
+    if (el) el.addEventListener("sl-change", () => { state[key] = el.value; updateImmediate(); });
+  }
+  if (centerArtScaleEl) centerArtScaleEl.addEventListener("sl-input", () => {
+    state.centerArtScale = clampFloat(centerArtScaleEl.value, 0.3, 0.55);
+    update();
+  });
+
   layer1IntensityEl.addEventListener("sl-input", () => {
     state.layer1Intensity = clampFloat(layer1IntensityEl.value, 0, 1);
     state.structurePreset = "custom";
@@ -1161,6 +1259,82 @@ function bindUI() {
   });
 
   uploadBtn.onclick = () => imageUploadEl.click();
+
+  // Mis imágenes: se convierten a contorno y se rellenan con mandalas
+  const figUploadEl = document.getElementById("medallionUpload");
+  const figUploadBtn = document.getElementById("medallionUploadBtn");
+  const packUploadEl = document.getElementById("figurePackUpload");
+  const packBtn = document.getElementById("figurePackBtn");
+  const useFigures = () => {
+    if (state.centerArt === "ninguno") { state.centerArt = "figura"; if (centerArtEl) centerArtEl.value = "figura"; }
+    renderFigureList();
+    updateImmediate();
+  };
+  if (figUploadBtn && figUploadEl) {
+    figUploadBtn.onclick = () => figUploadEl.click();
+    figUploadEl.onchange = async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      figUploadBtn.loading = true;
+      try {
+        for (const file of files) {
+          const img = await loadImageFile(file);
+          userFigures.push({ name: file.name, img, fig: await figureFromImage(img, figureSettings()) });
+        }
+        activeFigure = userFigures.length - 1;
+        useFigures();
+      } catch (err) {
+        console.error("Figure image error:", err);
+        alert("❌ No se pudo procesar la imagen: " + (err.message || err));
+      } finally {
+        figUploadBtn.loading = false;
+        figUploadEl.value = "";
+      }
+    };
+  }
+  if (packBtn && packUploadEl) {
+    packBtn.onclick = () => packUploadEl.click();
+    packUploadEl.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const figs = unpackFigures(await file.text());
+        for (const f of figs) userFigures.push({ name: f.name, img: null, fig: f });
+        activeFigure = Math.max(0, userFigures.length - figs.length);
+        useFigures();
+      } catch (err) {
+        alert("❌ Paquete no válido: " + (err.message || err));
+      } finally {
+        packUploadEl.value = "";
+      }
+    };
+  }
+  // Cambiar el tipo de imagen o la tolerancia reprocesa las imágenes subidas aquí
+  // (las de un paquete ya vienen ajustadas desde preprocesar.html)
+  let figTimer;
+  const reprocessFigures = () => {
+    clearTimeout(figTimer);
+    figTimer = setTimeout(async () => {
+      for (const m of userFigures) if (m.img) m.fig = await figureFromImage(m.img, figureSettings());
+      renderFigureList();
+      update();
+    }, 300);
+  };
+  ["medallionMode", "medallionThreshold", "medallionDetail", "figureBgTol", "figureRemoveBg", "figureBgBottom"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("sl-change", reprocessFigures);
+  });
+  const densityEl = document.getElementById("figureDensity");
+  if (densityEl) densityEl.addEventListener("sl-change", () => { state.figureDensity = clampFloat(densityEl.value, 0, 1); update(); });
+  for (const [id, key] of [["figureFillInside", "figureFillInside"], ["figureFillOutside", "figureFillOutside"]]) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("sl-change", () => { state[key] = el.checked; update(); });
+  }
+  const exportPackBtn = document.getElementById("figurePackExport");
+  if (exportPackBtn) exportPackBtn.onclick = () => {
+    if (!userFigures.length) return;
+    downloadTextFile("figuras.json", JSON.stringify(packFigures(userFigures.map(m => ({ name: m.name, ...m.fig })))));
+  };
   imageUploadEl.onchange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -1458,55 +1632,99 @@ function bindUI() {
     downloadPdfSidebar.addEventListener("click", downloadManualPdf);
   }
 
-  // Libro completo (Amazon KDP): N mandalas con semillas consecutivas, a página completa
+  // Libro completo (Amazon KDP): N mandalas planificados para no repetirse
   const bookBtn = document.getElementById("downloadBook");
   const bookPagesEl = document.getElementById("bookPages");
   const bookTitleEl = document.getElementById("bookTitle");
+  const bookSubtitleEl = document.getElementById("bookSubtitle");
+  const bookAuthorEl = document.getElementById("bookAuthor");
   const bookVaryEl = document.getElementById("bookVary");
+  const bookDifficultyEl = document.getElementById("bookDifficulty");
+  const bookCharactersEl = document.getElementById("bookCharacters");
+  const bookCharacterEveryEl = document.getElementById("bookCharacterEvery");
   const bookBlankBackEl = document.getElementById("bookBlankBack");
   const bookTitlePageEl = document.getElementById("bookTitlePage");
+  const bookCopyrightEl = document.getElementById("bookCopyright");
+  const bookColorTestEl = document.getElementById("bookColorTest");
   const bookPageNumbersEl = document.getElementById("bookPageNumbers");
   const bookSummaryEl = document.getElementById("bookSummary");
 
   const bookCount = () => Math.min(120, Math.max(1, parseInt(bookPagesEl?.value, 10) || 1));
+  const bookLayoutOpts = () => ({
+    mandalas: bookCount(),
+    blankBack: bookBlankBackEl.checked,
+    titlePage: bookTitlePageEl.checked,
+    copyrightPage: !!bookCopyrightEl?.checked,
+    colorTest: !!bookColorTestEl?.checked,
+  });
+  // El margen depende del grosor del libro (medianil de KDP): se calcula con el total
+  const bookMargin = (total) => kdpSafeMarginMm(total, 10);
 
   const updateBookSummary = () => {
     if (!bookSummaryEl) return;
-    const total = bookPageCount({
-      mandalas: bookCount(),
-      blankBack: bookBlankBackEl.checked,
-      titlePage: bookTitlePageEl.checked,
-    });
+    const total = bookPageCount(bookLayoutOpts());
+    const margin = bookMargin(total);
     const { wMm, hMm } = getCurrentDoc().page;
-    bookSummaryEl.textContent = `${total} páginas en total · ${wMm}×${hMm} mm · ` +
-      (total < 24 ? "⚠️ KDP exige mínimo 24 páginas: sube el número de mandalas." : "✅ cumple el mínimo de KDP (24).");
+    const checks = kdpChecklist({ pages: total, marginMm: margin, dpi: 300 });
+    const bad = checks.filter(c => !c.ok);
+    bookSummaryEl.innerHTML =
+      `${total} páginas · ${wMm}×${hMm} mm · margen ${margin.toFixed(1)} mm<br>` +
+      (bad.length ? bad.map(c => `⚠️ ${c.msg}`).join("<br>") : "✅ Cumple los requisitos de interior de KDP (sin sangrado).");
+    if (bookCharactersEl?.value !== "ninguno" && !userFigures.length) {
+      bookSummaryEl.innerHTML += "<br>⚠️ Sube imágenes en «Mis imágenes» para usarlas en el libro.";
+    }
   };
 
   const downloadBook = async () => {
     const count = bookCount();
-    const total = bookPageCount({
-      mandalas: count, blankBack: bookBlankBackEl.checked, titlePage: bookTitlePageEl.checked,
-    });
+    const layoutOpts = bookLayoutOpts();
+    const total = bookPageCount(layoutOpts);
     if (total < 24 && !confirm(`El libro tendría ${total} páginas y KDP exige mínimo 24. ¿Crear de todos modos?`)) return;
+    const marginMm = bookMargin(total);
 
     const baseSeed = state.seed >>> 0;
     const generatorFn = getGeneratorFn(state.generatorType);
+    const isClassic = state.generatorType === "classic";
+    const characters = bookCharactersEl?.value || "ninguno";
+    if (characters !== "ninguno" && !userFigures.length) {
+      alert("Sube primero tus imágenes en «Mis imágenes».");
+      return;
+    }
+    const vary = bookVaryEl.checked;
+    const base = buildOpts(state);
+    // Plan de todo el libro antes de dibujar: sin rachas de estilos ni encuadres repetidos
+    const plan = planBook({
+      count, seed: baseSeed,
+      styles: vary ? undefined : [state.styleMode],
+      compositions: vary && isClassic ? undefined : [state.composition || "centro"],
+      // "centro" sigue siendo el encuadre más frecuente: es el que más se colorea
+      compositionWeights: vary && isClassic ? [3, 2, 2, 1, 1, 1] : null,
+      frames: vary && isClassic ? undefined : [state.frameStyle || "redondeado"],
+      difficulty: bookDifficultyEl?.value || "mixta",
+      baseComplexity: base.complexity,
+      images: isClassic && characters !== "ninguno" ? userFigures.length : 0,
+      imageEvery: parseInt(bookCharacterEveryEl?.value, 10) || 1,
+    });
+
     const makeOpts = (i) => {
+      const pg = plan[i];
       // Mismo redondeo de pétalos que la vista previa en calidad alta (WYSIWYG)
-      const o = { ...buildOpts(state), seed: (baseSeed + i) >>> 0,
-        petals: Math.max(6, Math.round(state.petals / 2) * 2) };
-      if (bookVaryEl.checked) {
-        // Variación reproducible: mismas semillas ⇒ mismo libro
-        const rng = mulberry32(((baseSeed + i) ^ 0x9E3779B1) >>> 0);
-        o.petals = [8, 10, 12, 14, 16, 18, 20, 24][rInt(rng, 0, 7)];
-        o.complexity = Math.max(20, Math.round(o.complexity * (0.75 + rng() * 0.5)));
-        if (state.generatorType !== "radial") {
-          o.styleMode = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"][rInt(rng, 0, 6)];
-        }
-      }
+      const o = { ...base, seed: pg.seed, complexity: pg.complexity,
+        petals: vary ? pg.petals : Math.max(6, Math.round(state.petals / 2) * 2) };
+      if (vary) o.styleMode = pg.styleMode;
       if (state.generatorType === "radial") {
         return { ...o, spiroEnabled: state.spiroEnabled, alternation: 0.3, harmony: 0.5, taper: 0.2,
           spiroR: 60, spiror: 25, spiroDistance: 30, spiroResolution: 500, spiroMode: "hypo" };
+      }
+      if (isClassic) {
+        o.composition = pg.composition;
+        o.frameStyle = pg.frameStyle;
+        if (characters !== "ninguno") {
+          // Las imágenes rotan; las páginas sin imagen son mandalas normales
+          const fig = pg.centerArt ? userFigures[pg.centerArt.imageIndex].fig : null;
+          Object.assign(o, resolveUserImage({ ...state, centerArt: fig ? (characters === "figuras" ? "figura" : "medallon") : "ninguno" }, fig));
+        }
+        return o;
       }
       return { ...o, imagePoints: currentImagePoints, imageScale: state.imageScale,
         imageIntensity: state.imageIntensity, imageMirror: state.imageMirror };
@@ -1525,9 +1743,11 @@ function bindUI() {
         preset: state.preset,
         genOpts: makeOpts,
         title: (bookTitleEl.value || "").trim() || "Mandalas para Colorear",
-        titlePage: bookTitlePageEl.checked,
-        blankBack: bookBlankBackEl.checked,
+        subtitle: (bookSubtitleEl?.value || "").trim(),
+        author: (bookAuthorEl?.value || "").trim(),
+        ...layoutOpts,
         pageNumbers: bookPageNumbersEl.checked,
+        marginMm,
         dpi: 300,
         onProgress: (done, tot, label) => {
           if (progressBar && progressStatus) {
@@ -1537,7 +1757,8 @@ function bindUI() {
           }
         },
       });
-      alert(`✅ Libro creado (${total} páginas). Súbelo a KDP como manuscrito PDF.`);
+      alert(`✅ Libro creado (${total} páginas, margen ${marginMm.toFixed(1)} mm). ` +
+        "En KDP elige: tinta negra, papel blanco, sin sangrado, y el mismo tamaño de corte.");
     } catch (error) {
       console.error("Book PDF error:", error);
       alert("❌ Error al crear el libro: " + (error.message || "Intenta de nuevo"));
@@ -1550,7 +1771,7 @@ function bindUI() {
 
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
-    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, presetEl].forEach(el =>
+    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, bookCharactersEl, presetEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     updateBookSummary();

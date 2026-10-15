@@ -1,6 +1,8 @@
 // js/core/export.js
 import { createDoc } from "./svgDoc.js";
 import { renderDocToSvgString } from "./svgRender.js";
+import { bookLayout } from "./kdp.js";
+import { encodeGrayPng, rgbaToGray } from "./grayPng.js";
 
 const RENDER_PX_PER_MM = 300 / 25.4; // 300 DPI: estándar de imprenta para libros
 
@@ -345,25 +347,79 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
 }
 
 /**
- * Páginas totales de un libro (para avisar del mínimo de 24 de KDP).
+ * Páginas totales de un libro (incluye el relleno a número par que exige la imprenta).
  */
-export function bookPageCount({ mandalas, blankBack = true, titlePage = true }) {
-  return (titlePage ? (blankBack ? 2 : 1) : 0) + mandalas * (blankBack ? 2 : 1);
+export function bookPageCount({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, colorTest = false }) {
+  return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage }).length;
+}
+
+/** Rasteriza un SVG en un canvas con fondo blanco. */
+function svgToCanvas(svgString, widthPx, heightPx) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(new Blob([svgString], { type: "image/svg+xml;charset=utf-8" }));
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = widthPx; canvas.height = heightPx;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, widthPx, heightPx);
+      ctx.drawImage(img, 0, 0, widthPx, heightPx);
+      URL.revokeObjectURL(url);
+      resolve(canvas);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("No se pudo rasterizar la página")); };
+    img.src = url;
+  });
+}
+
+function blankCanvas(widthPx, heightPx) {
+  const canvas = document.createElement("canvas");
+  canvas.width = widthPx; canvas.height = heightPx;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, widthPx, heightPx);
+  return canvas;
+}
+
+/** Canvas → PNG gris de 8 bits sin alfa (sin transparencias en el PDF). */
+async function canvasToGrayPng(canvas) {
+  const { data, width, height } = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+  return encodeGrayPng(rgbaToGray(data, width, height), width, height);
+}
+
+// Texto dibujado como imagen: KDP exige fuentes incrustadas y las fuentes estándar
+// de jsPDF (Helvetica, Times) no se incrustan. Rasterizado, no hay fuente que incrustar.
+function drawTextBlock(ctx, text, { x, y, maxW, sizePx, weight = "normal", font = "Georgia, 'Times New Roman', serif", color = "#000", lineGap = 1.25 }) {
+  ctx.fillStyle = color;
+  ctx.font = `${weight} ${Math.round(sizePx)}px ${font}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  const lines = [];
+  for (const para of String(text).split("\n")) {
+    let line = "";
+    for (const word of para.split(/\s+/)) {
+      const t = line ? `${line} ${word}` : word;
+      if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = word; } else line = t;
+    }
+    lines.push(line);
+  }
+  lines.forEach((l, i) => ctx.fillText(l, x, y + i * sizePx * lineGap));
+  return y + lines.length * sizePx * lineGap;
 }
 
 /**
- * Libro completo para imprimir (p. ej. Amazon KDP): cada mandala ocupa la página
- * entera al tamaño de corte elegido, tal como se ve en la vista previa.
- * Orden con reverso en blanco: [título][blanco][m1][blanco][m2][blanco]…
- * opts: { preset, genOpts(i) -> opciones del generador, title, titlePage, blankBack,
- *         pageNumbers, dpi, onProgress }
+ * Libro completo para imprimir en Amazon KDP (tapa blanda, interior B/N, sin sangrado).
+ * Orden: [título][copyright|blanco][prueba de color][blanco][m1][blanco][m2]…, siempre par.
+ * opts: { preset, genOpts(i) -> opciones del generador, title, subtitle, author,
+ *         titlePage, copyrightPage, copyrightText, colorTest, blankBack, pageNumbers,
+ *         dpi, marginMm, onProgress }
  */
 export async function downloadBookPdf(filename, generateFn, count, opts) {
   if (!window.jspdf || !window.jspdf.jsPDF) {
     throw new Error("jsPDF no está cargado correctamente");
   }
   const {
-    preset, genOpts, title = "Mandalas para Colorear", titlePage = true,
+    preset, genOpts, title = "Mandalas para Colorear", subtitle = "", author = "",
+    titlePage = true, copyrightPage = false, copyrightText = "", colorTest = false,
     blankBack = true, pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
   } = opts;
 
@@ -373,52 +429,87 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
     orientation: wMm > hMm ? "landscape" : "portrait",
     unit: "mm",
     format: [wMm, hMm],
+    compress: true,
+    // Sin esto jsPDF declara las 14 fuentes estándar (no incrustadas) aunque no se usen,
+    // y el revisor de KDP las marca como "fuentes no incrustadas".
+    putOnlyUsedFonts: true,
   });
+  pdf.setProperties({ title, author, creator: "Mandala Studio" });
 
-  const wPx = Math.ceil(wMm * dpi / 25.4);
-  const hPx = Math.ceil(hMm * dpi / 25.4);
-  const total = bookPageCount({ mandalas: count, blankBack, titlePage });
+  const pxPerMm = dpi / 25.4;
+  const wPx = Math.ceil(wMm * pxPerMm);
+  const hPx = Math.ceil(hMm * pxPerMm);
+  // La prueba de color ocupa el lugar de un mandala más (con su reverso)
+  const layout = bookLayout({ mandalas: count + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage });
+  const total = layout.length;
   const yieldUI = () => new Promise(r => setTimeout(r, 0));
-  let pdfPage = 0;
-  const newPage = () => { if (pdfPage++ > 0) pdf.addPage([wMm, hMm]); };
-  const num = () => {
+
+  const numberCanvas = (canvas, n) => {
     if (!pageNumbers) return;
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text(String(pdfPage), wMm / 2, hMm - 6, { align: "center" });
-    pdf.setTextColor(0, 0, 0);
-  };
-  const report = async (label) => {
-    if (onProgress) { onProgress(pdfPage, total, label); await yieldUI(); }
+    const ctx = canvas.getContext("2d");
+    // Dentro del margen inferior, que KDP considera zona segura (≥ 6.4 mm del corte)
+    const y = hPx - Math.max(6.4, marginMm * 0.55) * pxPerMm;
+    drawTextBlock(ctx, String(n), { x: wPx / 2, y, maxW: wPx, sizePx: 3 * pxPerMm, color: "#555" });
   };
 
-  if (titlePage) {
-    newPage();
-    pdf.setFont("times", "bold");
-    pdf.setFontSize(Math.round(Math.min(wMm, hMm) / 6));
-    pdf.setTextColor(0, 0, 0);
-    const lines = pdf.splitTextToSize(title, wMm * 0.8);
-    pdf.text(lines, wMm / 2, hMm * 0.42, { align: "center" });
-    if (blankBack) newPage();
-    await report("Hoja de título");
-  }
+  for (let p = 0; p < layout.length; p++) {
+    const page = layout[p];
+    const pageNo = p + 1;
+    let canvas;
+    let label;
+    if (page.kind === "title") {
+      canvas = blankCanvas(wPx, hPx);
+      const ctx = canvas.getContext("2d");
+      const maxW = (wMm - 2 * marginMm - 10) * pxPerMm;
+      let y = drawTextBlock(ctx, title, { x: wPx / 2, y: hPx * 0.4, maxW, sizePx: Math.min(wMm, hMm) / 11 * pxPerMm, weight: "bold" });
+      if (subtitle) y = drawTextBlock(ctx, subtitle, { x: wPx / 2, y: y + 4 * pxPerMm, maxW, sizePx: 6 * pxPerMm });
+      if (author) drawTextBlock(ctx, author, { x: wPx / 2, y: hPx * 0.8, maxW, sizePx: 5 * pxPerMm });
+      label = "Hoja de título";
+    } else if (page.kind === "copyright") {
+      canvas = blankCanvas(wPx, hPx);
+      const ctx = canvas.getContext("2d");
+      const year = new Date().getFullYear();
+      const text = copyrightText ||
+        `© ${year} ${author || title}. Todos los derechos reservados.\n` +
+        "Ninguna parte de este libro puede reproducirse ni distribuirse sin permiso del autor, " +
+        "salvo para colorear las páginas en uso personal.";
+      drawTextBlock(ctx, text, { x: wPx / 2, y: hPx * 0.7, maxW: (wMm - 2 * marginMm - 20) * pxPerMm, sizePx: 3.4 * pxPerMm, lineGap: 1.45 });
+      label = "Página de derechos";
+    } else if (page.kind === "mandala" && colorTest && page.index === 0) {
+      // Página para probar colores: 24 círculos en rejilla
+      canvas = blankCanvas(wPx, hPx);
+      const ctx = canvas.getContext("2d");
+      const usableW = wMm - 2 * marginMm - 10, cols = 4, rows = 6;
+      const cell = Math.min(usableW / cols, (hMm - 2 * marginMm - 40) / rows);
+      const x0 = (wMm - cell * cols) / 2, y0 = marginMm + 30;
+      drawTextBlock(ctx, "Prueba tus colores", { x: wPx / 2, y: (marginMm + 18) * pxPerMm, maxW: usableW * pxPerMm, sizePx: 7 * pxPerMm, weight: "bold" });
+      ctx.strokeStyle = "#000"; ctx.lineWidth = 0.5 * pxPerMm;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        ctx.beginPath();
+        ctx.arc((x0 + (c + 0.5) * cell) * pxPerMm, (y0 + (r + 0.5) * cell) * pxPerMm, cell * 0.38 * pxPerMm, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      label = "Prueba de color";
+    } else if (page.kind === "mandala") {
+      const i = page.index - (colorTest ? 1 : 0);
+      const doc = createDoc({ preset, seed: i, marginMm });
+      const o = genOpts(i);
+      doc.seed = o.seed >>> 0;
+      generateFn(doc, o);
+      canvas = await svgToCanvas(renderDocToSvgString(doc), wPx, hPx);
+      numberCanvas(canvas, pageNo);
+      label = `Mandala ${i + 1} de ${count}`;
+    } else {
+      label = "Página en blanco";
+    }
 
-  for (let i = 0; i < count; i++) {
-    const doc = createDoc({ preset, seed: i, marginMm });
-    const o = genOpts(i);
-    doc.seed = o.seed >>> 0;
-    generateFn(doc, o);
-    const img = await svgStringToImageData(renderDocToSvgString(doc), wPx, hPx);
-    newPage();
-    pdf.addImage(img, "PNG", 0, 0, wMm, hMm, undefined, "FAST");
-    num();
-    if (blankBack) { newPage(); num(); }
-    await report(`Mandala ${i + 1} de ${count}`);
+    if (p > 0) pdf.addPage([wMm, hMm]);
+    if (canvas) pdf.addImage(await canvasToGrayPng(canvas), "PNG", 0, 0, wMm, hMm, undefined, "NONE");
+    if (onProgress) { onProgress(pageNo, total, label); await yieldUI(); }
   }
 
   pdf.save(filename);
-  return { pages: pdfPage, wMm, hMm };
+  return { pages: total, wMm, hMm };
 }
 
 function saveBlob(blob, filename) {
