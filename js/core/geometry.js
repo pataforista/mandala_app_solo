@@ -50,3 +50,26 @@ export function polarW(r, theta, intensity = 0.5, organicLevel = 0.0, wPhase1 = 
     y: rw * Math.sin(tw)
   };
 }
+
+/**
+ * Vueltas del círculo guía tras las que un hipo/epitrocoide se cierra.
+ * La curva vuelve a su inicio cuando t = 2πk y (R∓r)/r·t es múltiplo de 2π,
+ * es decir, k = denominador de R/r en su forma irreducible (R=60, r=25 → 12/5 → 5).
+ * Para razones irracionales (o de denominador enorme) devuelve el denominador
+ * de la mejor aproximación por fracciones continuas con denominador ≤ maxTurns.
+ */
+export function trochoidTurns(R, r, maxTurns = 20) {
+  const x = Math.abs(R / r);
+  if (!Number.isFinite(x) || x === 0) return 1;
+  let [h0, h1, k0, k1] = [0, 1, 1, 0];
+  let v = x;
+  for (let i = 0; i < 32; i++) {
+    const a = Math.floor(v);
+    const k2 = a * k1 + k0;
+    if (k2 > maxTurns) break;
+    [h0, h1, k0, k1] = [h1, a * h1 + h0, k1, k2];
+    if (Math.abs(h1 / k1 - x) < 1e-9) break;
+    v = 1 / (v - a);
+  }
+  return Math.max(1, k1);
+}

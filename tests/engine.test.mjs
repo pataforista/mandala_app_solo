@@ -230,3 +230,22 @@ test("clásico: todo cabe en la página y respeta el grosor mínimo de impresió
     }
   }
 });
+
+test("espirógrafo: periodo exacto de cierre y trazo único", async () => {
+  const { trochoidTurns } = await import("../js/core/geometry.js");
+  assert.equal(trochoidTurns(60, 25), 5);   // 60/25 = 12/5
+  assert.equal(trochoidTurns(5, 3), 3);
+  assert.equal(trochoidTurns(40, 40), 1);
+  assert.ok(trochoidTurns(Math.PI, 1) <= 20); // irracional: mejor aproximación acotada
+
+  const { doc } = render(generateMandalaRadial, { ...BASE, seed: 3, petals: 12, spiroEnabled: true });
+  const spiro = doc.body[doc.body.length - 1];
+  const nums = spiro.match(/ d="([^"]+)"/)[1].match(/-?\d+(\.\d+)?/g).map(Number);
+  const pts = [];
+  for (let i = 0; i < nums.length; i += 2) pts.push([nums[i], nums[i + 1]]);
+  const [first, last] = [pts[0], pts[pts.length - 1]];
+  assert.ok(Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.02, "la curva debe cerrarse");
+  // Un solo recorrido: el punto inicial no reaparece a mitad del trazo
+  const revisits = pts.slice(1, -1).filter(p => Math.hypot(p[0] - first[0], p[1] - first[1]) < 0.02).length;
+  assert.equal(revisits, 0, "no debe volver a trazar la misma curva");
+});
