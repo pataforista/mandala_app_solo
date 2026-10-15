@@ -74,6 +74,12 @@ Ninguna imagen se integra sola. Al subirla o importarla queda en «No usar»; ba
 | Anillos alrededor de un mandala | 6–12 copias (en espejo alterno) entre bandas de mandala, y la figura entera en el medallón | figuras pequeñas o con poco interior |
 | Medallón central | la figura dentro del círculo central de un mandala clásico | retratos, cabezas |
 
+**Geometría de los anillos** (resuelta con Wolfram Language): una copia de alto h y ancho a·h con
+su borde interior a distancia d del centro cabe si a·h/2 ≤ d·tan(π/n) (no invade la cuña de su
+vecina) y (d+h)² + (a·h/2)² ≤ r_ext² (su esquina exterior no sale del anillo). El alto máximo es
+h = 2·r_ext·t / √(4at + 4t² + a²(1+t²)), con t = tan(π/n). Se elige el mayor número de copias que
+no las encoja más de un 5 %; con Félix (a ≈ 0,8) las copias crecen un 11 % frente al cálculo anterior.
+
 Las copias de los anillos y el medallón usan una versión «sello» de trazo grueso (≈1,6 % del lado),
 para que sigan siendo coloreables a 25 mm. Idea tomada de `mandalas.py` (estampas en anillos),
 combinada con la limpieza de figuras de la app.

@@ -250,12 +250,21 @@ test("anillos de figuras: copias que no se pisan, sello de trazo grueso y medall
     const svg = renderDocToSvgString(doc);
     const stamps = [...svg.matchAll(/translate\(([\d.]+) ([\d.]+)\) rotate\(([\d.]+)\)(?: scale\(-1 1\))?"><image href="data:,S" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)];
     assert.ok(stamps.length >= 6 && stamps.length <= 12 && stamps.length % 2 === 0, `${preset}: ${stamps.length} copias`);
-    // Copias vecinas: la distancia entre centros supera el ancho de cada copia en el borde interior
-    const [x1, y1] = [+stamps[0][1], +stamps[0][2]], [x2, y2] = [+stamps[1][1], +stamps[1][2]];
-    const sw = +stamps[0][6], sh = +stamps[0][7];
+    // Condición exacta (Wolfram): cada copia cabe en su cuña, a·h/2 ≤ d·tan(π/n),
+    // y su esquina exterior no pasa del anillo que la rodea
+    const [x1, y1] = [+stamps[0][1], +stamps[0][2]];
+    const sw = +stamps[0][6], sh = +stamps[0][7], n = stamps.length;
     const rm = Math.hypot(x1 - doc.page.wMm / 2, y1 - doc.page.hMm / 2);
-    const gapInner = 2 * (rm - sh / 2) * Math.sin(Math.PI / stamps.length);
-    assert.ok(gapInner >= sw, `${preset}: se pisan (${gapInner.toFixed(1)} < ${sw})`);
+    const d = rm - sh / 2;
+    assert.ok(sw / 2 <= d * Math.tan(Math.PI / n) + 1e-6, `${preset}: se pisan`);
+    // Círculos centrados (un solo subpath de 8 arcos que empieza en el eje horizontal)
+    const cx = doc.page.wMm / 2, cy = doc.page.hMm / 2;
+    const ring = [...svg.matchAll(/<path d="(M ([\d.]+) ([\d.]+) (?:C(?: [\d.]+){6} ){8}Z)"/g)]
+      .filter(m => Math.abs(+m[3] - cy) < 0.02)
+      // (los círculos del mandala exterior que quedan debajo del anillo blanco no cuentan)
+      .map(m => +m[2] - cx).filter(r => r > rm + sh / 2);
+    const rOutLine = Math.min(...ring);
+    assert.ok(Math.hypot(d + sh, sw / 2) <= rOutLine, `${preset}: la esquina sale del anillo`);
     assert.match(svg, /<image href="data:,C"/, "falta la figura en el medallón");
   }
 });

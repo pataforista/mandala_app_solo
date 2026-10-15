@@ -140,38 +140,53 @@ export function composePage(doc, opts, drawMandala) {
       // medallón. Copias grandes y trazo grueso (versión "sello"): se pueden colorear.
       const ring = opts.figureRing;
       const R = maxR * 0.97;
-      const rOut = R * (0.76 + rng() * 0.04), rIn = R * 0.33;
+      const rOut = R * (0.76 + rng() * 0.04);
       content.push(...sub(acx, acy, R, { maxBands: 3, centerArt: null }));
       const band = new PathBuilder();
       circle(band, acx, acy, rOut);
       emitTo(content, band, mainW, "#fff");
+      const lineIn = rOut - Math.max(1.6, R * 0.025);
       const inner = new PathBuilder();
-      circle(inner, acx, acy, rOut - Math.max(1.6, (rOut - rIn) * 0.05));
+      circle(inner, acx, acy, lineIn);
       emitTo(content, inner, detailW);
 
-      // Tamaño de cada copia: alto radial fijo, cuántas caben sin tocarse
-      const h = (rOut - rIn) * 0.86, rm = (rOut + rIn) / 2;
-      const aspect = ring.w / ring.h;
-      let sw = h * aspect, sh = h;
-      // Pocas copias grandes (6–12) antes que muchas diminutas: tienen que poder colorearse
-      // El espacio se mide en el borde interior del anillo, donde la circunferencia es menor
-      // (en el centro del anillo, las esquinas de copias vecinas se pisarían)
-      const rEdge = rm - sh / 2;
-      let n = Math.floor((TAU * rEdge) / (sw * 1.06));
-      n = Math.max(6, Math.min(12, n - (n % 2)));
-      // Si ni con 6 caben, se reducen hasta caber
-      for (let k = 0; k < 8; k++) {
-        const maxW = (TAU * (rm - sh / 2)) / (n * 1.06);
-        if (sw <= maxW) break;
-        sh *= maxW / sw; sw = maxW;
-      }
+      // Geometría exacta (resuelta con Wolfram): copia de alto h y ancho a·h, borde
+      // interior a distancia d del centro. Cabe si
+      //   a·h/2 ≤ d·tan(π/n)              (no invade la cuña de su vecina)
+      //   (d + h)² + (a·h/2)² ≤ rExt²      (su esquina exterior no sale del anillo)
+      // y el alto máximo es min(hTan, hIn):
+      //   hTan = 2·rExt·t / √(4at + 4t² + a²(1+t²)),  t = tan(π/n)
+      //   hIn  = 2·(√((4+a²)·rExt² − a²·rIn²) − 2·rIn) / (4+a²)
+      // Se elige el n (6–12, par) que cubre más área n·a·h² sin bajar de un tamaño coloreable.
+      const a = ring.w / ring.h;
+      const rExt = lineIn - Math.max(1.2, R * 0.015), rInMin = R * 0.3;
+      const hIn = (2 * (Math.sqrt((4 + a * a) * rExt * rExt - a * a * rInMin * rInMin) - 2 * rInMin)) / (4 + a * a);
+      // Criterio: copias GRANDES primero (se colorean mejor). Se añaden copias sólo si
+      // no encogen más de un 5 % respecto a la más grande posible; entre esas, la que
+      // más área cubre (n·a·h²). Ej. figura alta (a = 0.6): 8 copias del mismo tamaño que 6.
+      const cands = [6, 8, 10, 12].map(n => {
+        const t = Math.tan(Math.PI / n);
+        const hTan = (2 * rExt * t) / Math.sqrt(4 * a * t + 4 * t * t + a * a * (1 + t * t));
+        const h = Math.min(hTan, hIn) * 0.94; // 6 % de holgura: las copias no se tocan
+        return { n, h, t, cover: n * a * h * h };
+      });
+      const hMax = Math.max(...cands.map(c => c.h));
+      const best = cands.filter(c => c.h >= hMax * 0.95).reduce((x, y) => (y.cover > x.cover ? y : x));
+      const { n, h: sh, t } = best;
+      const sw = a * sh;
+      // Entre la posición más baja permitida y la que toca el anillo exterior: al medio
+      const dMin = Math.max(rInMin, sw / (2 * t));
+      const dMax = Math.sqrt(rExt * rExt - (sw / 2) ** 2) - sh;
+      const d = Math.max(dMin, (dMin + dMax) / 2);
+      const rm = d + sh / 2;
       const mirror = rng() < 0.6;
       for (let i = 0; i < n; i++) {
-        const a = (360 * i) / n;
-        const x = acx + rm * Math.sin((a * Math.PI) / 180), y = acy - rm * Math.cos((a * Math.PI) / 180);
+        const ang = (360 * i) / n;
+        const x = acx + rm * Math.sin((ang * Math.PI) / 180), y = acy - rm * Math.cos((ang * Math.PI) / 180);
         const flip = mirror && i % 2 ? " scale(-1 1)" : "";
-        content.push(`<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${a.toFixed(2)})${flip}"><image href="${ring.href}" x="${(-sw / 2).toFixed(2)}" y="${(-sh / 2).toFixed(2)}" width="${sw.toFixed(2)}" height="${sh.toFixed(2)}" preserveAspectRatio="none" /></g>`);
+        content.push(`<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${ang.toFixed(2)})${flip}"><image href="${ring.href}" x="${(-sw / 2).toFixed(2)}" y="${(-sh / 2).toFixed(2)}" width="${sw.toFixed(2)}" height="${sh.toFixed(2)}" preserveAspectRatio="none" /></g>`);
       }
+      const rIn = d;
       // Mandala interior con la figura completa en el medallón
       const ri = rIn - Math.max(1.5, R * 0.02);
       content.push(...sub(acx, acy, ri, { maxBands: 2, centerArt: ring.centerHref ? { type: "image", href: ring.centerHref, scale: 0.62 } : null }));
