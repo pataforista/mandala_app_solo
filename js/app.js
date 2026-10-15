@@ -788,6 +788,8 @@ function figureSettings() {
     bgTol: parseFloat(val("figureBgTol", 26)) || 26,
     removeBackground: document.getElementById("figureRemoveBg")?.checked ?? true,
     bgFromBottom: document.getElementById("figureBgBottom")?.checked ?? false,
+    simplify: parseFloat(val("figureSimplify", 0.3)),
+    keepMain: document.getElementById("figureKeepMain")?.checked ?? true,
   };
 }
 
@@ -1320,7 +1322,7 @@ function bindUI() {
       update();
     }, 300);
   };
-  ["medallionMode", "medallionThreshold", "medallionDetail", "figureBgTol", "figureRemoveBg", "figureBgBottom"].forEach(id => {
+  ["medallionMode", "medallionThreshold", "medallionDetail", "figureBgTol", "figureRemoveBg", "figureBgBottom", "figureSimplify", "figureKeepMain"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("sl-change", reprocessFigures);
   });

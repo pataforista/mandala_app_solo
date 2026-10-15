@@ -37,19 +37,31 @@ elegido en «Formato de Papel». Revisa siempre con el **Print Previewer** de KD
 
 ## 3. Figuras rellenas de mandalas (tus imágenes)
 
-1. Sube imágenes en «Mis imágenes (figuras)» o, para lotes, abre `preprocesar.html`.
-2. El procesamiento (`js/core/lineArt.js → processFigure`):
+1. Sube imágenes en «Mis imágenes (figuras)» o, para lotes y fotos difíciles, abre `preprocesar.html`.
+2. El procesamiento (`js/core/lineArt.js → processFigure`) busca una figura **sin fondo, sin texto y
+   con pocos detalles**:
    - **Colores planos** (caricaturas, carteles): bordes entre zonas de color.
    - **Dibujo / grabado**: umbral de tinta.
    - **Pintura / foto**: diferencia de gaussianas (una línea por contorno).
-   - Quita el fondo creciendo desde los bordes superior y laterales, vacía las manchas negras
-     (un gato negro queda como silueta rellenable) y deja en blanco las regiones pequeñas (ojos).
+   - **Quitar fondo**: crece desde los bordes superior y laterales; una segunda pasada suavizada
+     reconoce fondos con textura (marcos grabados, papel viejo).
+   - **Clics sobre el fondo** (en `preprocesar.html`): borran fondos que no tocan el borde,
+     como el fondo oscuro de una foto enmarcada.
+   - **Sólo la figura principal**: descarta textos, pies de foto, firmas y restos de marco.
+   - **Simplificar**: borra trazos cortos (pelo, grano), suaviza la silueta y elimina franjas
+     delgadas pegadas a la figura. Deja la silueta y los rasgos grandes (ojos, nariz, boca).
+   - Vacía las manchas negras (un gato negro queda como silueta rellenable) y deja en blanco las
+     regiones pequeñas (ojos).
+   - Salida a 3000 px de lado largo: ≈300 DPI para una figura de 25 cm.
 3. El relleno (`js/generators/figureFill.js`) coloca mandalas pequeños, flores y estrellas dentro de
    cada región cerrada sin tocar ninguna línea. «Densidad del relleno» baja = más fácil de colorear.
 
+**Receta para una foto antigua** (p. ej. el gato con sombrero): tipo «Pintura / foto»,
+Simplificar 0,5, Tolerancia del fondo ≈20, 4–5 clics sobre el fondo oscuro y recorte inferior
+si queda el borde de la foto.
+
 **Qué funciona mejor:** caricaturas con contornos claros y fondo sencillo, grabados e ilustraciones
-de libros antiguos. Las fotografías y pinturas con mucho detalle dan contornos incompletos;
-recórtalas (sin marcos ni textos) en `preprocesar.html`.
+de libros antiguos, retratos de animales sobre fondo liso.
 
 ## 4. Derechos de autor: qué puedes usar para vender
 

@@ -37,7 +37,9 @@
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
     .card h3 { margin: 0; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .pair img, .pair canvas { width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #fff; border-radius: 6px; border: 1px solid var(--line); }
+    .pair canvas { width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #fff; border-radius: 6px; border: 1px solid var(--line); }
+    .pair canvas.orig { cursor: crosshair; }
+    .hint { font-size: .75rem; color: var(--muted); margin: 0; }
     .crop { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
     .crop input { min-width: 0; width: 100%; }
     .legend { font-size: .78rem; color: var(--muted); }
@@ -49,7 +51,7 @@
 <body>
   <header>
     <h1>Preprocesar figuras</h1>
-    <p>Convierte caricaturas, grabados o pinturas en contornos listos para rellenar con mandalas. Todo ocurre en tu navegador: las imágenes no se suben a ningún servidor.
+    <p>Convierte caricaturas, grabados o pinturas en figuras limpias —sin fondo, sin texto y con pocos detalles— listas para rellenar con mandalas. Todo ocurre en tu navegador: las imágenes no se suben a ningún servidor.
       Al terminar, exporta el paquete e impórtalo en <a href="index.html">Mandala Studio</a> → «Mis imágenes» → «Importar paquete».</p>
   </header>
   <main>
@@ -70,7 +72,9 @@
         <label>Umbral de tinta <input type="range" id="threshold" min="30" max="230" value="110" /></label>
         <label>Detalle (pinturas) <input type="range" id="detail" min="0" max="1" step="0.05" value="0.5" /></label>
         <label>Tolerancia del fondo <input type="range" id="bgTol" min="8" max="60" value="26" /></label>
+        <label>Simplificar (menos detalle) <input type="range" id="simplify" min="0" max="1" step="0.05" value="0.3" /></label>
         <label class="check"><input type="checkbox" id="removeBg" checked /> Quitar fondo</label>
+        <label class="check"><input type="checkbox" id="keepMain" checked /> Sólo la figura principal (quita textos y restos)</label>
         <label class="check"><input type="checkbox" id="bgBottom" /> El fondo toca el borde inferior</label>
       </div>
       <div class="row" style="margin-top:12px">
@@ -97,6 +101,8 @@
       threshold: +$("threshold").value,
       detail: +$("detail").value,
       bgTol: +$("bgTol").value,
+      simplify: +$("simplify").value,
+      keepMain: $("keepMain").checked,
       removeBackground: $("removeBg").checked,
       bgFromBottom: $("bgBottom").checked,
     });
@@ -133,12 +139,31 @@
       img.src = fig.href;
     }
 
+    // Original con el recorte sombreado y los clics de fondo marcados
+    function drawOriginal(canvas, it) {
+      const k = Math.min(1, 600 / Math.max(it.img.naturalWidth, it.img.naturalHeight));
+      const w = Math.round(it.img.naturalWidth * k), h = Math.round(it.img.naturalHeight * k);
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(it.img, 0, 0, w, h);
+      const { left = 0, top = 0, right = 0, bottom = 0 } = it.crop;
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(0, 0, w, h * top);
+      ctx.fillRect(0, h * (1 - bottom), w, h * bottom);
+      ctx.fillRect(0, h * top, w * left, h * (1 - top - bottom));
+      ctx.fillRect(w * (1 - right), h * top, w * right, h * (1 - top - bottom));
+      for (const [x, y] of it.seeds) {
+        ctx.beginPath(); ctx.arc(x * w, y * h, Math.max(4, w / 80), 0, Math.PI * 2);
+        ctx.fillStyle = "#e53935"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
+      }
+    }
+
     async function process(it) {
       it.card.querySelector(".status").textContent = "Procesando…";
       await new Promise(r => setTimeout(r, 0));
       try {
-        it.fig = await figureFromImage(it.img, it.settings, it.crop);
-        drawPreview(it.card.querySelector("canvas"), it.fig);
+        it.fig = await figureFromImage(it.img, it.settings, it.crop, it.seeds);
+        drawPreview(it.card.querySelector("canvas.out"), it.fig);
         const inside = it.fig.cls.reduce((a, c) => a + (c === 1), 0) / it.fig.cls.length;
         it.card.querySelector(".status").textContent = inside < 0.03
           ? "⚠️ Casi no hay regiones cerradas: prueba otro tipo de imagen o ajusta el fondo."
@@ -154,7 +179,10 @@
       card.className = "card";
       card.innerHTML = `
         <h3 title="${it.name}">${it.name}</h3>
-        <div class="pair"><img alt="Original" /><canvas aria-label="Resultado"></canvas></div>
+        <div class="pair"><canvas class="orig" aria-label="Original: haz clic sobre el fondo"></canvas><canvas class="out" aria-label="Resultado"></canvas></div>
+        <p class="hint">Haz clic sobre el fondo que quieras borrar (puntos rojos). El recorte se ve sombreado.</p>
+        <label>Simplificar <input type="range" class="simp" min="0" max="1" step="0.05" /></label>
+        <label>Tolerancia del fondo <input type="range" class="tol" min="8" max="60" /></label>
         <label>Tipo de imagen
           <select class="mode">
             <option value="colores">Colores planos</option>
@@ -168,14 +196,31 @@
             return `<label>${t} <input type="range" data-crop="${k}" min="0" max="0.45" step="0.01" value="0" /></label>`;
           }).join("")}
         </div>
-        <div class="row"><button class="redo">Reprocesar</button><button class="remove">Quitar</button></div>
+        <div class="row"><button class="undo">Deshacer clic</button><button class="redo">Reprocesar</button><button class="remove">Quitar</button></div>
         <div class="status"></div>`;
-      card.querySelector("img").src = it.url;
+      const orig = card.querySelector("canvas.orig");
+      drawOriginal(orig, it);
+      orig.onclick = (e) => {
+        const r = orig.getBoundingClientRect();
+        // El lienzo conserva la proporción de la imagen dentro de la caja (object-fit: contain)
+        const k = Math.min(r.width / orig.width, r.height / orig.height);
+        const ox = (r.width - orig.width * k) / 2, oy = (r.height - orig.height * k) / 2;
+        const fx = (e.clientX - r.left - ox) / (orig.width * k), fy = (e.clientY - r.top - oy) / (orig.height * k);
+        if (fx < 0 || fy < 0 || fx > 1 || fy > 1) return;
+        it.seeds.push([fx, fy]);
+        drawOriginal(orig, it);
+        process(it);
+      };
+      card.querySelector(".undo").onclick = () => { it.seeds.pop(); drawOriginal(orig, it); process(it); };
+      const simp = card.querySelector(".simp"), tol = card.querySelector(".tol");
+      simp.value = it.settings.simplify; tol.value = it.settings.bgTol;
+      simp.onchange = () => { it.settings = { ...it.settings, simplify: +simp.value }; process(it); };
+      tol.onchange = () => { it.settings = { ...it.settings, bgTol: +tol.value }; process(it); };
       const modeSel = card.querySelector(".mode");
       modeSel.value = it.settings.mode;
       modeSel.onchange = () => { it.settings = { ...it.settings, mode: modeSel.value }; process(it); };
       card.querySelectorAll("[data-crop]").forEach(inp => {
-        inp.onchange = () => { it.crop[inp.dataset.crop] = +inp.value; process(it); };
+        inp.onchange = () => { it.crop[inp.dataset.crop] = +inp.value; drawOriginal(orig, it); process(it); };
       });
       card.querySelector(".redo").onclick = () => process(it);
       card.querySelector(".remove").onclick = () => {
@@ -193,7 +238,7 @@
         if (!file.type.startsWith("image/")) continue;
         try {
           const img = await loadImageFile(file);
-          const it = { name: file.name, img, url: URL.createObjectURL(file), settings: settingsFromUI(), crop: {}, fig: null };
+          const it = { name: file.name, img, url: URL.createObjectURL(file), settings: settingsFromUI(), crop: {}, seeds: [], fig: null };
           items.push(it);
           makeCard(it);
           await process(it);
@@ -216,6 +261,8 @@
       for (const it of items) {
         it.settings = { ...s };
         it.card.querySelector(".mode").value = s.mode;
+        it.card.querySelector(".simp").value = s.simplify;
+        it.card.querySelector(".tol").value = s.bgTol;
         await process(it);
       }
     };

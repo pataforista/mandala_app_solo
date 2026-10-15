@@ -92,18 +92,21 @@ function dilate(ink, w, h, r) {
  *         thickenPx, minSpeckPx }
  */
 export function imageToLineArt(rgba, w, h, opts = {}) {
-  const { mode = "lineas", threshold = 110, detail = 0.5, thickenPx = 1, minSpeckPx = Math.round((w * h) / 20000) } = opts;
+  const { mode = "lineas", threshold = 110, detail = 0.5, thickenPx = 1, minSpeckPx = Math.round((w * h) / 20000), simplify = 0 } = opts;
   const g = toGray(rgba, w, h);
   let ink = new Uint8Array(w * h);
   if (mode === "bordes") {
     // Diferencia de gaussianas (DoG): marca donde el píxel es más oscuro que su entorno.
     // A diferencia de Sobel, da UNA línea por contorno (no dos) y respeta el sombreado.
-    const fine = boxBlur(boxBlur(g, w, h, 1), w, h, 1);
-    const wide = boxBlur(boxBlur(g, w, h, 3), w, h, 3);
+    // Simplificar = mirar la imagen "con los ojos entrecerrados": se pierden pelo y
+    // textura y quedan las formas grandes (ojos, nariz, contorno del sombrero)
+    const k = 1 + simplify * 3;
+    const fine = boxBlur(boxBlur(g, w, h, Math.round(k)), w, h, Math.round(k));
+    const wide = boxBlur(boxBlur(g, w, h, Math.round(3 * k)), w, h, Math.round(3 * k));
     const d = new Float32Array(w * h);
     for (let i = 0; i < d.length; i++) d[i] = Math.max(0, wide[i] - fine[i]);
     // detail 0 ⇒ sólo el 5% más marcado; detail 1 ⇒ el 20%
-    const t = Math.max(2, percentile(d, 1 - (0.05 + detail * 0.15)));
+    const t = Math.max(2, percentile(d, 1 - (0.05 + detail * 0.15) * (1 - 0.6 * simplify)));
     for (let i = 0; i < ink.length; i++) ink[i] = d[i] >= t ? 1 : 0;
   } else {
     for (let i = 0; i < ink.length; i++) ink[i] = g[i] < threshold ? 1 : 0;
@@ -191,7 +194,7 @@ function colorEdges(rgba, w, h, tol) {
  * (el inferior suele cortar el cuerpo del personaje) y avanza mientras el color cambie
  * suavemente. Un degradado se cruza; el contorno del personaje, no.
  */
-export function backgroundMask(rgba, w, h, tol = 26, fromBottom = false) {
+export function backgroundMask(rgba, w, h, tol = 26, fromBottom = false, extraSeeds = [], fromBorders = true) {
   // Gradiente con salto de 2 px: una rampa suavizada (JPEG, reescalado) sigue contando
   // como borde aunque cada píxel difiera poco del vecino
   const grad = new Float32Array(w * h);
@@ -210,8 +213,22 @@ export function backgroundMask(rgba, w, h, tol = 26, fromBottom = false) {
     bg[i] = 1; stack.push(i);
     ref[i * 3] = rgba[i * 4]; ref[i * 3 + 1] = rgba[i * 4 + 1]; ref[i * 3 + 2] = rgba[i * 4 + 2];
   };
-  for (let x = 0; x < w; x++) { seed(x, 0); seed(x, 1); if (fromBottom) { seed(x, h - 1); seed(x, h - 2); } }
-  for (let y = 0; y < h; y++) { seed(0, y); seed(1, y); seed(w - 1, y); seed(w - 2, y); }
+  if (fromBorders) {
+    for (let x = 0; x < w; x++) { seed(x, 0); seed(x, 1); if (fromBottom) { seed(x, h - 1); seed(x, h - 2); } }
+    for (let y = 0; y < h; y++) { seed(0, y); seed(1, y); seed(w - 1, y); seed(w - 2, y); }
+  }
+  // Clics del usuario sobre el fondo ("varita mágica"): un parche de 5×5 por clic
+  for (const [fx, fy] of extraSeeds) {
+    const cx = Math.round(fx * (w - 1)), cy = Math.round(fy * (h - 1));
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const i = y * w + x;
+      if (bg[i]) continue;
+      bg[i] = 1; stack.push(i);
+      ref[i * 3] = rgba[i * 4]; ref[i * 3 + 1] = rgba[i * 4 + 1]; ref[i * 3 + 2] = rgba[i * 4 + 2];
+    }
+  }
   const t2 = tol * tol;
   while (stack.length) {
     const i = stack.pop(), x = i % w, y = (i / w) | 0;
@@ -263,6 +280,53 @@ function absorbEdgeScraps(bg, w, h, maxFrac = 0.03) {
   return bg;
 }
 
+/**
+ * Sólo la figura principal: de las zonas que no son fondo se quedan la mayor y las que
+ * miden al menos un 25 % de ella (dos personajes juntos sobreviven). Textos, pies de
+ * foto, firmas y restos de marco pasan a ser fondo.
+ */
+function keepMainFigure(bg, w, h, frac = 0.25) {
+  const seen = new Uint8Array(w * h), stack = new Int32Array(w * h), comps = [];
+  for (let s = 0; s < bg.length; s++) {
+    if (bg[s] || seen[s]) continue;
+    let top = 0;
+    const comp = [];
+    stack[top++] = s; seen[s] = 1;
+    while (top) {
+      const i = stack[--top]; comp.push(i);
+      const x = i % w, y = (i / w) | 0;
+      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) {
+        if (j >= 0 && !bg[j] && !seen[j]) { seen[j] = 1; stack[top++] = j; }
+      }
+    }
+    comps.push(comp);
+  }
+  if (!comps.length) return bg;
+  const big = Math.max(...comps.map(c => c.length));
+  for (const c of comps) if (c.length < big * frac) for (const i of c) bg[i] = 1;
+  return bg;
+}
+
+/** Apertura de la figura (fondo = 1): erosiona r y vuelve a dilatar r. */
+function openFigure(bg, w, h, r) {
+  const dBg = distanceTransform(bg, w, h, false);          // distancia de la figura al fondo
+  const core = new Uint8Array(w * h);
+  for (let i = 0; i < core.length; i++) core[i] = !bg[i] && dBg[i] > r ? 1 : 0;
+  const dCore = distanceTransform(core, w, h, false);      // distancia al núcleo erosionado
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < out.length; i++) out[i] = core[i] || dCore[i] <= r ? 0 : 1;
+  return out;
+}
+
+function smoothMask(mask, w, h, r) {
+  const f = new Float32Array(w * h);
+  for (let i = 0; i < f.length; i++) f[i] = mask[i];
+  const b = boxBlur(boxBlur(f, w, h, r), w, h, r);
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < out.length; i++) out[i] = b[i] >= 0.5 ? 1 : 0;
+  return out;
+}
+
 function blurRgba(rgba, w, h, r) {
   const out = new Uint8ClampedArray(rgba.length);
   for (let c = 0; c < 4; c++) {
@@ -282,50 +346,85 @@ function blurRgba(rgba, w, h, r) {
  *         2 = espacio exterior (fondo; opcionalmente se decora),
  *         3 = región interior pequeña (ojos, brillos): se deja en blanco
  * opts: { mode: "lineas"|"bordes"|"colores", threshold, detail, colorTol,
- *         removeBackground, bgTol, bgFromBottom, hollow }
+ *         removeBackground, bgTol, bgFromBottom, hollow,
+ *         simplify (0-1: menos detalle), keepMain (sólo la figura principal),
+ *         bgSeeds: [[x, y], …] clics sobre el fondo en fracciones 0-1 de la imagen }
  */
 export function processFigure(rgba, w, h, opts = {}) {
   const {
     mode = "lineas", threshold = 110, detail = 0.5, colorTol = 60,
     removeBackground = true, bgTol = 26, bgFromBottom = false, hollow = true, minRegionFrac = 0.025,
-    outLong = 1600,
+    outLong = 3000, simplify = 0.3, keepMain = true, bgSeeds = [],
   } = opts;
+  const S = Math.max(0, Math.min(1, simplify));
+  // Salida de 3000 px: ≈300 DPI para una figura de 25 cm (lo que exige KDP).
   // Grosor de línea pensado en la SALIDA: ~0.35 % del lado largo (≈0.7 mm en una página
   // de 20 cm), sea cual sea el tamaño de la imagen original
   const outScale = Math.max(1, outLong / Math.max(w, h));
   const lineNative = (outLong * 0.0035) / outScale;
   const lineW = lineNative >= 3 ? Math.round(lineNative / 3) : 0;
-  // Un desenfoque suave borra la trama de impresión (semitonos) y el ruido JPEG
+  // Un desenfoque suave borra la trama de impresión (semitonos) y el ruido JPEG;
+  // simplificar lo agranda para que sólo sobrevivan las formas grandes
   const soft = blurRgba(rgba, w, h, Math.max(1, Math.round(Math.max(w, h) / 500)));
 
+  // ---------- 1. Líneas interiores ----------
   let ink;
   if (mode === "colores") {
-    ink = colorEdges(soft, w, h, colorTol);
-    const g = toGray(rgba, w, h);
+    ink = colorEdges(soft, w, h, colorTol * (1 + 0.5 * S));
+    const g = toGray(soft, w, h);
     for (let i = 0; i < ink.length; i++) if (g[i] < threshold * 0.6) ink[i] = 1;
   } else {
-    const gray = imageToLineArt(rgba, w, h, { mode, threshold, detail, thickenPx: 0 });
+    const gray = imageToLineArt(mode === "bordes" ? rgba : soft, w, h, { mode, threshold, detail, thickenPx: 0, simplify: S });
     ink = new Uint8Array(w * h);
     for (let i = 0; i < ink.length; i++) ink[i] = gray[i] === 0 ? 1 : 0;
   }
   if (hollow && mode !== "bordes") ink = hollowSolids(ink, w, h, Math.max(1, lineNative));
-
-  let bg = null;
-  if (removeBackground) {
-    bg = absorbEdgeScraps(backgroundMask(rgba, w, h, bgTol, bgFromBottom), w, h); // sin desenfocar: el desenfoque abre rampas por donde el fondo se cuela
-    // Nada de tinta en el fondo; la silueta de la figura se traza siempre
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      if (bg[i]) { ink[i] = 0; continue; }
-      if ((x > 0 && bg[i - 1]) || (x < w - 1 && bg[i + 1]) || (y > 0 && bg[i - w]) || (y < h - 1 && bg[i + w])) ink[i] = 1;
-    }
-  }
   // El filo de la imagen suele traer una franja oscura de compresión: no es dibujo
   const edge = Math.max(2, lineW);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     if (x < edge || y < edge || x >= w - edge || y >= h - edge) ink[y * w + x] = 0;
   }
-  ink = removeSpecks(ink, w, h, Math.max(6, Math.round((w * h) / 4000)));
+  // Trazos cortos fuera: pelo, grano, letras. Simplificar sube el mínimo hasta ×9
+  ink = removeSpecks(ink, w, h, Math.max(6, Math.round((w * h) / 4000 * (1 + 8 * S))));
+
+  // ---------- 2. Fondo, figura principal y silueta ----------
+  let bg = null;
+  if (removeBackground || bgSeeds.length) {
+    // Siempre sobre la imagen sin desenfocar: el desenfoque abre rampas por donde el
+    // fondo se cuela dentro de la figura (pasaba con el pelaje oscuro del gato)
+    bg = removeBackground ? backgroundMask(rgba, w, h, bgTol, bgFromBottom) : new Uint8Array(w * h);
+    if (removeBackground) {
+      // Segunda pasada para fondos con textura (marcos grabados, papel, trama): muy
+      // suavizada para que la textura se vuelva un tono liso, pero con tolerancia
+      // estricta para no colarse por las rampas del contorno del personaje
+      const flat = blurRgba(rgba, w, h, Math.max(2, Math.round(Math.max(w, h) / 160)));
+      const textured = backgroundMask(flat, w, h, bgTol * 0.5, bgFromBottom);
+      for (let i = 0; i < bg.length; i++) bg[i] |= textured[i];
+    }
+    if (bgSeeds.length) {
+      const fromClicks = backgroundMask(rgba, w, h, bgTol, false, bgSeeds, false);
+      for (let i = 0; i < bg.length; i++) bg[i] |= fromClicks[i];
+    }
+    bg = absorbEdgeScraps(bg, w, h);
+    // Apertura morfológica: franjas delgadas pegadas a la figura (el filo de una foto,
+    // un trozo de marco) desaparecen; las formas gruesas sobreviven intactas
+    const open = Math.round((Math.max(w, h) / 100) * S);
+    if (open >= 1) bg = openFigure(bg, w, h, open);
+    if (keepMain) bg = keepMainFigure(bg, w, h);
+    // Silueta suave: sin bigotes, grano ni dientes de sierra en el contorno
+    const r = Math.round((Math.max(w, h) / 200) * S);
+    if (r >= 1) bg = smoothMask(bg, w, h, r);
+    if (keepMain) bg = keepMainFigure(bg, w, h);
+    // Nada de tinta en el fondo; la silueta se traza siempre, con el grosor de línea
+    // final (si no, en imágenes pequeñas el contorno exterior sale tenue)
+    const dBg = distanceTransform(bg, w, h, false);
+    const sil = Math.max(1, lineNative * 0.9);
+    for (let i = 0; i < bg.length; i++) {
+      if (bg[i]) ink[i] = 0;
+      else if (dBg[i] <= sil) ink[i] = 1;
+    }
+  }
+  ink = removeSpecks(ink, w, h, 6);
   ink = dilate(ink, w, h, lineW);
 
   // Regiones de papel: cerradas (dentro) o conectadas con el borde / el fondo (fuera)
@@ -373,7 +472,7 @@ export function processFigure(rgba, w, h, opts = {}) {
   for (let i = 0; i < inkF.length; i++) inkF[i] = ink[i];
   const smooth = sc > 1.5 ? boxBlur(boxBlur(inkF, w, h, 1), w, h, 1) : inkF;
   // La rampa se estrecha con la ampliación: ~1 px de antialias en la salida, no un halo gris
-  const lo = sc > 1.5 ? 0.2 : 0.35, span = sc > 1.5 ? Math.min(0.2, 0.5 / sc) : 0.3;
+  const lo = sc > 1.5 ? 0.22 : 0.35, span = sc > 1.5 ? 0.05 : 0.3;
   const inkAt = (x, y) => smooth[(Math.min(ch - 1, Math.max(0, y)) + y0) * w + Math.min(cw - 1, Math.max(0, x)) + x0];
   for (let y = 0; y < oh; y++) {
     const sy = (y + 0.5) / sc - 0.5, iy = Math.floor(sy), fy = sy - iy;

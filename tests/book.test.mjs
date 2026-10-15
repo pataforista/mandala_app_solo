@@ -213,3 +213,21 @@ test("dibujo de líneas: contorno negro conservado, motas eliminadas", () => {
   const edges = imageToLineArt(rgba, w, h, { mode: "bordes", detail: 0.5, thickenPx: 0, minSpeckPx: 4 });
   assert.ok(edges.some(v => v === 0) && edges.some(v => v === 255));
 });
+
+test("figura: clics sobre el fondo y 'sólo figura principal' quitan fondo oscuro y textos", () => {
+  // Personaje claro sobre fondo oscuro rodeado de un marco crema, con una "letra" suelta abajo
+  const w = 160, h = 200;
+  const rgba = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const frame = x < 15 || y < 15 || x >= w - 15 || y >= h - 15;
+    const body = ((x - 80) / 35) ** 2 + ((y - 95) / 50) ** 2 < 1;
+    const letter = !frame && x > 70 && x < 90 && y > 165 && y < 178;
+    rgba.set(frame ? [235, 225, 200, 255] : body ? [200, 200, 200, 255] : letter ? [250, 250, 250, 255] : [30, 30, 30, 255], (y * w + x) * 4);
+  }
+  const noClick = processFigure(rgba, w, h, { mode: "bordes", outLong: 200 });
+  const withClick = processFigure(rgba, w, h, { mode: "bordes", outLong: 200, bgSeeds: [[0.2, 0.2], [0.8, 0.8]] });
+  const inside = (f) => f.cls.reduce((a, v) => a + (v === 1 || v === 3), 0) / f.cls.length;
+  assert.ok(inside(withClick) < inside(noClick), "el fondo oscuro marcado con clics debía desaparecer");
+  // Recortado al personaje: la caja sigue a la elipse (70×100), no al rectángulo oscuro
+  assert.ok(withClick.w / withClick.h < 0.85, `relación ${withClick.w}/${withClick.h}`);
+});

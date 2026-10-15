@@ -491,6 +491,12 @@
             <sl-range id="medallionThreshold" label="Umbral de tinta" min="30" max="230" value="110"></sl-range>
             <sl-range id="medallionDetail" label="Detalle (pinturas)" min="0" max="1" step="0.05" value="0.5"></sl-range>
             <sl-range id="figureBgTol" label="Tolerancia del fondo" min="8" max="60" value="26"></sl-range>
+            <sl-range id="figureSimplify" label="Simplificar (menos detalle)" min="0" max="1" step="0.05" value="0.3"></sl-range>
+            <sl-checkbox id="figureKeepMain" checked>Sólo la figura principal (quita textos y restos)</sl-checkbox>
+            <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 0;">
+              ¿Fotos antiguas con fondo oscuro o marcos? En <a href="preprocesar.html" target="_blank">preprocesar.html</a>
+              haz clic sobre el fondo para borrarlo y recorta textos.
+            </p>
             <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 0;">
               Para vender el libro usa sólo obras de <b>dominio público</b> o tuyas. Personajes actuales
               (Minions, Pokémon, Disney moderno) están protegidos. Ver <code>docs/libro-kdp.md</code>.
