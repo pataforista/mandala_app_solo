@@ -44,7 +44,8 @@ export async function figureFromImage(img, settings = {}, crop = {}, seeds = [])
     .filter(([x, y]) => x >= 0 && y >= 0 && x <= 1 && y <= 1);
   const fig = processFigure(data, w, h, { ...settings, bgSeeds });
   const href = bytesToDataUrl(await encodeGrayPng(fig.gray, fig.w, fig.h));
-  return withStamp({ href, cls: fig.cls, w: fig.w, h: fig.h });
+  // srcLong: píxeles reales del original (recortado); la lista de verificación lo usa
+  return withStamp({ href, cls: fig.cls, w: fig.w, h: fig.h, srcLong: Math.round(Math.max(sw, sh)) });
 }
 
 /** Añade fig.stampHref (versión reducida de trazo grueso) si falta. */

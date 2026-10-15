@@ -268,3 +268,32 @@ test("anillos de figuras: copias que no se pisan, sello de trazo grueso y medall
     assert.match(svg, /<image href="data:,C"/, "falta la figura en el medallón");
   }
 });
+
+test("lista de verificación: fondo rectangular, derechos y alternativas", async () => {
+  const { checkFigure, checklistHtml } = await import("../js/core/figureChecks.js");
+  const mk = (shape) => {
+    const w = 200, h = 240, cls = new Uint8Array(w * h).fill(2);
+    for (let y = 10; y < 230; y++) for (let x = 10; x < 190; x++) {
+      const inEl = ((x - 100) / 85) ** 2 + ((y - 120) / 105) ** 2;
+      const isIn = shape === "rect" ? true : inEl < 1;
+      if (!isIn) continue;
+      const edge = shape === "rect" ? (x < 14 || x > 185 || y < 14 || y > 225) : inEl > 0.93;
+      cls[y * w + x] = edge ? 0 : 1;
+    }
+    return { cls, w, h, srcLong: 900 };
+  };
+  const meta = { rightsConfirmed: true, source: "Smithsonian, 1902" };
+  const ok = checkFigure(mk("ellipse"), "figura", meta);
+  assert.ok(ok.ready, JSON.stringify(ok.checks.filter(c => !c.ok)));
+  const rect = checkFigure(mk("rect"), "figura", meta);
+  assert.ok(!rect.ready && rect.checks.some(c => c.level === "error" && /fondo/.test(c.msg)));
+  // Sin derechos confirmados no está lista, y se sugieren fuentes de dominio público
+  const noRights = checkFigure(mk("ellipse"), "figura", {});
+  assert.ok(!noRights.ready);
+  assert.match(checklistHtml(noRights, "figura"), /Smithsonian Open Access/);
+  // Baja resolución: aviso con herramienta para ampliar
+  const small = checkFigure({ ...mk("ellipse"), srcLong: 420 }, "figura", meta);
+  assert.ok(small.ready && small.checks.some(c => c.level === "warn" && c.tools.some(t => t.name === "Upscayl")));
+  // Sin uso elegido nunca está lista (nada entra al libro por defecto)
+  assert.ok(!checkFigure(mk("ellipse"), "ninguno", meta).ready);
+});

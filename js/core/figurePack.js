@@ -52,12 +52,12 @@ export function base64ToBytes(b64) {
 export function packFigures(figures) {
   return {
     format: PACK_FORMAT, version: PACK_VERSION,
-    figures: figures.map(f => ({ name: f.name, use: f.use || "ninguno", w: f.w, h: f.h, href: f.href, stampHref: f.stampHref, cls: encodeCls(f.cls) })),
+    figures: figures.map(f => ({ name: f.name, use: f.use || "ninguno", source: f.source || "", rightsConfirmed: !!f.rightsConfirmed, srcLong: f.srcLong, w: f.w, h: f.h, href: f.href, stampHref: f.stampHref, cls: encodeCls(f.cls) })),
   };
 }
 
 export function unpackFigures(json) {
   const data = typeof json === "string" ? JSON.parse(json) : json;
   if (data?.format !== PACK_FORMAT) throw new Error("no es un paquete de figuras de Mandala Studio");
-  return data.figures.map(f => ({ name: f.name, use: f.use || "ninguno", w: f.w, h: f.h, href: f.href, stampHref: f.stampHref, cls: decodeCls(f.cls, f.w * f.h) }));
+  return data.figures.map(f => ({ name: f.name, use: f.use || "ninguno", source: f.source || "", rightsConfirmed: !!f.rightsConfirmed, srcLong: f.srcLong, w: f.w, h: f.h, href: f.href, stampHref: f.stampHref, cls: decodeCls(f.cls, f.w * f.h) }));
 }

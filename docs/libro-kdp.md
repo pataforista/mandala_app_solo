@@ -87,6 +87,23 @@ combinada con la limpieza de figuras de la app.
 Al crear el libro se descarga también `…_registro_fuentes.csv`: página del PDF, uso, estilo e
 imagen de origen. Guárdalo como prueba de qué obra de dominio público usaste en cada página.
 
+### Lista de verificación (imagen lista antes de entrar al libro)
+
+Cada imagen se comprueba sola (`js/core/figureChecks.js`), en `preprocesar.html` y en la app.
+Sólo entran al libro las que tienen uso elegido **y** ningún error:
+
+| Requisito | ✅ | ⚠️ aviso | ❌ bloquea | Alternativa sugerida |
+|---|---|---|---|---|
+| Resolución del original | ≥ 800 px | 350–800 px | < 350 px | Upscayl |
+| Sin fondo (relleno de la caja de la silueta) | ≤ 78 % | 78–90 % | > 90 % (queda un rectángulo) | clics, rembg, Photopea |
+| Sin texto ni restos | ≤ 3 trazos sueltos | 4–10 | > 10 | Photopea, GIMP |
+| Pocos detalles (línea / figura) | ≤ 21 % | ≤ 30 % | > 30 % (figura rellena) | Simplificar, sketch2lineart, Anime2Sketch |
+| Interior rellenable (figura rellena) | ≥ 30 % | 15–30 % | < 15 % | Inkscape, o usar en «Anillos» |
+| Proporción (anillos / medallón) | 0,4–1,6 / 0,6–1,4 | fuera de rango | — | recortar |
+| Derechos y fuente | confirmados | — | faltan | Smithsonian Open Access, Rawpixel |
+
+La fuente anotada viaja en el paquete y aparece en la columna `fuente` del registro CSV del libro.
+
 ## 4. Derechos de autor: qué puedes usar para vender
 
 Esto es orientación, no asesoría legal. Ante la duda, no lo uses.

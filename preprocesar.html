@@ -43,6 +43,11 @@
     .crop { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
     .crop input { min-width: 0; width: 100%; }
     .legend { font-size: .78rem; color: var(--muted); }
+    .card.ready { border-color: #2e7d32; }
+    .card.notready { border-color: #c62828; }
+    .rights { display: grid; gap: 4px; }
+    .rights input[type=text] { padding: 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+    summary { cursor: pointer; }
     .legend span { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; margin: 0 3px 0 8px; }
     .status { font-size: .8rem; color: var(--muted); min-height: 1.2em; }
     a { color: var(--accent); }
@@ -56,6 +61,10 @@
       Al terminar, exporta el paquete e impórtalo en <a href="index.html">Mandala Studio</a> → «Mis imágenes» → «Importar paquete».</p>
   </header>
   <main>
+    <details class="panel" open>
+      <summary><b>Requisitos para que una imagen esté lista</b> (se comprueban solos en cada tarjeta)</summary>
+      <div id="requirements"></div>
+    </details>
     <div class="panel">
       <div id="drop">Arrastra aquí tus imágenes o haz clic para elegirlas (puedes elegir varias)</div>
       <input type="file" id="files" accept="image/*" multiple hidden />
@@ -93,6 +102,21 @@
   <script type="module">
     import { loadImageFile, figureFromImage } from "./js/core/figureImport.js";
     import { packFigures } from "./js/core/figurePack.js";
+    import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./js/core/figureChecks.js";
+    document.head.insertAdjacentHTML("beforeend", `<style>${CHECKLIST_CSS}</style>`);
+    document.getElementById("requirements").innerHTML = REQUIREMENTS_HTML;
+
+    // Lista de verificación de la tarjeta según el uso elegido
+    function renderChecks(it) {
+      const box = it.card.querySelector(".checks");
+      it.card.classList.remove("ready", "notready");
+      if (!it.fig) { box.innerHTML = ""; return; }
+      const r = checkFigure(it.fig, it.use, { rightsConfirmed: it.rightsConfirmed, source: it.source });
+      it.ready = r.ready;
+      box.innerHTML = checklistHtml(r, it.use);
+      if (it.use !== "ninguno") it.card.classList.add(r.ready ? "ready" : "notready");
+      refreshButtons();
+    }
 
     const $ = (id) => document.getElementById(id);
     const items = []; // { name, img, url, settings, crop, fig, card }
@@ -165,10 +189,8 @@
       try {
         it.fig = await figureFromImage(it.img, it.settings, it.crop, it.seeds);
         drawPreview(it.card.querySelector("canvas.out"), it.fig);
-        const inside = it.fig.cls.reduce((a, c) => a + (c === 1), 0) / it.fig.cls.length;
-        it.card.querySelector(".status").textContent = inside < 0.03
-          ? "⚠️ Casi no hay regiones cerradas: prueba otro tipo de imagen o ajusta el fondo."
-          : `${it.fig.w}×${it.fig.h} px · ${Math.round(inside * 100)} % de la figura se rellenará`;
+        it.card.querySelector(".status").textContent = `Original ${it.fig.srcLong} px · salida ${it.fig.w}×${it.fig.h} px`;
+        renderChecks(it);
       } catch (err) {
         it.card.querySelector(".status").textContent = "❌ " + (err.message || err);
       }
@@ -206,6 +228,11 @@
           }).join("")}
         </div>
         <div class="row"><button class="undo">Deshacer clic</button><button class="redo">Reprocesar</button><button class="remove">Quitar</button></div>
+        <div class="rights">
+          <label>Fuente (URL, libro o «obra propia»)<input type="text" class="source" placeholder="https://… o título del libro y año" /></label>
+          <label class="check"><input type="checkbox" class="rightsOk" /> Confirmo que es de dominio público o mía</label>
+        </div>
+        <div class="checks"></div>
         <div class="status"></div>`;
       const orig = card.querySelector("canvas.orig");
       drawOriginal(orig, it);
@@ -227,7 +254,10 @@
       tol.onchange = () => { it.settings = { ...it.settings, bgTol: +tol.value }; process(it); };
       const useSel = card.querySelector(".use");
       useSel.value = it.use;
-      useSel.onchange = () => { it.use = useSel.value; };
+      useSel.onchange = () => { it.use = useSel.value; renderChecks(it); };
+      const src = card.querySelector(".source"), ok = card.querySelector(".rightsOk");
+      src.oninput = () => { it.source = src.value; renderChecks(it); };
+      ok.onchange = () => { it.rightsConfirmed = ok.checked; renderChecks(it); };
       const modeSel = card.querySelector(".mode");
       modeSel.value = it.settings.mode;
       modeSel.onchange = () => { it.settings = { ...it.settings, mode: modeSel.value }; process(it); };
@@ -250,7 +280,7 @@
         if (!file.type.startsWith("image/")) continue;
         try {
           const img = await loadImageFile(file);
-          const it = { name: file.name, img, url: URL.createObjectURL(file), settings: settingsFromUI(), crop: {}, seeds: [], use: "ninguno", fig: null };
+          const it = { name: file.name, img, url: URL.createObjectURL(file), settings: settingsFromUI(), crop: {}, seeds: [], use: "ninguno", source: "", rightsConfirmed: false, ready: false, fig: null };
           items.push(it);
           makeCard(it);
           await process(it);
@@ -287,9 +317,13 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     };
     $("exportPack").onclick = () => {
-      const figs = items.filter(it => it.fig).map(it => ({ name: it.name, use: it.use, ...it.fig }));
+      const pending = items.filter(it => it.fig && it.use !== "ninguno" && !it.ready);
+      if (pending.length && !confirm(`${pending.length} imagen(es) con uso elegido no están listas (marcadas en rojo). ` +
+        "Se exportan igual, pero la app no las pondrá en el libro hasta corregirlas. ¿Exportar?")) return;
+      const figs = items.filter(it => it.fig).map(it => ({ name: it.name, use: it.use, source: it.source, rightsConfirmed: it.rightsConfirmed, ...it.fig }));
       save(new Blob([JSON.stringify(packFigures(figs))], { type: "application/json" }), "figuras.json");
-      setStatus(`Paquete con ${figs.length} figura(s) exportado.`);
+      const ready = items.filter(it => it.ready).length;
+      setStatus(`Paquete con ${figs.length} figura(s) exportado · ${ready} lista(s) para el libro.`);
     };
     $("exportPng").onclick = async () => {
       for (const it of items.filter(it => it.fig)) {

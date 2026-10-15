@@ -15,6 +15,7 @@ import { planBook } from "./core/bookPlan.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
+import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 
 const historyMan = new StateHistory();
 const imgProc = new ImageProcessor();
@@ -805,9 +806,36 @@ function figureSettings() {
   };
 }
 
+// ¿Lista para el uso elegido? (resolución, fondo, texto, detalle, interior, derechos)
+function figureStatus(m) {
+  return checkFigure(m.fig, m.use || "ninguno", { rightsConfirmed: m.rightsConfirmed, source: m.source });
+}
+
+// Lista de verificación de la imagen seleccionada, con fuente y derechos editables
+function renderFigureChecks() {
+  const box = document.getElementById("figureChecks");
+  if (!box) return;
+  const m = userFigures[activeFigure];
+  if (!m) { box.innerHTML = ""; return; }
+  const esc = (t) => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  box.innerHTML = `<div style="font-weight:600;margin-top:6px;">${esc(m.name)}</div>
+    <label style="display:block;margin:4px 0;">Fuente (URL, libro u «obra propia»)
+      <input id="figSource" type="text" value="${esc(m.source)}" style="width:100%;padding:4px;border-radius:6px;border:1px solid #bbb;"></label>
+    <label style="display:flex;gap:6px;align-items:center;"><input id="figRights" type="checkbox" ${m.rightsConfirmed ? "checked" : ""}> Confirmo que es de dominio público o mía</label>
+    ${checklistHtml(figureStatus(m), m.use || "ninguno")}`;
+  const refresh = () => { renderFigureList(); document.dispatchEvent(new Event("figures-changed")); };
+  box.querySelector("#figSource").onchange = (e) => { m.source = e.target.value; refresh(); };
+  box.querySelector("#figRights").onchange = (e) => { m.rightsConfirmed = e.target.checked; refresh(); };
+}
+
 function renderFigureList() {
   const list = document.getElementById("medallionList");
   if (!list) return;
+  const req = document.getElementById("figureRequirements");
+  if (req && !req.innerHTML) {
+    req.innerHTML = REQUIREMENTS_HTML;
+    document.head.insertAdjacentHTML("beforeend", `<style>${CHECKLIST_CSS}</style>`);
+  }
   list.innerHTML = "";
   userFigures.forEach((m, i) => {
     const wrap = document.createElement("div");
@@ -833,9 +861,16 @@ function renderFigureList() {
     sel.style.cssText = "width:96px;font-size:11px;padding:2px;border-radius:6px;";
     for (const [v, t] of FIGURE_USES) sel.add(new Option(t, v, false, (m.use || "ninguno") === v));
     sel.onchange = () => { m.use = sel.value; activeFigure = i; renderFigureList(); update(); document.dispatchEvent(new Event("figures-changed")); };
-    wrap.append(thumb, del, sel);
+    // Semáforo: verde lista, rojo no lista, gris sin uso
+    const st = figureStatus(m);
+    const dot = document.createElement("span");
+    const used = (m.use || "ninguno") !== "ninguno";
+    dot.textContent = !used ? "· sin uso" : st.ready ? "✅ lista" : "❌ revisar";
+    dot.style.cssText = `font-size:10px;color:${!used ? "#777" : st.ready ? "#2e7d32" : "#c62828"};`;
+    wrap.append(thumb, del, sel, dot);
     list.appendChild(wrap);
   });
+  renderFigureChecks();
 }
 
 async function reprocessImage() {
@@ -1300,7 +1335,7 @@ function bindUI() {
       try {
         for (const file of files) {
           const img = await loadImageFile(file);
-          userFigures.push({ name: file.name, img, use: "ninguno", fig: await figureFromImage(img, figureSettings()) });
+          userFigures.push({ name: file.name, img, use: "ninguno", source: "", rightsConfirmed: false, fig: await figureFromImage(img, figureSettings()) });
         }
         activeFigure = userFigures.length - 1;
         useFigures();
@@ -1320,7 +1355,7 @@ function bindUI() {
       if (!file) return;
       try {
         const figs = unpackFigures(await file.text());
-        for (const f of figs) userFigures.push({ name: f.name, img: null, use: f.use || "ninguno", fig: await withStamp(f) });
+        for (const f of figs) userFigures.push({ name: f.name, img: null, use: f.use || "ninguno", source: f.source, rightsConfirmed: f.rightsConfirmed, fig: await withStamp(f) });
         activeFigure = Math.max(0, userFigures.length - figs.length);
         useFigures();
       } catch (err) {
@@ -1355,7 +1390,7 @@ function bindUI() {
   const exportPackBtn = document.getElementById("figurePackExport");
   if (exportPackBtn) exportPackBtn.onclick = () => {
     if (!userFigures.length) return;
-    downloadTextFile("figuras.json", JSON.stringify(packFigures(userFigures.map(m => ({ name: m.name, use: m.use, ...m.fig })))));
+    downloadTextFile("figuras.json", JSON.stringify(packFigures(userFigures.map(m => ({ name: m.name, use: m.use, source: m.source, rightsConfirmed: m.rightsConfirmed, ...m.fig })))));
   };
   imageUploadEl.onchange = (e) => {
     const file = e.target.files[0];
@@ -1662,8 +1697,9 @@ function bindUI() {
   const bookAuthorEl = document.getElementById("bookAuthor");
   const bookVaryEl = document.getElementById("bookVary");
   const bookDifficultyEl = document.getElementById("bookDifficulty");
-  // Sólo las imágenes a las que el usuario les asignó un uso, en el orden de la lista
-  const chosenFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno");
+  // Sólo las imágenes con uso elegido a mano Y que pasan la lista de verificación
+  const chosenFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && figureStatus(m).ready);
+  const pendingFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && !figureStatus(m).ready);
   const bookBlankBackEl = document.getElementById("bookBlankBack");
   const bookTitlePageEl = document.getElementById("bookTitlePage");
   const bookCopyrightEl = document.getElementById("bookCopyright");
@@ -1697,7 +1733,9 @@ function bindUI() {
     if (info) {
       info.innerHTML = chosen.length
         ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano: ` + chosen.map(m => `${m.name} (${FIGURE_USES.find(u => u[0] === m.use)[1].toLowerCase()})`).join(", ")
-        : "Ninguna imagen elegida: el libro será sólo de mandalas. Para incluir una, elige su uso en «Mis imágenes».";
+        : "Ninguna imagen lista: el libro será sólo de mandalas. Para incluir una, elige su uso en «Mis imágenes».";
+      const pend = pendingFigures();
+      if (pend.length) info.innerHTML += `<br>❌ No entran (no están listas): ${pend.map(m => m.name).join(", ")}. Revisa su lista de verificación.`;
     }
     if (chosen.length > bookCount()) bookSummaryEl.innerHTML += `<br>⚠️ Hay ${chosen.length} imágenes elegidas y sólo ${bookCount()} páginas: sobran ${chosen.length - bookCount()}.`;
   };
@@ -1747,7 +1785,7 @@ function bindUI() {
         // el resto de páginas son mandalas sin imagen
         const entry = pg.centerArt ? chosen[pg.centerArt.imageIndex] : null;
         Object.assign(o, resolveUserImage(state, entry));
-        sourceLog[i] = { mandala: i + 1, composition: entry ? entry.use : pg.composition, style: o.styleMode, image: entry ? entry.name : "" };
+        sourceLog[i] = { mandala: i + 1, composition: entry ? entry.use : pg.composition, style: o.styleMode, image: entry ? entry.name : "", source: entry ? entry.source : "" };
         return o;
       }
       return { ...o, imagePoints: currentImagePoints, imageScale: state.imageScale,
@@ -1786,11 +1824,11 @@ function bindUI() {
         const layout = bookLayout({ ...layoutOpts, mandalas: count + (layoutOpts.colorTest ? 1 : 0) });
         const off = layoutOpts.colorTest ? 1 : 0;
         const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-        const rows = [["pagina_pdf", "mandala", "composicion_o_uso", "estilo", "imagen_origen"].join(",")];
+        const rows = [["pagina_pdf", "mandala", "composicion_o_uso", "estilo", "imagen_origen", "fuente"].join(",")];
         sourceLog.forEach((r, i) => {
           if (!r) return;
           const page = layout.findIndex(p => p.kind === "mandala" && p.index === i + off) + 1;
-          rows.push([page, r.mandala, q(r.composition), q(r.style), q(r.image)].join(","));
+          rows.push([page, r.mandala, q(r.composition), q(r.style), q(r.image), q(r.source)].join(","));
         });
         downloadTextFile(filename.replace(/\.pdf$/, "_registro_fuentes.csv"), rows.join("\n"));
       }
