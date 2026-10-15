@@ -1,6 +1,6 @@
 import { mulberry32, rFloat } from "../core/prng.js";
 import { PathBuilder, coloringCullArea } from "../core/pathBuilder.js";
-import { lerp, clamp, fmt, polar, polarW, getWobblePhases, trochoidTurns } from "../core/geometry.js";
+import { lerp, clamp, fmt, polar, polarW, getWobblePhases, trochoidTurns, harmonicTrochoid } from "../core/geometry.js";
 import { circleSegments } from "./layers/core.js";
 
 /**
@@ -59,6 +59,7 @@ export function generateMandalaRadial(doc, opts) {
     spiroDistance = 30,
     spiroResolution = 500,
     spiroMode = "hypo", // hypo or epi
+    spiroMatchPetals = true, // lóbulos múltiplo de los pétalos y alineados con sus ejes
   } = opts;
 
   const page = doc?.page ?? { wMm: 210, hMm: 297, marginMm: 10 };
@@ -478,7 +479,7 @@ export function generateMandalaRadial(doc, opts) {
   }
 
   // --- PHASE 4: Spirograph (Hypotrochoid / Epitrochoid) ---
-  function addSpirograph(pb, R, r, d, minSteps, mode = "hypo") {
+  function addSpirograph(pb, R, r, d, minSteps, mode = "hypo", rot = 0) {
     // Periodo exacto: la curva se cierra tras `turns` vueltas (más sería volver a
     // trazar la misma línea: doble tinta y doble tiempo en plotter).
     const turns = trochoidTurns(R, r);
@@ -490,6 +491,7 @@ export function generateMandalaRadial(doc, opts) {
     const h = Math.sqrt((8 * 0.04) / Math.max(aMax, 1e-6));
     const steps = Math.min(40000, Math.max(minSteps, Math.ceil(span / h)));
     const step = span / steps;
+    const cosR = Math.cos(rot), sinR = Math.sin(rot);
 
     for (let i = 0; i <= steps; i++) {
       const t = i * step;
@@ -503,8 +505,9 @@ export function generateMandalaRadial(doc, opts) {
         y = (R - r) * Math.sin(t) - d * Math.sin(k * t);
       }
 
-      if (i === 0) pb.moveTo(cx + x, cy + y);
-      else pb.lineTo(cx + x, cy + y);
+      const xr = x * cosR - y * sinR, yr = x * sinR + y * cosR;
+      if (i === 0) pb.moveTo(cx + xr, cy + yr);
+      else pb.lineTo(cx + xr, cy + yr);
     }
   }
 
@@ -1391,13 +1394,23 @@ if (spiroEnabled) {
   // R/r/d de forma uniforme para que el alcance máximo encaje en la página.
   // Así los controles definen la figura y el resultado siempre cae dentro
   // del marco (no se sale ni se satura), independientemente de los valores.
+  let sR = spiroR, sr = spiror, sd = spiroDistance, rot = 0;
+  if (spiroMatchPetals && spiroR > 0 && spiror > 0) {
+    // Lóbulos = múltiplo de los pétalos; d escala con r para conservar la forma
+    const h = harmonicTrochoid(petals, spiroR, spiror);
+    sd = spiroDistance * h.r / spiror;
+    sr = h.r;
+    // Punta de lóbulo: hipo en t=0 (ángulo 0); epi desfasada medio lóbulo.
+    // Se gira para que caiga en el eje de la cuña 0 (−90°), como los pétalos.
+    rot = radialPhase - (spiroMode === "epi" ? Math.PI / h.lobes : 0);
+  }
   const rawReach = (spiroMode === "epi")
-    ? (spiroR + spiror + spiroDistance)
-    : (Math.abs(spiroR - spiror) + spiroDistance);
+    ? (sR + sr + sd)
+    : (Math.abs(sR - sr) + sd);
   const fit = rawReach > 1e-6 ? (computedRadius * 0.95) / rawReach : 1;
 
   const pbSpiro = newPB();
-  addSpirograph(pbSpiro, spiroR * fit, spiror * fit, spiroDistance * fit, spiroResolution, spiroMode);
+  addSpirograph(pbSpiro, sR * fit, sr * fit, sd * fit, spiroResolution, spiroMode, rot);
 
   const spiroStrokes = getStrokesForRadius(computedRadius * 0.95, "secondary");
 

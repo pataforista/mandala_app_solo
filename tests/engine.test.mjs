@@ -249,3 +249,32 @@ test("espirógrafo: periodo exacto de cierre y trazo único", async () => {
   const revisits = pts.slice(1, -1).filter(p => Math.hypot(p[0] - first[0], p[1] - first[1]) < 0.02).length;
   assert.equal(revisits, 0, "no debe volver a trazar la misma curva");
 });
+
+test("espirógrafo: lóbulos múltiplo de los pétalos y alineados con sus ejes", async () => {
+  const { harmonicTrochoid } = await import("../js/core/geometry.js");
+  assert.deepEqual(harmonicTrochoid(12, 60, 25), { r: 25, lobes: 12, turns: 5 }); // la figura por defecto no cambia
+  for (const p of [5, 6, 7, 8, 10, 16, 24, 32]) assert.equal(harmonicTrochoid(p, 60, 25).lobes % p, 0, `${p} pétalos`);
+
+  const spiroPts = (petals, spiroMode) => {
+    const { doc } = render(generateMandalaRadial, { ...BASE, seed: 3, petals, spiroEnabled: true, spiroMode });
+    const nums = doc.body[doc.body.length - 1].match(/ d="([^"]+)"/)[1].match(/-?\d+(\.\d+)?/g).map(Number);
+    const pts = [];
+    for (let i = 0; i < nums.length; i += 2) pts.push([nums[i] - CENTER.x, nums[i + 1] - CENTER.y]);
+    return pts;
+  };
+  const near = (pts, [x, y]) => {
+    let best = Infinity;
+    for (let i = 1; i < pts.length; i++) best = Math.min(best, distToSeg(x, y, [...pts[i - 1], ...pts[i]]));
+    return best;
+  };
+  for (const spiroMode of ["hypo", "epi"]) for (const petals of [8, 10, 12]) {
+    const pts = spiroPts(petals, spiroMode);
+    const a = (2 * Math.PI) / petals, sample = pts.filter((_, i) => i % 23 === 0);
+    // Giro de una cuña: la curva cae sobre sí misma
+    const rotErr = Math.max(...sample.map(([x, y]) => near(pts, [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)])));
+    // Espejo sobre el eje vertical (eje de la cuña 0, −90°): simetría de pétalo
+    const mirErr = Math.max(...sample.map(([x, y]) => near(pts, [-x, y])));
+    assert.ok(rotErr < 0.08, `${spiroMode}/${petals}: simetría rotacional (${rotErr.toFixed(3)} mm)`);
+    assert.ok(mirErr < 0.08, `${spiroMode}/${petals}: alineado con el eje de pétalo (${mirErr.toFixed(3)} mm)`);
+  }
+});

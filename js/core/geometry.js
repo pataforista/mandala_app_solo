@@ -57,8 +57,9 @@ export function polarW(r, theta, intensity = 0.5, organicLevel = 0.0, wPhase1 = 
  * es decir, k = denominador de R/r en su forma irreducible (R=60, r=25 → 12/5 → 5).
  * Para razones irracionales (o de denominador enorme) devuelve el denominador
  * de la mejor aproximación por fracciones continuas con denominador ≤ maxTurns.
+ * Los lóbulos de la curva son R/gcd(R, r) (el numerador de esa fracción).
  */
-export function trochoidTurns(R, r, maxTurns = 20) {
+export function trochoidTurns(R, r, maxTurns = 64) {
   const x = Math.abs(R / r);
   if (!Number.isFinite(x) || x === 0) return 1;
   let [h0, h1, k0, k1] = [0, 1, 1, 0];
@@ -72,4 +73,31 @@ export function trochoidTurns(R, r, maxTurns = 20) {
     v = 1 / (v - a);
   }
   return Math.max(1, k1);
+}
+
+/**
+ * Radio del círculo móvil para que el trocoide tenga L lóbulos, con L múltiplo
+ * de `petals` y cercano al número de lóbulos que darían R y rHint (por defecto 12).
+ * R/r = L/q irreducible ⇒ L lóbulos y q vueltas; q es el coprimo de L más próximo
+ * a L·rHint/R, así la figura conserva su aspecto. Con 12 pétalos y 60:25 no cambia.
+ */
+export function harmonicTrochoid(petals, R, rHint) {
+  const n = Math.max(1, Math.round(petals));
+  const ratio = Math.abs(rHint / R);
+  const baseLobes = Math.round(Math.abs(R) / gcd(Math.round(Math.abs(R)), Math.round(Math.abs(rHint)))) || 12;
+  const lobes = n * Math.max(1, Math.round(baseLobes / n));
+  const target = lobes * ratio;
+  let q = 1, best = Infinity;
+  for (let c = 1; c < lobes; c++) {
+    if (gcd(c, lobes) !== 1) continue;
+    const dist = Math.abs(c - target);
+    if (dist < best) { best = dist; q = c; }
+  }
+  return { r: R * q / lobes, lobes, turns: q };
+}
+
+function gcd(a, b) {
+  a = Math.abs(a); b = Math.abs(b);
+  while (b) [a, b] = [b, a % b];
+  return a || 1;
 }
