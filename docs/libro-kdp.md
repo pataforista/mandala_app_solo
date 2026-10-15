@@ -8,13 +8,50 @@ El modo libro planifica ahora cada página antes de dibujarla (`js/core/bookPlan
 | Dimensión | Opciones | Regla |
 |---|---|---|
 | Estilo | sashiko, floral, geométrico, islámico, azteca, yantra, céltico | bolsa barajada: se agotan todos antes de repetir; nunca dos iguales seguidos |
-| Composición | centrado, fondo decorado, constelación, cuartos en esquinas, gigante recortado, medio mandala | «centrado» pesa más (es el más coloreable) |
+| Composición | centrado, fondo decorado, constelación, cuartos en esquinas, gigante (cubre la hoja), medio mandala | «centrado» pesa más (es el más coloreable); en «Libro KDP» eliges cuáles pueden salir |
 | Marco | redondeado, doble con rombos, festón, sin marco | sin repetición consecutiva |
 | Pétalos | 8–24 | bolsa barajada |
 | Dificultad | mixta, progresiva (fácil → difícil), fija | |
 | Mis imágenes | uso elegido **a mano** por imagen: figura rellena, anillos o medallón | cada imagen elegida aparece una vez, repartida de forma uniforme |
 
 Misma semilla ⇒ mismo libro (reproducible).
+
+### Revisar páginas antes de crear el PDF
+
+El sorteo no siempre acierta. En la pestaña **Libro KDP → Revisar páginas antes de crear** se ven
+todas las páginas en miniatura; en cada una:
+
+- **Borrar y crear otro**: descarta la página y dibuja al instante un mandala nuevo en su lugar
+  (mismo encuadre, otra semilla).
+- **Otro encuadre**: pasa a la siguiente composición permitida.
+
+Los cambios se guardan mientras no cambies la semilla, las composiciones permitidas o la dificultad,
+y se aplican al pulsar «Crear libro».
+
+### Perfil «Los más vendidos para este formato» (por defecto)
+
+No se basa en datos de ventas (la app no los tiene). Resume las convenciones de los libros de
+mandalas mejor posicionados: un mandala grande y centrado por página, impreso a una sola cara,
+con simetría alta y sin marcos pesados (`bestSellerProfile` en `js/core/bookPlan.js`).
+
+| | 8.5×8.5 (cuadrado) | Formatos verticales |
+|---|---|---|
+| Composición (peso) | centrado 6 · fondo 2 · gigante 1 · constelación 1 | centrado 5 · fondo 2 · constelación 2 · esquinas 1 · gigante 1 |
+| Medio mandala | nunca | nunca |
+| Estilo (peso) | floral 3 · geométrico, islámico, yantra 2 · resto 1 | igual |
+| Pétalos | 12, 16, 18, 20, 24 | igual |
+| Marco | sin marco 3 · redondeado 1 | igual |
+
+Para usar tus propias composiciones elige «Elegir yo las composiciones».
+
+### Composiciones corregidas (revisión del libro de 30 mandalas, semilla 3164907524)
+
+| Problema visto en el PDF | Causa | Corrección |
+|---|---|---|
+| «Gigante»: pétalos exteriores apenas cortados y esquinas vacías; parecía un mandala mal encuadrado | radio entre 0,78 y 0,90 de la semidiagonal | radio > semidiagonal: el diseño cubre toda la hoja y se lee como un acercamiento |
+| «Medio mandala» cortado también por los lados | radio de 0,62 × ancho | radio ≤ 0,48 × ancho: sólo lo corta la línea de base |
+| Celdas abiertas en el borde de las páginas recortadas sin marco | el recorte no dejaba línea | una línea cierra el borde del recorte |
+| Mini mandalas con el centro como una mancha negra | los límites de celda escalaban con el radio: un disco de 15 mm tenía celdas de 1 mm | mínimos absolutos: celda ≥ 2 mm², ancho de celda ≥ 3,2 mm, núcleo ≥ 3,5 mm, cuentas sólo en bandas ≥ 3 mm |
 
 ## 2. Requisitos de KDP que el PDF cumple
 

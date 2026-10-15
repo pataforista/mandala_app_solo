@@ -11,7 +11,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile } from "./core/bookPlan.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
@@ -36,7 +36,6 @@ const organicEl = document.getElementById("organic");
 
 const seedInputEl = document.getElementById("seed");
 const structurePresetEl = document.getElementById("structurePreset");
-const applyStructureBtn = document.getElementById("applyStructure");
 
 const strokeWidthEl = document.getElementById("strokeWidth");
 const framesEl = document.getElementById("frames");
@@ -51,7 +50,6 @@ const detailSimplificationEl = document.getElementById("detailSimplification");
 // New coloring book features
 const coloringPresetEl = document.getElementById("coloringPreset");
 const outlineModeEl = document.getElementById("outlineMode");
-const applyColoringPresetBtn = document.getElementById("applyColoringPreset");
 
 const styleModeEl = document.getElementById("styleMode");
 const layer1IntensityEl = document.getElementById("layer1Intensity");
@@ -374,7 +372,7 @@ if (!state.coloringPreset || !COLORING_PRESETS[state.coloringPreset]) state.colo
 
 if (state.styleMode === "hashiko") state.styleMode = "sashiko";
 
-if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl || !structurePresetEl || !applyStructureBtn) {
+if (!stage || !presetEl || !petalsEl || !complexityEl || !organicEl || !seedInputEl || !structurePresetEl) {
   throw new Error("Faltan elementos esenciales de la UI. Verifica que el HTML esté completo.");
 }
 
@@ -482,7 +480,14 @@ function updateGeneratorUI() {
   if (imageAccordionItem) imageAccordionItem.style.display = isLayers ? "block" : "none";
   // Composición, marco y medallón sólo existen en el motor clásico
   const isClassic = state.generatorType === "classic";
-  if (centerArtAccordionItem) centerArtAccordionItem.style.display = isClassic ? "block" : "none";
+  if (centerArtAccordionItem) centerArtAccordionItem.style.display = isClassic ? "flex" : "none";
+  const needClassic = document.getElementById("imagesNeedClassic");
+  if (needClassic) needClassic.style.display = isClassic ? "none" : "block";
+  // Controles que el motor clásico ignora: ocultarlos evita mover sliders sin efecto
+  if (organicEl) organicEl.style.display = isClassic ? "none" : "block";
+  if (kaleidoscopeEl) kaleidoscopeEl.style.display = isClassic ? "none" : "block";
+  const compBox = document.getElementById("bookCompBox");
+  if (compBox) compBox.style.display = isClassic && document.getElementById("bookVary")?.checked !== false ? "grid" : "none";
   if (compositionEl) compositionEl.style.display = isClassic ? "block" : "none";
   if (frameStyleEl) frameStyleEl.style.display = isClassic ? "block" : "none";
   
@@ -1402,21 +1407,20 @@ function bindUI() {
     }
   };
 
+  // Las plantillas y niveles se aplican al elegirlos (antes pedían un segundo clic
+  // en «Aplicar», y elegir sin aplicar no cambiaba nada)
   structurePresetEl.addEventListener("sl-change", () => {
     state.structurePreset = structurePresetEl.value || "custom";
-  });
-
-  applyStructureBtn.addEventListener("click", () => {
     if (applyStructurePreset(state.structurePreset)) {
       bindUI();
       update();
     }
   });
-  
-  // Coloring preset button
-  if (applyColoringPresetBtn && coloringPresetEl) {
-    applyColoringPresetBtn.addEventListener("click", () => {
+
+  if (coloringPresetEl) {
+    coloringPresetEl.addEventListener("sl-change", () => {
       const presetKey = coloringPresetEl.value;
+      if (presetKey === state.coloringPreset) return; // bindUI() también dispara sl-change
       const preset = COLORING_PRESETS[presetKey];
       if (preset) {
         Object.entries(preset).forEach(([key, value]) => {
@@ -1537,6 +1541,7 @@ function bindUI() {
       const randomColoring = pick(shuffleRng, coloringOptions);
       const coloringPreset = COLORING_PRESETS[randomColoring];
       if (coloringPreset) {
+        state.coloringPreset = randomColoring;
         Object.entries(coloringPreset).forEach(([key, value]) => {
           // Don't override seed or style-related properties in shuffle
           if (!['complexity', 'organic', 'styleMode', 'generatorType'].includes(key)) {
@@ -1740,38 +1745,61 @@ function bindUI() {
     if (chosen.length > bookCount()) bookSummaryEl.innerHTML += `<br>⚠️ Hay ${chosen.length} imágenes elegidas y sólo ${bookCount()} páginas: sobran ${chosen.length - bookCount()}.`;
   };
 
-  const downloadBook = async () => {
-    const count = bookCount();
-    const layoutOpts = bookLayoutOpts();
-    const total = bookPageCount(layoutOpts);
-    if (total < 24 && !confirm(`El libro tendría ${total} páginas y KDP exige mínimo 24. ¿Crear de todos modos?`)) return;
-    const marginMm = bookMargin(total);
+  // ---------- Plan del libro (compartido por la revisión y la descarga) ----------
+  // Composiciones permitidas y su peso: «centro» sale más (es el que más se colorea)
+  const COMP_WEIGHTS = { centro: 3, fondo: 2, constelacion: 2, esquinas: 1, gigante: 1, medio: 1 };
+  const bookProfileEl = document.getElementById("bookProfile");
+  const bestSeller = () => (bookProfileEl?.value || "rentable") === "rentable";
+  const allowedCompositions = () => {
+    if (bestSeller()) return bestSellerProfile(state.preset).compositions;
+    const boxes = [...document.querySelectorAll(".bookComp")];
+    const on = boxes.filter(b => b.checked).map(b => b.value);
+    return on.length ? on : ["centro"];
+  };
+  // Páginas cambiadas a mano en la revisión: índice → { bump, composition }.
+  // Se descartan si cambia la semilla base (el libro entero es otro).
+  let bookOverrides = new Map();
+  let overridesSeed = state.seed >>> 0;
+  const currentOverrides = () => {
+    if ((state.seed >>> 0) !== overridesSeed) { bookOverrides = new Map(); overridesSeed = state.seed >>> 0; }
+    return bookOverrides;
+  };
 
+  const buildBook = () => {
+    const count = bookCount();
     const baseSeed = state.seed >>> 0;
-    const generatorFn = getGeneratorFn(state.generatorType);
     const isClassic = state.generatorType === "classic";
     const chosen = isClassic ? chosenFigures() : [];
-    // Registro de fuentes: qué imagen va en qué página (trazabilidad de derechos)
-    const sourceLog = [];
     const vary = bookVaryEl.checked;
     const base = buildOpts(state);
+    const comps = allowedCompositions();
+    // «Lo más vendido»: composiciones, estilos, marcos y pétalos con los pesos del perfil
+    const prof = vary && bestSeller() ? bestSellerProfile(state.preset) : null;
     // Plan de todo el libro antes de dibujar: sin rachas de estilos ni encuadres repetidos
     const plan = planBook({
       count, seed: baseSeed,
-      styles: vary ? undefined : [state.styleMode],
-      compositions: vary && isClassic ? undefined : [state.composition || "centro"],
-      // "centro" sigue siendo el encuadre más frecuente: es el que más se colorea
-      compositionWeights: vary && isClassic ? [3, 2, 2, 1, 1, 1] : null,
-      frames: vary && isClassic ? undefined : [state.frameStyle || "redondeado"],
+      styles: vary ? prof?.styles : [state.styleMode],
+      styleWeights: prof?.styleWeights ?? null,
+      petals: prof?.petals,
+      compositions: vary && isClassic ? comps : [state.composition || "centro"],
+      compositionWeights: vary && isClassic ? (prof && isClassic ? prof.compositionWeights : comps.map(c => COMP_WEIGHTS[c] ?? 1)) : null,
+      frames: vary && isClassic ? prof?.frames : [state.frameStyle || "redondeado"],
+      frameWeights: vary && isClassic ? prof?.frameWeights ?? null : null,
       difficulty: bookDifficultyEl?.value || "mixta",
       baseComplexity: base.complexity,
       images: chosen.length,
     });
+    const overrides = currentOverrides();
+    // Registro de fuentes: qué imagen va en qué página (trazabilidad de derechos)
+    const sourceLog = [];
 
     const makeOpts = (i) => {
       const pg = plan[i];
+      const ov = overrides.get(i);
+      // «Otro diseño» desplaza la semilla de esa página sin tocar las demás
+      const seed = ov?.bump ? ((pg.seed + 0x9E3779B1 * ov.bump) >>> 0) : pg.seed;
       // Mismo redondeo de pétalos que la vista previa en calidad alta (WYSIWYG)
-      const o = { ...base, seed: pg.seed, complexity: pg.complexity,
+      const o = { ...base, seed, complexity: pg.complexity,
         petals: vary ? pg.petals : Math.max(6, Math.round(state.petals / 2) * 2) };
       if (vary) o.styleMode = pg.styleMode;
       if (state.generatorType === "radial") {
@@ -1779,18 +1807,126 @@ function bindUI() {
           spiroR: 60, spiror: 25, spiroDistance: 30, spiroResolution: 500, spiroMode: "hypo" };
       }
       if (isClassic) {
-        o.composition = pg.composition;
+        o.composition = ov?.composition || pg.composition;
         o.frameStyle = pg.frameStyle;
         // Cada imagen elegida aparece una vez, con el uso que se le asignó a mano;
         // el resto de páginas son mandalas sin imagen
         const entry = pg.centerArt ? chosen[pg.centerArt.imageIndex] : null;
         Object.assign(o, resolveUserImage(state, entry));
-        sourceLog[i] = { mandala: i + 1, composition: entry ? entry.use : pg.composition, style: o.styleMode, image: entry ? entry.name : "", source: entry ? entry.source : "" };
+        sourceLog[i] = { mandala: i + 1, composition: entry ? entry.use : o.composition, style: o.styleMode, image: entry ? entry.name : "", source: entry ? entry.source : "" };
         return o;
       }
       return { ...o, imagePoints: currentImagePoints, imageScale: state.imageScale,
         imageIntensity: state.imageIntensity, imageMirror: state.imageMirror };
     };
+    return { count, baseSeed, plan, makeOpts, sourceLog, isClassic, comps, generatorFn: getGeneratorFn(state.generatorType) };
+  };
+
+  // ---------- Revisión de páginas ----------
+  const reviewDialog = document.getElementById("reviewDialog");
+  const reviewGrid = document.getElementById("reviewGrid");
+  const reviewInfo = document.getElementById("bookReviewInfo");
+  const COMP_NAMES = { centro: "Centrado", fondo: "Fondo decorado", constelacion: "Constelación", esquinas: "Esquinas", gigante: "Gigante", medio: "Medio mandala", figura: "Figura", anillos: "Anillos", medallon: "Medallón" };
+  const STYLE_NAMES = { sashiko: "Sashiko", floral: "Floral", geometric: "Geométrico", islamico: "Islámico", azteca: "Azteca", yantra: "Yantra", celtico: "Céltico" };
+  let reviewToken = 0;
+
+  const updateReviewInfo = () => {
+    if (!reviewInfo) return;
+    const n = currentOverrides().size;
+    reviewInfo.textContent = n ? `✏️ ${n} página(s) cambiada(s) a mano: se usarán al crear el libro.` : "";
+  };
+
+  const pageSvg = (book, i) => {
+    const o = book.makeOpts(i);
+    const doc = createDoc({ preset: state.preset, seed: o.seed, marginMm: bookMargin(bookPageCount(bookLayoutOpts())) });
+    book.generatorFn(doc, o);
+    return { svg: renderDocToSvgString(doc).replace(/width="[^"]+mm" height="[^"]+mm"/, ""), opts: o };
+  };
+
+  const fillCard = (card, book, i) => {
+    const { svg, opts } = pageSvg(book, i);
+    const changed = currentOverrides().has(i);
+    card.classList.toggle("changed", changed);
+    card.querySelector(".thumb").innerHTML = svg;
+    card.querySelector(".meta").textContent =
+      `${i + 1} · ${COMP_NAMES[opts.figure ? "figura" : opts.figureRing ? "anillos" : opts.composition] || opts.composition || ""} · ${STYLE_NAMES[opts.styleMode] || opts.styleMode || ""}`;
+  };
+
+  const openReview = async () => {
+    const token = ++reviewToken;
+    const book = buildBook();
+    reviewGrid.innerHTML = "";
+    reviewDialog.show();
+    for (let i = 0; i < book.count; i++) {
+      const card = document.createElement("div");
+      card.className = "review-card";
+      card.innerHTML = `<div class="thumb"><sl-spinner></sl-spinner></div><div class="meta"></div>
+        <div class="actions"><sl-button size="small" variant="danger" outline data-act="seed"><sl-icon slot="prefix" name="trash"></sl-icon>Borrar y crear otro</sl-button>${book.isClassic && bookVaryEl.checked ? '<sl-button size="small" data-act="comp">Otro encuadre</sl-button>' : ""}</div>`;
+      card.addEventListener("click", (e) => {
+        const act = e.target.closest("sl-button")?.dataset.act;
+        if (!act) return;
+        const ov = { ...(currentOverrides().get(i) || {}) };
+        if (act === "seed") ov.bump = (ov.bump || 0) + 1;
+        if (act === "comp") {
+          const b = buildBook();
+          const cur = b.makeOpts(i).composition;
+          const list = b.comps.length > 1 ? b.comps : Object.keys(COMP_WEIGHTS);
+          ov.composition = list[(list.indexOf(cur) + 1) % list.length];
+        }
+        currentOverrides().set(i, ov);
+        // El reemplazo se dibuja en el acto, en el mismo lugar del libro
+        fillCard(card, buildBook(), i);
+        card.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 350 });
+        updateReviewInfo();
+      });
+      reviewGrid.appendChild(card);
+    }
+    // Miniaturas una a una: la ventana sigue respondiendo mientras se dibujan
+    const cards = [...reviewGrid.children];
+    for (let i = 0; i < cards.length; i++) {
+      if (token !== reviewToken) return;
+      await new Promise(r => setTimeout(r, 0));
+      try { fillCard(cards[i], book, i); } catch (err) { console.error("Miniatura", i, err); }
+    }
+  };
+
+  const reviewBtn = document.getElementById("reviewBook");
+  if (reviewBtn && reviewDialog) {
+    reviewBtn.addEventListener("click", openReview);
+    document.getElementById("reviewClose")?.addEventListener("click", () => reviewDialog.hide());
+    document.getElementById("reviewReset")?.addEventListener("click", () => {
+      bookOverrides = new Map();
+      updateReviewInfo();
+      openReview();
+    });
+    document.getElementById("reviewCreate")?.addEventListener("click", () => { reviewDialog.hide(); downloadBook(); });
+    reviewDialog.addEventListener("sl-after-hide", (e) => { if (e.target === reviewDialog) reviewToken++; });
+  }
+  // Cambiar el número de páginas o las composiciones permitidas rehace el plan
+  const syncProfileUI = () => {
+    const rent = bestSeller();
+    const box = document.getElementById("bookCompBox");
+    if (box) box.classList.toggle("hidden-by-profile", rent);
+    const info = document.getElementById("bookProfileInfo");
+    if (info) info.textContent = rent
+      ? (/8_5x8_5/.test(state.preset)
+          ? "Cuadrado 8.5×8.5: sobre todo mandalas grandes centrados a página completa; pocos fondos decorados; sin medios mandalas. 12–24 pétalos, floral y geométrico primero."
+          : "Mandalas grandes centrados como base, con algunas páginas decoradas para variar; sin medios mandalas. 12–24 pétalos, floral y geométrico primero.")
+      : "";
+  };
+  bookProfileEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); syncProfileUI(); });
+  presetEl.addEventListener("sl-change", syncProfileUI);
+  syncProfileUI();
+  document.querySelectorAll(".bookComp").forEach(b => b.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); }));
+  bookVaryEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateGeneratorUI(); });
+  bookDifficultyEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); });
+
+  const downloadBook = async () => {
+    const layoutOpts = bookLayoutOpts();
+    const total = bookPageCount(layoutOpts);
+    if (total < 24 && !confirm(`El libro tendría ${total} páginas y KDP exige mínimo 24. ¿Crear de todos modos?`)) return;
+    const marginMm = bookMargin(total);
+    const { count, baseSeed, makeOpts, sourceLog, generatorFn } = buildBook();
 
     bookBtn.loading = true;
     bookBtn.disabled = true;

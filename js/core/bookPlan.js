@@ -11,6 +11,29 @@ export const BOOK_COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas",
 export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno"];
 export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 
+/**
+ * Perfil «lo que más se vende» para un formato. NO sale de datos de ventas (no los
+ * tenemos): resume las convenciones de los libros de mandalas mejor posicionados en
+ * Amazon. Un mandala grande y centrado por página, una sola cara, simetría alta
+ * (12–24 pétalos), estilos florales y geométricos por delante y sin marcos pesados.
+ * Los encuadres que dejan el mandala a medias (medio mandala) desaparecen; los
+ * decorativos aparecen sólo como variación ocasional.
+ */
+export function bestSellerProfile(preset = "KDP_8_5x8_5") {
+  const square = /8_5x8_5/.test(preset);
+  // Hoja cuadrada: el disco ocupa toda la página y el centrado domina aún más
+  const comps = square
+    ? { centro: 6, fondo: 2, gigante: 1, constelacion: 1 }
+    : { centro: 5, fondo: 2, constelacion: 2, esquinas: 1, gigante: 1 };
+  const styles = { floral: 3, geometric: 2, islamico: 2, yantra: 2, sashiko: 1, celtico: 1, azteca: 1 };
+  return {
+    compositions: Object.keys(comps), compositionWeights: Object.values(comps),
+    styles: Object.keys(styles), styleWeights: Object.values(styles),
+    frames: ["ninguno", "redondeado"], frameWeights: [3, 1],
+    petals: [12, 16, 18, 20, 24],
+  };
+}
+
 function shuffled(rng, arr) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
@@ -56,13 +79,13 @@ export function planBook(opts) {
     count, seed = 1,
     styles = BOOK_STYLES, compositions = BOOK_COMPOSITIONS, frames = BOOK_FRAMES,
     compositionWeights = null, difficulty = "mixta", baseComplexity = 130,
-    images = 0,
+    images = 0, styleWeights = null, frameWeights = null, petals = BOOK_PETALS,
   } = opts;
   const rng = mulberry32(((seed >>> 0) ^ 0xB00C5EED) >>> 0);
-  const nextStyle = shuffleBag(rng, styles);
+  const nextStyle = shuffleBag(rng, styles, styleWeights);
   const nextComp = shuffleBag(rng, compositions, compositionWeights);
-  const nextFrame = shuffleBag(rng, frames);
-  const nextPetals = shuffleBag(rng, BOOK_PETALS);
+  const nextFrame = shuffleBag(rng, frames, frameWeights);
+  const nextPetals = shuffleBag(rng, petals);
 
   // Páginas con imagen: espaciadas de forma uniforme (k + ½) · count / images
   const imageAt = new Map();

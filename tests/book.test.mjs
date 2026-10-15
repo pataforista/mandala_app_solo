@@ -7,7 +7,7 @@ import { createDoc } from "../js/core/svgDoc.js";
 import { renderDocToSvgString } from "../js/core/svgRender.js";
 import { generateMandalaClassic } from "../js/generators/mandalaClassic.js";
 import { COMPOSITIONS, FRAME_STYLES } from "../js/generators/pageComposer.js";
-import { planBook, shuffleBag, BOOK_STYLES } from "../js/core/bookPlan.js";
+import { planBook, shuffleBag, BOOK_STYLES, bestSellerProfile } from "../js/core/bookPlan.js";
 import { kdpGutterMm, kdpSafeMarginMm, bookLayout, kdpChecklist } from "../js/core/kdp.js";
 import { encodeGrayPng, rgbaToGray } from "../js/core/grayPng.js";
 import { stampRaster } from "../js/core/lineArt.js";
@@ -296,4 +296,95 @@ test("lista de verificación: fondo rectangular, derechos y alternativas", async
   assert.ok(small.ready && small.checks.some(c => c.level === "warn" && c.tools.some(t => t.name === "Upscayl")));
   // Sin uso elegido nunca está lista (nada entra al libro por defecto)
   assert.ok(!checkFigure(mk("ellipse"), "ninguno", meta).ready);
+});
+
+// Áreas de cada subtrayecto cerrado (curvas muestreadas, fórmula del cordón)
+function closedAreas(svgParts) {
+  const areas = [];
+  for (const f of svgParts) for (const m of f.matchAll(/ d="([^"]+)"/g)) {
+    const t = m[1].trim().split(/\s+/);
+    let i = 0, pts = [], cx = 0, cy = 0;
+    const n = () => parseFloat(t[i++]);
+    const flush = (closed) => {
+      if (closed && pts.length > 2) {
+        let a = 0;
+        for (let k = 0; k < pts.length; k++) { const [x0, y0] = pts[k], [x1, y1] = pts[(k + 1) % pts.length]; a += x0 * y1 - x1 * y0; }
+        areas.push(Math.abs(a) / 2);
+      }
+      pts = [];
+    };
+    while (i < t.length) {
+      const c = t[i++];
+      if (c === "M") { flush(false); cx = n(); cy = n(); pts.push([cx, cy]); }
+      else if (c === "L") { cx = n(); cy = n(); pts.push([cx, cy]); }
+      else if (c === "Q" || c === "C") {
+        const ctrl = [[cx, cy]];
+        for (let k = 0; k < (c === "Q" ? 2 : 3); k++) ctrl.push([n(), n()]);
+        for (let s = 1; s <= 12; s++) {
+          let p = ctrl.map(q => q.slice());
+          const u = s / 12;
+          while (p.length > 1) p = p.slice(1).map((q, j) => [p[j][0] + (q[0] - p[j][0]) * u, p[j][1] + (q[1] - p[j][1]) * u]);
+          pts.push(p[0]);
+        }
+        [cx, cy] = ctrl[ctrl.length - 1];
+      } else if (c === "Z") flush(true);
+    }
+  }
+  return areas;
+}
+
+test("gigante: el mandala cubre toda la hoja (sin pétalos apenas recortados ni esquinas vacías)", () => {
+  for (const preset of ["KDP_8_5x8_5", "KDP_8_5x11", "KDP_6x9"]) {
+    for (let seed = 1; seed <= 6; seed++) {
+      const doc = createDoc({ preset, seed, marginMm: 12 });
+      generateMandalaClassic(doc, { ...BASE, seed, composition: "gigante", frameStyle: "ninguno" });
+      // Lo dibujado (antes del recorte) desborda la página por los cuatro lados
+      const b = bbox(doc.body), { wMm, hMm } = doc.page;
+      assert.ok(b.x0 < 0 && b.y0 < 0 && b.x1 > wMm && b.y1 > hMm, `${preset} semilla ${seed}: ${JSON.stringify(b)}`);
+    }
+  }
+});
+
+test("recortes sin marco: una línea cierra las celdas cortadas por el borde", () => {
+  for (const composition of ["gigante", "esquinas", "medio"]) {
+    const doc = createDoc({ preset: "KDP_8_5x8_5", seed: 3, marginMm: 12 });
+    generateMandalaClassic(doc, { ...BASE, seed: 3, composition, frameStyle: "ninguno" });
+    const after = doc.body.slice(doc.body.lastIndexOf("</g>") + 1).join("");
+    assert.match(after, /<path[^>]+d="M [\d.]+ [\d.]+ L [\d.]+ [\d.]+ L [\d.]+ [\d.]+ L [\d.]+ [\d.]+ Z"/, composition);
+  }
+});
+
+test("medio mandala: cabe a lo ancho, sólo lo corta la línea de base", () => {
+  for (const preset of ["KDP_8_5x8_5", "KDP_8_5x11", "KDP_6x9"]) {
+    const doc = createDoc({ preset, seed: 5, marginMm: 12 });
+    generateMandalaClassic(doc, { ...BASE, seed: 5, composition: "medio", frameStyle: "redondeado" });
+    // El disco principal es el último bloque de contenido dentro del recorte
+    const inner = doc.body.slice(doc.body.findIndex(s => s.startsWith("<g clip-path")) + 1, doc.body.lastIndexOf("</g>"));
+    const b = bbox(inner.slice(-40));
+    assert.ok(b.x0 >= 12 && b.x1 <= doc.page.wMm - 12, `${preset}: ${JSON.stringify(b)}`);
+  }
+});
+
+test("mini mandalas: sin celdas diminutas que se impriman como manchas negras", () => {
+  for (const petals of [8, 12, 16, 24]) {
+    for (let seed = 1; seed <= 8; seed++) {
+      const doc = createDoc({ preset: "KDP_8_5x8_5", seed, marginMm: 12 });
+      generateMandalaClassic(doc, { ...BASE, seed, petals, center: { x: 60, y: 60 }, radius: 15,
+        maxBands: 2, outlineMode: true, pageBorder: false, includeFrames: false, complexity: 20, detailSimplification: 0.7 });
+      const small = closedAreas(doc.body).filter(a => a < 1.2);
+      assert.equal(small.length, 0, `pétalos ${petals} semilla ${seed}: ${small.length} celdas < 1.2 mm² (${small.slice(0, 4).map(a => a.toFixed(2))})`);
+    }
+  }
+});
+
+test("perfil «más vendidos»: centrado domina, sin medios mandalas, simetría alta", () => {
+  for (const preset of ["KDP_8_5x8_5", "KDP_8_5x11"]) {
+    const prof = bestSellerProfile(preset);
+    const plan = planBook({ count: 60, seed: 42, ...prof });
+    const n = (c) => plan.filter(p => p.composition === c).length;
+    assert.equal(n("medio"), 0, preset);
+    assert.ok(n("centro") >= 0.45 * plan.length, `${preset}: centrado ${n("centro")}/60`);
+    assert.ok(plan.every(p => p.petals >= 12), preset);
+    assert.ok(plan.filter(p => p.styleMode === "floral").length > plan.filter(p => p.styleMode === "azteca").length, preset);
+  }
 });
