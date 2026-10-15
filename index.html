@@ -471,11 +471,10 @@
             </div>
             <div id="medallionList" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
             <sl-button id="figurePackExport" variant="text" size="small">Guardar mis imágenes procesadas (paquete .json)</sl-button>
-            <sl-select id="centerArt" label="Uso en la página" size="small" value="ninguno">
-              <sl-option value="ninguno">No usar</sl-option>
-              <sl-option value="figura">Figura grande rellena de mandalas</sl-option>
-              <sl-option value="medallon">Dentro del medallón central del mandala</sl-option>
-            </sl-select>
+            <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 0;">
+              Nada se aplica solo: bajo cada imagen elige su uso (figura rellena, anillos o medallón).
+              Clic en la miniatura para verla en la vista previa. Sólo las imágenes con uso elegido entran al libro.
+            </p>
             <sl-checkbox id="figureFillInside" checked>Rellenar el interior con mandalas</sl-checkbox>
             <sl-checkbox id="figureFillOutside" checked>Decorar el fondo alrededor</sl-checkbox>
             <sl-range id="figureDensity" label="Densidad del relleno (menos = más fácil de colorear)" min="0" max="1" step="0.05" value="0.3"></sl-range>
@@ -548,16 +547,7 @@
           <sl-option value="progresiva">Progresiva (de fácil a difícil)</sl-option>
           <sl-option value="fija">Fija (la complejidad actual)</sl-option>
         </sl-select>
-        <sl-select id="bookCharacters" label="Mis imágenes en el libro" size="small" value="ninguno">
-          <sl-option value="ninguno">No usar</sl-option>
-          <sl-option value="figuras">Como figuras rellenas de mandalas (rotan)</sl-option>
-          <sl-option value="medallon">Dentro del medallón (rotan)</sl-option>
-        </sl-select>
-        <sl-select id="bookCharacterEvery" label="Páginas con imagen" size="small" value="1">
-          <sl-option value="1">Todas</sl-option>
-          <sl-option value="2">Una de cada dos (alterna con mandalas)</sl-option>
-          <sl-option value="3">Una de cada tres</sl-option>
-        </sl-select>
+        <p id="bookImagesInfo" style="font-size: 0.75rem; color: var(--m3-on-surface-variant); margin: 0;"></p>
         <sl-checkbox id="bookBlankBack" checked>Página en blanco al reverso (evita que el marcador traspase)</sl-checkbox>
         <sl-checkbox id="bookTitlePage" checked>Incluir hoja de título</sl-checkbox>
         <sl-checkbox id="bookCopyright" checked>Incluir página de derechos de autor</sl-checkbox>

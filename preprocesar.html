@@ -52,6 +52,7 @@
   <header>
     <h1>Preprocesar figuras</h1>
     <p>Convierte caricaturas, grabados o pinturas en figuras limpias —sin fondo, sin texto y con pocos detalles— listas para rellenar con mandalas. Todo ocurre en tu navegador: las imágenes no se suben a ningún servidor.
+      Elige a mano el uso de cada imagen (figura rellena, anillos o medallón); las que dejes en «No usar todavía» no entran al libro.
       Al terminar, exporta el paquete e impórtalo en <a href="index.html">Mandala Studio</a> → «Mis imágenes» → «Importar paquete».</p>
   </header>
   <main>
@@ -183,6 +184,14 @@
         <p class="hint">Haz clic sobre el fondo que quieras borrar (puntos rojos). El recorte se ve sombreado.</p>
         <label>Simplificar <input type="range" class="simp" min="0" max="1" step="0.05" /></label>
         <label>Tolerancia del fondo <input type="range" class="tol" min="8" max="60" /></label>
+        <label>Uso en el libro (se elige a mano)
+          <select class="use">
+            <option value="ninguno">No usar todavía</option>
+            <option value="figura">Figura rellena de mandalas</option>
+            <option value="anillos">Anillos alrededor de un mandala</option>
+            <option value="medallon">Medallón central</option>
+          </select>
+        </label>
         <label>Tipo de imagen
           <select class="mode">
             <option value="colores">Colores planos</option>
@@ -216,6 +225,9 @@
       simp.value = it.settings.simplify; tol.value = it.settings.bgTol;
       simp.onchange = () => { it.settings = { ...it.settings, simplify: +simp.value }; process(it); };
       tol.onchange = () => { it.settings = { ...it.settings, bgTol: +tol.value }; process(it); };
+      const useSel = card.querySelector(".use");
+      useSel.value = it.use;
+      useSel.onchange = () => { it.use = useSel.value; };
       const modeSel = card.querySelector(".mode");
       modeSel.value = it.settings.mode;
       modeSel.onchange = () => { it.settings = { ...it.settings, mode: modeSel.value }; process(it); };
@@ -238,7 +250,7 @@
         if (!file.type.startsWith("image/")) continue;
         try {
           const img = await loadImageFile(file);
-          const it = { name: file.name, img, url: URL.createObjectURL(file), settings: settingsFromUI(), crop: {}, seeds: [], fig: null };
+          const it = { name: file.name, img, url: URL.createObjectURL(file), settings: settingsFromUI(), crop: {}, seeds: [], use: "ninguno", fig: null };
           items.push(it);
           makeCard(it);
           await process(it);
@@ -275,7 +287,7 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     };
     $("exportPack").onclick = () => {
-      const figs = items.filter(it => it.fig).map(it => ({ name: it.name, ...it.fig }));
+      const figs = items.filter(it => it.fig).map(it => ({ name: it.name, use: it.use, ...it.fig }));
       save(new Blob([JSON.stringify(packFigures(figs))], { type: "application/json" }), "figuras.json");
       setStatus(`Paquete con ${figs.length} figura(s) exportado.`);
     };

@@ -12,8 +12,8 @@ import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
 import { planBook } from "./core/bookPlan.js";
-import { kdpSafeMarginMm, kdpChecklist } from "./core/kdp.js";
-import { loadImageFile, figureFromImage } from "./core/figureImport.js";
+import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
+import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
 
 const historyMan = new StateHistory();
@@ -437,13 +437,25 @@ function buildOpts(s) {
   };
 }
 
-// Imagen del usuario: figura grande rellena de mandalas, o dentro del medallón
-function resolveUserImage(s, fig = userFigures[activeFigure]?.fig) {
-  const out = { figure: null, centerArt: null,
+const FIGURE_USES = [
+  ["ninguno", "No usar"],
+  ["figura", "Figura rellena de mandalas"],
+  ["anillos", "Anillos alrededor de un mandala"],
+  ["medallon", "Medallón central"],
+];
+
+// Imagen del usuario según el uso que ELIGIÓ para ella (nada es automático):
+// figura rellena, anillos de copias alrededor de un mandala o medallón central.
+// La vista previa usa la imagen seleccionada (borde morado) con su uso.
+function resolveUserImage(s, entry = userFigures[activeFigure]) {
+  const out = { figure: null, centerArt: null, figureRing: null,
     figureDensity: s.figureDensity, figureFillInside: s.figureFillInside, figureFillOutside: s.figureFillOutside };
-  if (!fig) return out;
-  if (s.centerArt === "figura") out.figure = fig;
-  else if (s.centerArt === "medallon") out.centerArt = { type: "image", href: fig.href, scale: s.centerArtScale };
+  const fig = entry?.fig;
+  if (!fig || !entry.use || entry.use === "ninguno") return out;
+  const stamp = fig.stampHref || fig.href;
+  if (entry.use === "figura") out.figure = fig;
+  else if (entry.use === "anillos") out.figureRing = { href: stamp, centerHref: stamp, w: fig.w, h: fig.h };
+  else if (entry.use === "medallon") out.centerArt = { type: "image", href: stamp, scale: s.centerArtScale };
   return out;
 }
 
@@ -799,24 +811,29 @@ function renderFigureList() {
   list.innerHTML = "";
   userFigures.forEach((m, i) => {
     const wrap = document.createElement("div");
-    wrap.style.cssText = "position:relative;";
+    wrap.style.cssText = "position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:96px;";
     const thumb = document.createElement("img");
     thumb.src = m.fig.href;
-    thumb.title = `${m.name} — clic para usarla en la vista previa`;
+    thumb.title = `${m.name} — clic para verla en la vista previa`;
     thumb.style.cssText = `width:52px;height:52px;border-radius:8px;object-fit:contain;background:#fff;cursor:pointer;border:2px solid ${i === activeFigure ? "var(--m3-primary, #6750a4)" : "#ccc"};`;
     thumb.onclick = () => { activeFigure = i; renderFigureList(); update(); };
     const del = document.createElement("button");
     del.textContent = "×";
     del.title = "Quitar";
-    del.style.cssText = "position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;border:none;background:#b3261e;color:#fff;font-size:12px;line-height:18px;padding:0;cursor:pointer;";
+    del.style.cssText = "position:absolute;top:-6px;right:16px;width:18px;height:18px;border-radius:50%;border:none;background:#b3261e;color:#fff;font-size:12px;line-height:18px;padding:0;cursor:pointer;";
     del.onclick = () => {
       userFigures.splice(i, 1);
       activeFigure = Math.min(activeFigure, Math.max(0, userFigures.length - 1));
-      if (!userFigures.length) { state.centerArt = "ninguno"; if (centerArtEl) centerArtEl.value = "ninguno"; }
       renderFigureList();
       update();
     };
-    wrap.append(thumb, del);
+    // Uso elegido a mano para esta imagen (también decide si entra en el libro)
+    const sel = document.createElement("select");
+    sel.title = "Uso de esta imagen";
+    sel.style.cssText = "width:96px;font-size:11px;padding:2px;border-radius:6px;";
+    for (const [v, t] of FIGURE_USES) sel.add(new Option(t, v, false, (m.use || "ninguno") === v));
+    sel.onchange = () => { m.use = sel.value; activeFigure = i; renderFigureList(); update(); document.dispatchEvent(new Event("figures-changed")); };
+    wrap.append(thumb, del, sel);
     list.appendChild(wrap);
   });
 }
@@ -1267,10 +1284,12 @@ function bindUI() {
   const figUploadBtn = document.getElementById("medallionUploadBtn");
   const packUploadEl = document.getElementById("figurePackUpload");
   const packBtn = document.getElementById("figurePackBtn");
+  // Subir o importar NO cambia la página: cada imagen entra como "No usar" hasta que
+  // se elige su uso a mano (un paquete conserva el uso elegido en preprocesar.html)
   const useFigures = () => {
-    if (state.centerArt === "ninguno") { state.centerArt = "figura"; if (centerArtEl) centerArtEl.value = "figura"; }
     renderFigureList();
     updateImmediate();
+    document.dispatchEvent(new Event("figures-changed"));
   };
   if (figUploadBtn && figUploadEl) {
     figUploadBtn.onclick = () => figUploadEl.click();
@@ -1281,7 +1300,7 @@ function bindUI() {
       try {
         for (const file of files) {
           const img = await loadImageFile(file);
-          userFigures.push({ name: file.name, img, fig: await figureFromImage(img, figureSettings()) });
+          userFigures.push({ name: file.name, img, use: "ninguno", fig: await figureFromImage(img, figureSettings()) });
         }
         activeFigure = userFigures.length - 1;
         useFigures();
@@ -1301,7 +1320,7 @@ function bindUI() {
       if (!file) return;
       try {
         const figs = unpackFigures(await file.text());
-        for (const f of figs) userFigures.push({ name: f.name, img: null, fig: f });
+        for (const f of figs) userFigures.push({ name: f.name, img: null, use: f.use || "ninguno", fig: await withStamp(f) });
         activeFigure = Math.max(0, userFigures.length - figs.length);
         useFigures();
       } catch (err) {
@@ -1318,6 +1337,7 @@ function bindUI() {
     clearTimeout(figTimer);
     figTimer = setTimeout(async () => {
       for (const m of userFigures) if (m.img) m.fig = await figureFromImage(m.img, figureSettings());
+      document.dispatchEvent(new Event("figures-changed"));
       renderFigureList();
       update();
     }, 300);
@@ -1335,7 +1355,7 @@ function bindUI() {
   const exportPackBtn = document.getElementById("figurePackExport");
   if (exportPackBtn) exportPackBtn.onclick = () => {
     if (!userFigures.length) return;
-    downloadTextFile("figuras.json", JSON.stringify(packFigures(userFigures.map(m => ({ name: m.name, ...m.fig })))));
+    downloadTextFile("figuras.json", JSON.stringify(packFigures(userFigures.map(m => ({ name: m.name, use: m.use, ...m.fig })))));
   };
   imageUploadEl.onchange = (e) => {
     const file = e.target.files[0];
@@ -1642,8 +1662,8 @@ function bindUI() {
   const bookAuthorEl = document.getElementById("bookAuthor");
   const bookVaryEl = document.getElementById("bookVary");
   const bookDifficultyEl = document.getElementById("bookDifficulty");
-  const bookCharactersEl = document.getElementById("bookCharacters");
-  const bookCharacterEveryEl = document.getElementById("bookCharacterEvery");
+  // Sólo las imágenes a las que el usuario les asignó un uso, en el orden de la lista
+  const chosenFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno");
   const bookBlankBackEl = document.getElementById("bookBlankBack");
   const bookTitlePageEl = document.getElementById("bookTitlePage");
   const bookCopyrightEl = document.getElementById("bookCopyright");
@@ -1672,9 +1692,14 @@ function bindUI() {
     bookSummaryEl.innerHTML =
       `${total} páginas · ${wMm}×${hMm} mm · margen ${margin.toFixed(1)} mm<br>` +
       (bad.length ? bad.map(c => `⚠️ ${c.msg}`).join("<br>") : "✅ Cumple los requisitos de interior de KDP (sin sangrado).");
-    if (bookCharactersEl?.value !== "ninguno" && !userFigures.length) {
-      bookSummaryEl.innerHTML += "<br>⚠️ Sube imágenes en «Mis imágenes» para usarlas en el libro.";
+    const chosen = chosenFigures();
+    const info = document.getElementById("bookImagesInfo");
+    if (info) {
+      info.innerHTML = chosen.length
+        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano: ` + chosen.map(m => `${m.name} (${FIGURE_USES.find(u => u[0] === m.use)[1].toLowerCase()})`).join(", ")
+        : "Ninguna imagen elegida: el libro será sólo de mandalas. Para incluir una, elige su uso en «Mis imágenes».";
     }
+    if (chosen.length > bookCount()) bookSummaryEl.innerHTML += `<br>⚠️ Hay ${chosen.length} imágenes elegidas y sólo ${bookCount()} páginas: sobran ${chosen.length - bookCount()}.`;
   };
 
   const downloadBook = async () => {
@@ -1687,11 +1712,9 @@ function bindUI() {
     const baseSeed = state.seed >>> 0;
     const generatorFn = getGeneratorFn(state.generatorType);
     const isClassic = state.generatorType === "classic";
-    const characters = bookCharactersEl?.value || "ninguno";
-    if (characters !== "ninguno" && !userFigures.length) {
-      alert("Sube primero tus imágenes en «Mis imágenes».");
-      return;
-    }
+    const chosen = isClassic ? chosenFigures() : [];
+    // Registro de fuentes: qué imagen va en qué página (trazabilidad de derechos)
+    const sourceLog = [];
     const vary = bookVaryEl.checked;
     const base = buildOpts(state);
     // Plan de todo el libro antes de dibujar: sin rachas de estilos ni encuadres repetidos
@@ -1704,8 +1727,7 @@ function bindUI() {
       frames: vary && isClassic ? undefined : [state.frameStyle || "redondeado"],
       difficulty: bookDifficultyEl?.value || "mixta",
       baseComplexity: base.complexity,
-      images: isClassic && characters !== "ninguno" ? userFigures.length : 0,
-      imageEvery: parseInt(bookCharacterEveryEl?.value, 10) || 1,
+      images: chosen.length,
     });
 
     const makeOpts = (i) => {
@@ -1721,11 +1743,11 @@ function bindUI() {
       if (isClassic) {
         o.composition = pg.composition;
         o.frameStyle = pg.frameStyle;
-        if (characters !== "ninguno") {
-          // Las imágenes rotan; las páginas sin imagen son mandalas normales
-          const fig = pg.centerArt ? userFigures[pg.centerArt.imageIndex].fig : null;
-          Object.assign(o, resolveUserImage({ ...state, centerArt: fig ? (characters === "figuras" ? "figura" : "medallon") : "ninguno" }, fig));
-        }
+        // Cada imagen elegida aparece una vez, con el uso que se le asignó a mano;
+        // el resto de páginas son mandalas sin imagen
+        const entry = pg.centerArt ? chosen[pg.centerArt.imageIndex] : null;
+        Object.assign(o, resolveUserImage(state, entry));
+        sourceLog[i] = { mandala: i + 1, composition: entry ? entry.use : pg.composition, style: o.styleMode, image: entry ? entry.name : "" };
         return o;
       }
       return { ...o, imagePoints: currentImagePoints, imageScale: state.imageScale,
@@ -1759,6 +1781,19 @@ function bindUI() {
           }
         },
       });
+      // Registro de fuentes (CSV) junto al PDF, si el libro lleva imágenes del usuario
+      if (sourceLog.some(r => r && r.image)) {
+        const layout = bookLayout({ ...layoutOpts, mandalas: count + (layoutOpts.colorTest ? 1 : 0) });
+        const off = layoutOpts.colorTest ? 1 : 0;
+        const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const rows = [["pagina_pdf", "mandala", "composicion_o_uso", "estilo", "imagen_origen"].join(",")];
+        sourceLog.forEach((r, i) => {
+          if (!r) return;
+          const page = layout.findIndex(p => p.kind === "mandala" && p.index === i + off) + 1;
+          rows.push([page, r.mandala, q(r.composition), q(r.style), q(r.image)].join(","));
+        });
+        downloadTextFile(filename.replace(/\.pdf$/, "_registro_fuentes.csv"), rows.join("\n"));
+      }
       alert(`✅ Libro creado (${total} páginas, margen ${marginMm.toFixed(1)} mm). ` +
         "En KDP elige: tinta negra, papel blanco, sin sangrado, y el mismo tamaño de corte.");
     } catch (error) {
@@ -1773,7 +1808,8 @@ function bindUI() {
 
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
-    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, bookCharactersEl, presetEl].forEach(el =>
+    document.addEventListener("figures-changed", updateBookSummary);
+    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     updateBookSummary();

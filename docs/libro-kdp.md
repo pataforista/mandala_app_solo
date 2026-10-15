@@ -12,7 +12,7 @@ El modo libro planifica ahora cada página antes de dibujarla (`js/core/bookPlan
 | Marco | redondeado, doble con rombos, festón, sin marco | sin repetición consecutiva |
 | Pétalos | 8–24 | bolsa barajada |
 | Dificultad | mixta, progresiva (fácil → difícil), fija | |
-| Mis imágenes | figura rellena de mandalas o medallón; todas / 1 de cada 2 / 1 de cada 3 | rotan en orden |
+| Mis imágenes | uso elegido **a mano** por imagen: figura rellena, anillos o medallón | cada imagen elegida aparece una vez, repartida de forma uniforme |
 
 Misma semilla ⇒ mismo libro (reproducible).
 
@@ -62,6 +62,24 @@ si queda el borde de la foto.
 
 **Qué funciona mejor:** caricaturas con contornos claros y fondo sencillo, grabados e ilustraciones
 de libros antiguos, retratos de animales sobre fondo liso.
+
+### Elección manual y anillos de figuras
+
+Ninguna imagen se integra sola. Al subirla o importarla queda en «No usar»; bajo cada miniatura
+(o en cada tarjeta de `preprocesar.html`) eliges su uso:
+
+| Uso | Resultado | Mejor para |
+|---|---|---|
+| Figura rellena de mandalas | la figura ocupa la página y su interior se llena de mandalas y flores | siluetas grandes y cerradas (caricaturas, animales) |
+| Anillos alrededor de un mandala | 6–12 copias (en espejo alterno) entre bandas de mandala, y la figura entera en el medallón | figuras pequeñas o con poco interior |
+| Medallón central | la figura dentro del círculo central de un mandala clásico | retratos, cabezas |
+
+Las copias de los anillos y el medallón usan una versión «sello» de trazo grueso (≈1,6 % del lado),
+para que sigan siendo coloreables a 25 mm. Idea tomada de `mandalas.py` (estampas en anillos),
+combinada con la limpieza de figuras de la app.
+
+Al crear el libro se descarga también `…_registro_fuentes.csv`: página del PDF, uso, estilo e
+imagen de origen. Guárdalo como prueba de qué obra de dominio público usaste en cada página.
 
 ## 4. Derechos de autor: qué puedes usar para vender
 

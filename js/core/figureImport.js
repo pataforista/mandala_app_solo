@@ -1,7 +1,7 @@
 // js/core/figureImport.js
 // Del archivo de imagen a una figura lista para la página (navegador).
 // Lo comparten la app y preprocesar.html, así ambas dan exactamente el mismo resultado.
-import { processFigure } from "./lineArt.js";
+import { processFigure, stampRaster } from "./lineArt.js";
 import { encodeGrayPng, bytesToDataUrl } from "./grayPng.js";
 
 // Se procesa a tamaño real (sin ampliar): ampliar antes crea rampas suaves en los
@@ -44,5 +44,12 @@ export async function figureFromImage(img, settings = {}, crop = {}, seeds = [])
     .filter(([x, y]) => x >= 0 && y >= 0 && x <= 1 && y <= 1);
   const fig = processFigure(data, w, h, { ...settings, bgSeeds });
   const href = bytesToDataUrl(await encodeGrayPng(fig.gray, fig.w, fig.h));
-  return { href, cls: fig.cls, w: fig.w, h: fig.h };
+  return withStamp({ href, cls: fig.cls, w: fig.w, h: fig.h });
+}
+
+/** Añade fig.stampHref (versión reducida de trazo grueso) si falta. */
+export async function withStamp(fig) {
+  if (fig.stampHref) return fig;
+  const st = stampRaster(fig.cls, fig.w, fig.h);
+  return { ...fig, stampHref: bytesToDataUrl(await encodeGrayPng(st.gray, st.w, st.h)) };
 }

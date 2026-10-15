@@ -35,7 +35,7 @@ export const FILLERS = {
  */
 export function wantsComposition(opts) {
   if (opts._inner || opts.center || opts.centerMm || opts.radius || opts.radiusMm) return false;
-  if (opts.figure) return true;
+  if (opts.figure || opts.figureRing) return true;
   const c = opts.composition ?? "centro";
   const f = opts.frameStyle ?? "redondeado";
   return c !== "centro" || f !== "redondeado";
@@ -133,7 +133,52 @@ export function composePage(doc, opts, drawMandala) {
   let clip = false;
   let fill = null;       // { minis: bool } si la composición rellena el espacio libre
 
-  switch (opts.figure ? "figura" : composition) {
+  switch (opts.figure ? "figura" : opts.figureRing ? "anillos" : composition) {
+    case "anillos": {
+      // Mandala con un anillo de la figura repetida: bandas clásicas por fuera, copias
+      // grandes de la figura en medio (en espejo alterno) y la figura entera en el
+      // medallón. Copias grandes y trazo grueso (versión "sello"): se pueden colorear.
+      const ring = opts.figureRing;
+      const R = maxR * 0.97;
+      const rOut = R * (0.76 + rng() * 0.04), rIn = R * 0.33;
+      content.push(...sub(acx, acy, R, { maxBands: 3, centerArt: null }));
+      const band = new PathBuilder();
+      circle(band, acx, acy, rOut);
+      emitTo(content, band, mainW, "#fff");
+      const inner = new PathBuilder();
+      circle(inner, acx, acy, rOut - Math.max(1.6, (rOut - rIn) * 0.05));
+      emitTo(content, inner, detailW);
+
+      // Tamaño de cada copia: alto radial fijo, cuántas caben sin tocarse
+      const h = (rOut - rIn) * 0.86, rm = (rOut + rIn) / 2;
+      const aspect = ring.w / ring.h;
+      let sw = h * aspect, sh = h;
+      // Pocas copias grandes (6–12) antes que muchas diminutas: tienen que poder colorearse
+      // El espacio se mide en el borde interior del anillo, donde la circunferencia es menor
+      // (en el centro del anillo, las esquinas de copias vecinas se pisarían)
+      const rEdge = rm - sh / 2;
+      let n = Math.floor((TAU * rEdge) / (sw * 1.06));
+      n = Math.max(6, Math.min(12, n - (n % 2)));
+      // Si ni con 6 caben, se reducen hasta caber
+      for (let k = 0; k < 8; k++) {
+        const maxW = (TAU * (rm - sh / 2)) / (n * 1.06);
+        if (sw <= maxW) break;
+        sh *= maxW / sw; sw = maxW;
+      }
+      const mirror = rng() < 0.6;
+      for (let i = 0; i < n; i++) {
+        const a = (360 * i) / n;
+        const x = acx + rm * Math.sin((a * Math.PI) / 180), y = acy - rm * Math.cos((a * Math.PI) / 180);
+        const flip = mirror && i % 2 ? " scale(-1 1)" : "";
+        content.push(`<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${a.toFixed(2)})${flip}"><image href="${ring.href}" x="${(-sw / 2).toFixed(2)}" y="${(-sh / 2).toFixed(2)}" width="${sw.toFixed(2)}" height="${sh.toFixed(2)}" preserveAspectRatio="none" /></g>`);
+      }
+      // Mandala interior con la figura completa en el medallón
+      const ri = rIn - Math.max(1.5, R * 0.02);
+      content.push(...sub(acx, acy, ri, { maxBands: 2, centerArt: ring.centerHref ? { type: "image", href: ring.centerHref, scale: 0.62 } : null }));
+      obstacles.push({ x: acx, y: acy, r: R });
+      fill = { minis: false };
+      break;
+    }
     case "figura": {
       content.push(...drawFigure({
         figure: opts.figure, A, seed, styleMode, outlineMode, stroke, mainW, detailW,
@@ -218,6 +263,11 @@ export function composePage(doc, opts, drawMandala) {
   }
   doc.body.push(...frameItems);
   return doc;
+}
+
+function emitTo(arr, pb, w, fill = "none", stroke = "#000") {
+  const p = pb.toPath({ stroke, strokeWidthMm: w, fill });
+  if (p) arr.push(p);
 }
 
 // ---------- Empaquetado voraz de círculos ----------

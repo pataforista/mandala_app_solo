@@ -488,3 +488,34 @@ export function processFigure(rgba, w, h, opts = {}) {
   }
   return { gray, cls: cc, w: ow, h: oh };
 }
+
+/**
+ * Versión "sello" de una figura para usarla pequeña (anillos, medallón): se reduce a
+ * `long` px de lado y la línea se engruesa a `lineFrac` del lado. Sin esto, una figura
+ * de 3000 px impresa a 25 mm tendría líneas de 0.1 mm, invisibles al colorear.
+ * Parte de cls (0 = tinta), así no hace falta guardar la imagen gris completa.
+ */
+export function stampRaster(cls, w, h, long = 720, lineFrac = 0.016) {
+  const k = long / Math.max(w, h);
+  const sw = Math.max(4, Math.round(w * k)), sh = Math.max(4, Math.round(h * k));
+  const ink = new Uint8Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    const y0 = Math.floor(y / k), y1 = Math.min(h, Math.max(y0 + 1, Math.floor((y + 1) / k)));
+    for (let x = 0; x < sw; x++) {
+      const x0 = Math.floor(x / k), x1 = Math.min(w, Math.max(x0 + 1, Math.floor((x + 1) / k)));
+      // Máximo del bloque: una línea fina nunca desaparece al reducir
+      let hit = 0;
+      for (let yy = y0; yy < y1 && !hit; yy++) for (let xx = x0; xx < x1; xx++) if (cls[yy * w + xx] === 0) { hit = 1; break; }
+      ink[y * sw + x] = hit;
+    }
+  }
+  const r = Math.max(1, (long * lineFrac) / 2);
+  const d = distanceTransform(ink, sw, sh, false);
+  const gray = new Uint8Array(sw * sh);
+  for (let i = 0; i < gray.length; i++) {
+    // Rampa de 1 px en el borde de la línea: antialias sin halo gris
+    const t = Math.max(0, Math.min(1, d[i] - r + 0.5));
+    gray[i] = Math.round(255 * t);
+  }
+  return { gray, w: sw, h: sh };
+}

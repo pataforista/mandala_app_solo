@@ -10,6 +10,7 @@ import { COMPOSITIONS, FRAME_STYLES } from "../js/generators/pageComposer.js";
 import { planBook, shuffleBag, BOOK_STYLES } from "../js/core/bookPlan.js";
 import { kdpGutterMm, kdpSafeMarginMm, bookLayout, kdpChecklist } from "../js/core/kdp.js";
 import { encodeGrayPng, rgbaToGray } from "../js/core/grayPng.js";
+import { stampRaster } from "../js/core/lineArt.js";
 import { imageToLineArt, processFigure } from "../js/core/lineArt.js";
 import { packFigures, unpackFigures } from "../js/core/figurePack.js";
 import { mulberry32 } from "../js/core/prng.js";
@@ -140,20 +141,20 @@ test("bolsa barajada: nunca repite en páginas consecutivas y reparte parejo", (
 });
 
 test("plan de libro: sin estilos ni encuadres repetidos seguidos, reproducible", () => {
-  const plan = planBook({ count: 60, seed: 123, images: 5, imageEvery: 2 });
+  const plan = planBook({ count: 60, seed: 123, images: 5 });
   assert.equal(plan.length, 60);
-  assert.deepEqual(planBook({ count: 60, seed: 123, images: 5, imageEvery: 2 }), plan);
+  assert.deepEqual(planBook({ count: 60, seed: 123, images: 5 }), plan);
   for (let i = 1; i < plan.length; i++) {
     assert.notEqual(plan[i].styleMode, plan[i - 1].styleMode);
     assert.notEqual(plan[i].frameStyle, plan[i - 1].frameStyle);
   }
   assert.equal(new Set(plan.map(p => p.styleMode)).size, BOOK_STYLES.length);
-  // Imagen en una de cada dos, rotando en orden, y nunca en medio mandala
-  plan.filter(p => p.centerArt).forEach((p, k) => assert.equal(p.centerArt.imageIndex, k % 5));
-  plan.forEach((p, i) => {
-    assert.equal(!!p.centerArt, i % 2 === 0);
-    if (p.centerArt) assert.notEqual(p.composition, "medio");
-  });
+  // Cada imagen elegida aparece UNA vez, repartidas (cada 12 páginas), nunca en medio mandala
+  const withImg = plan.map((p, i) => [i, p]).filter(([, p]) => p.centerArt);
+  assert.deepEqual(withImg.map(([i]) => i), [6, 18, 30, 42, 54]);
+  assert.deepEqual(withImg.map(([, p]) => p.centerArt.imageIndex), [0, 1, 2, 3, 4]);
+  for (const [, p] of withImg) assert.notEqual(p.composition, "medio");
+  assert.equal(planBook({ count: 3, seed: 1, images: 9 }).filter(p => p.centerArt).length, 3);
   const prog = planBook({ count: 10, seed: 1, difficulty: "progresiva" });
   for (let i = 1; i < prog.length; i++) assert.ok(prog[i].complexity >= prog[i - 1].complexity);
 });
@@ -230,4 +231,31 @@ test("figura: clics sobre el fondo y 'sólo figura principal' quitan fondo oscur
   assert.ok(inside(withClick) < inside(noClick), "el fondo oscuro marcado con clics debía desaparecer");
   // Recortado al personaje: la caja sigue a la elipse (70×100), no al rectángulo oscuro
   assert.ok(withClick.w / withClick.h < 0.85, `relación ${withClick.w}/${withClick.h}`);
+});
+
+test("anillos de figuras: copias que no se pisan, sello de trazo grueso y medallón", () => {
+  const w = 120, h = 150;
+  const cls = new Uint8Array(w * h).fill(2);
+  for (let y = 20; y < 130; y++) for (let x = 20; x < 100; x++) cls[y * w + x] = (x === 20 || x === 99 || y === 20 || y === 129) ? 0 : 1;
+  const st = stampRaster(cls, w, h, 300, 0.02);
+  assert.equal(Math.max(st.w, st.h), 300);
+  // La línea de 1 px original sale de ~6 px (2 % de 300)
+  let run = 0, best = 0;
+  for (let x = 0; x < st.w; x++) { const v = st.gray[Math.floor(st.h / 2) * st.w + x]; run = v < 128 ? run + 1 : 0; best = Math.max(best, run); }
+  assert.ok(best >= 5 && best <= 8, `grosor ${best}`);
+
+  for (const preset of ["KDP_8_5x11", "KDP_8_5x8_5", "KDP_6x9"]) {
+    const doc = createDoc({ preset, seed: 2, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 2, figureRing: { href: "data:,S", centerHref: "data:,C", w: 100, h: 120 } });
+    const svg = renderDocToSvgString(doc);
+    const stamps = [...svg.matchAll(/translate\(([\d.]+) ([\d.]+)\) rotate\(([\d.]+)\)(?: scale\(-1 1\))?"><image href="data:,S" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)];
+    assert.ok(stamps.length >= 6 && stamps.length <= 12 && stamps.length % 2 === 0, `${preset}: ${stamps.length} copias`);
+    // Copias vecinas: la distancia entre centros supera el ancho de cada copia en el borde interior
+    const [x1, y1] = [+stamps[0][1], +stamps[0][2]], [x2, y2] = [+stamps[1][1], +stamps[1][2]];
+    const sw = +stamps[0][6], sh = +stamps[0][7];
+    const rm = Math.hypot(x1 - doc.page.wMm / 2, y1 - doc.page.hMm / 2);
+    const gapInner = 2 * (rm - sh / 2) * Math.sin(Math.PI / stamps.length);
+    assert.ok(gapInner >= sw, `${preset}: se pisan (${gapInner.toFixed(1)} < ${sw})`);
+    assert.match(svg, /<image href="data:,C"/, "falta la figura en el medallón");
+  }
 });

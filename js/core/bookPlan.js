@@ -46,7 +46,8 @@ export function shuffleBag(rng, options, weights = null) {
  *   compositionWeights?               (mismo orden que compositions)
  *   difficulty: "mixta" | "progresiva" | "fija",
  *   baseComplexity,
- *   images?: number (nº de imágenes del usuario que rotan), imageEvery?: n (1 = todas las páginas)
+ *   images?: number (nº de imágenes elegidas a mano; cada una aparece UNA vez, repartidas
+ *            a lo largo del libro para que no queden amontonadas al principio)
  * }
  * Devuelve [{ seed, styleMode, composition, frameStyle, petals, complexity, centerArt }]
  */
@@ -55,7 +56,7 @@ export function planBook(opts) {
     count, seed = 1,
     styles = BOOK_STYLES, compositions = BOOK_COMPOSITIONS, frames = BOOK_FRAMES,
     compositionWeights = null, difficulty = "mixta", baseComplexity = 130,
-    images = 0, imageEvery = 1,
+    images = 0,
   } = opts;
   const rng = mulberry32(((seed >>> 0) ^ 0xB00C5EED) >>> 0);
   const nextStyle = shuffleBag(rng, styles);
@@ -63,6 +64,9 @@ export function planBook(opts) {
   const nextFrame = shuffleBag(rng, frames);
   const nextPetals = shuffleBag(rng, BOOK_PETALS);
 
+  // Páginas con imagen: espaciadas de forma uniforme (k + ½) · count / images
+  const imageAt = new Map();
+  for (let k = 0; k < Math.min(images, count); k++) imageAt.set(Math.floor(((k + 0.5) * count) / Math.min(images, count)), k);
   const pages = [];
   for (let i = 0; i < count; i++) {
     let complexity;
@@ -76,10 +80,7 @@ export function planBook(opts) {
       complexity = Math.max(20, Math.round(baseComplexity * (0.7 + rng() * 0.6)));
     }
     let centerArt = null;
-    if (images && i % Math.max(1, imageEvery) === 0) {
-      // Las imágenes se reparten en orden: cada una aparece antes de repetir ninguna
-      centerArt = { type: "image", imageIndex: pages.filter(p => p.centerArt).length % images };
-    }
+    if (imageAt.has(i)) centerArt = { type: "image", imageIndex: imageAt.get(i) };
     let composition = nextComp();
     // Un medio mandala cortaría al personaje por la mitad
     if (centerArt && composition === "medio") composition = "fondo";
