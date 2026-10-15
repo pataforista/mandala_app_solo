@@ -162,6 +162,23 @@ test("PathBuilder descarta formas cerradas menores que minClosedArea", () => {
   assert.equal(pb.d, "M 10 10 L 13 10 L 13 13 L 10 13 Z M 20 20 L 21 21");
 });
 
+test("PathBuilder mide el área de curvas Bézier de forma exacta", () => {
+  // Disco de radio 1 con 4 cúbicas (k = 4/3·tan(π/8)): área ≈ π (error < 0.03 %).
+  // El muestreo poligonal anterior daba ~3.0 y descartaba este disco con umbral 3.1.
+  const k = (4 / 3) * Math.tan(Math.PI / 8);
+  const pb = new PathBuilder({ minClosedArea: 3.1 });
+  pb.moveTo(1, 0).cubicTo(1, k, k, 1, 0, 1).cubicTo(-k, 1, -1, k, -1, 0)
+    .cubicTo(-1, -k, -k, -1, 0, -1).cubicTo(k, -1, 1, -k, 1, 0).close();
+  assert.ok(pb.d.endsWith("Z"), "un disco de área π no debe descartarse con umbral 3.1");
+  // Semidisco con cuadrática: área exacta 4/3 (parábola y = 1 − x², base [-1, 1])
+  const q = new PathBuilder({ minClosedArea: 1.3 });
+  q.moveTo(-1, 0).quadTo(0, 2, 1, 0).close();
+  assert.ok(q.d.endsWith("Z"), "la región parabólica mide 4/3 > 1.3");
+  const q2 = new PathBuilder({ minClosedArea: 1.34 });
+  q2.moveTo(-1, 0).quadTo(0, 2, 1, 0).close();
+  assert.equal(q2.d, "", "y 4/3 < 1.34: se descarta");
+});
+
 test("perfil de coloreo: adulto/experto intactos, niños filtra y simplifica", () => {
   assert.equal(coloringCullArea({ minCellAreaMm2: 3, detailSimplification: 0.5 }), 0);
   assert.equal(coloringCullArea({ minCellAreaMm2: 2, detailSimplification: 0.2 }), 0);
