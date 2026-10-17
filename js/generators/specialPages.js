@@ -22,8 +22,14 @@ export function generateSpecialPage(doc, opts) {
       doc.body.push(svgText(m, doc.page.hMm - FOOTER_BASELINE_MM, label, { size: 2.8, anchor: "start", fill: "#444" }));
       return doc;
     }
-    case "mystery":
-      return generateMysteryMandala(doc, { ...opts, shape: sp.shape });
+    case "mystery": {
+      generateMysteryMandala(doc, { ...opts, shape: sp.shape });
+      if (sp.n) {
+        const m = Number.isFinite(doc.page.marginMm) ? doc.page.marginMm : 10;
+        doc.body.push(svgText(m, doc.page.hMm - FOOTER_BASELINE_MM, `Misterioso ${sp.n} de ${sp.of} · solución al final`, { size: 2.8, anchor: "start", fill: "#444" }));
+      }
+      return doc;
+    }
     case "nature":
       return generateNaturePage(doc, { ...opts, kind: sp.kind, captions: sp.captions ?? true });
     case "mural":

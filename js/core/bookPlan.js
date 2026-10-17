@@ -48,8 +48,13 @@ export function strokeScaleFor(complexity, baseComplexity) {
 
 /** Trazo final de una página: nunca por debajo de 0,35 mm (las líneas finas se pierden al imprimir). */
 export const MIN_PRINT_STROKE_MM = 0.35;
+export const MAX_AUTO_STROKE_MM = 1.2;
 export function pageStrokeMm(baseMm, scale = 1) {
-  return Math.round(Math.max(MIN_PRINT_STROKE_MM, baseMm * scale) * 100) / 100;
+  let mm = baseMm * scale;
+  // El aumento automático no pasa de 1,2 mm: más grueso empasta las celdas pequeñas.
+  // Si el usuario eligió un trazo mayor, se respeta (nunca se adelgaza por este tope).
+  if (scale > 1) mm = Math.min(mm, Math.max(baseMm, MAX_AUTO_STROKE_MM));
+  return Math.round(Math.max(MIN_PRINT_STROKE_MM, mm) * 100) / 100;
 }
 
 function shuffled(rng, arr) {
@@ -204,9 +209,12 @@ export function addSpecialPages(plan, opts = {}) {
   for (let k = 0; k < mystery; k++) {
     insertAt(Math.round(((k + 0.75) * pages.length) / (mystery + 0.5)), [{
       ...blank, seed: sub(key++), styleMode: nextStyle(), petals: 16,
-      special: { type: "mystery", shape: shapes[k % shapes.length] },
+      special: { type: "mystery", shape: shapes[k % shapes.length], n: 0, of: mystery },
     }]);
   }
+  // Numeración en orden de aparición (las inserciones no siguen el orden del libro)
+  let mk = 0;
+  for (const p of pages) if (p.special?.type === "mystery") p.special.n = ++mk;
   if (nature) {
     insertAt(Math.round(pages.length * 0.6), NATURE_ORDER.map((kind) => ({
       ...blank, seed: sub(key++), styleMode: "floral", petals: 12, special: { type: "nature", kind },

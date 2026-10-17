@@ -14,6 +14,7 @@ import { PathBuilder } from "./core/pathBuilder.js";
 import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES } from "./core/bookPlan.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
+import { escapeXml } from "./core/svgText.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
@@ -1818,10 +1819,10 @@ function bindUI() {
     const info = document.getElementById("bookImagesInfo");
     if (info) {
       info.innerHTML = chosen.length
-        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano: ` + chosen.map(m => `${m.name} (${FIGURE_USES.find(u => u[0] === m.use)[1].toLowerCase()})`).join(", ")
+        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano: ` + chosen.map(m => `${escapeXml(m.name)} (${FIGURE_USES.find(u => u[0] === m.use)[1].toLowerCase()})`).join(", ")
         : "Ninguna imagen lista: el libro será sólo de mandalas. Para incluir una, elige su uso en «Mis imágenes».";
       const pend = pendingFigures();
-      if (pend.length) info.innerHTML += `<br>❌ No entran (no están listas): ${pend.map(m => m.name).join(", ")}. Revisa su lista de verificación.`;
+      if (pend.length) info.innerHTML += `<br>❌ No entran (no están listas): ${pend.map(m => escapeXml(m.name)).join(", ")}. Revisa su lista de verificación.`;
     }
     if (chosen.length > bookCount()) bookSummaryEl.innerHTML += `<br>⚠️ Hay ${chosen.length} imágenes elegidas y sólo ${bookCount()} páginas: sobran ${chosen.length - bookCount()}.`;
   };
@@ -1888,7 +1889,9 @@ function bindUI() {
       const layout = bookLayout({ ...lo, mandalas: count + (lo.colorTest ? 1 : 0) });
       const off = lo.colorTest ? 1 : 0;
       return plan.map((p, j) => ({ p, j })).filter(({ p }) => p.special?.type === "mystery").map(({ p, j }) => ({
-        label: `Página ${layout.findIndex(q => q.kind === "mandala" && q.index === j + off) + 1} · ${MYSTERY_SHAPES[p.special.shape]?.name || p.special.shape}`,
+        // El número del misterioso va impreso en su propia página: sirve aunque el libro
+        // no lleve números de página
+        label: `Misterioso ${p.special.n} (pág. ${layout.findIndex(q => q.kind === "mandala" && q.index === j + off) + 1}) · ${MYSTERY_SHAPES[p.special.shape]?.name || p.special.shape}`,
         shape: p.special.shape, seed: seedOf(j), complexity: p.complexity,
       }));
     };

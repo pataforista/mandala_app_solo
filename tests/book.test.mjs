@@ -397,6 +397,10 @@ test("trazo por página: más grueso en páginas fáciles, más fino en difícil
   assert.ok(strokeScaleFor(260, 130) < 1 && strokeScaleFor(260, 130) >= 0.85);
   assert.equal(pageStrokeMm(0.3, 0.85), MIN_PRINT_STROKE_MM);
   assert.equal(pageStrokeMm(0.55, 1.6), 0.88);
+  // Tope del aumento automático: 1,2 mm; un trazo elegido mayor se respeta
+  assert.equal(pageStrokeMm(1.0, 1.6), 1.2);
+  assert.equal(pageStrokeMm(1.5, 1.6), 1.5);
+  assert.equal(pageStrokeMm(1.0, 0.85), 0.85);
 
   const prog = planBook({ count: 20, seed: 5, difficulty: "progresiva", baseComplexity: 130 });
   assert.ok(prog[0].strokeScale > prog[19].strokeScale, "progresiva: la línea se afina al avanzar");
@@ -583,4 +587,13 @@ test("muralTilePositions coincide con dónde addSpecialPages pone las hojas del 
     const real = plan.map((p, i) => (p.special?.type === "mural" && !p.special.guide ? i : -1)).filter(i => i >= 0);
     assert.deepEqual(muralTilePositions(plan.length, sp), real);
   }
+});
+
+test("misteriosos numerados en orden de aparición, con rótulo en su página", () => {
+  const plan = addSpecialPages(planBook({ count: 20, seed: 6 }), { seed: 6, mystery: 4 });
+  const ms = plan.filter(p => p.special?.type === "mystery");
+  assert.deepEqual(ms.map(p => p.special.n), [1, 2, 3, 4]);
+  assert.ok(ms.every(p => p.special.of === 4));
+  const svg = renderDocToSvgString(special(ms[1].special));
+  assert.match(svg, />Misterioso 2 de 4 · solución al final</);
 });
