@@ -11,7 +11,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, GROWTH_STAGES } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES } from "./core/bookPlan.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
@@ -1758,13 +1758,6 @@ function bindUI() {
       mural: mural ? { cols: mural[0], rows: mural[1] } : null,
     };
   };
-  // Hojas del mural (índice en el plan): van al final, antes de las soluciones
-  const muralTileIdx = (total) => {
-    const sp = specialOpts();
-    if (!sp.mural) return [];
-    const tiles = sp.mural.cols * sp.mural.rows, sol = sp.mystery > 0 ? 1 : 0;
-    return Array.from({ length: tiles }, (_, k) => total - sol - tiles + k);
-  };
   const layoutFor = (regular) => {
     const total = regular + specialPageCount(specialOpts());
     const off = bookColorTestEl?.checked ? 1 : 0;
@@ -1773,7 +1766,7 @@ function bindUI() {
       mandalas: total,
       blankBack: !doubleSided,
       // A doble cara, el mural conserva sus reversos en blanco: se recorta
-      keepBack: doubleSided ? muralTileIdx(total).map(i => i + off) : [],
+      keepBack: doubleSided ? muralTilePositions(total, specialOpts()).map(i => i + off) : [],
     titlePage: bookTitlePageEl.checked,
     copyrightPage: !!bookCopyrightEl?.checked,
     colorTest: !!bookColorTestEl?.checked,

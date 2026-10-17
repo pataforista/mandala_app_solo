@@ -151,6 +151,17 @@ export function specialPageCount({ growth = 0, mystery = 0, nature = false, mura
 }
 
 /**
+ * Posiciones (índice en el plan) de las hojas del mural, sin construir el plan.
+ * addSpecialPages las pone al final, antes de la página de soluciones; si eso cambia,
+ * cambia también aquí (lo comprueba una prueba).
+ */
+export function muralTilePositions(total, { mystery = 0, mural = null } = {}) {
+  if (!mural) return [];
+  const tiles = mural.cols * mural.rows, sol = mystery > 0 ? 1 : 0;
+  return Array.from({ length: tiles }, (_, k) => total - sol - tiles + k);
+}
+
+/**
  * Inserta las páginas especiales en un plan de planBook y, en dificultad progresiva,
  * reparte la complejidad sobre el libro COMPLETO (la última página es la más difícil).
  *  - growth: nº de secuencias «mandala que crece» (GROWTH_STAGES páginas seguidas cada una)

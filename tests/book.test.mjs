@@ -574,3 +574,13 @@ test("doble cara: sin páginas en blanco salvo los reversos que se piden (hojas 
   // pad: false revela el total natural (impar) que la app corrige con un mandala más
   assert.equal(bookLayout({ mandalas: 9, blankBack: false, titlePage: true, keepBack: [8], pad: false }).length, 11);
 });
+
+test("muralTilePositions coincide con dónde addSpecialPages pone las hojas del mural", async () => {
+  const { muralTilePositions } = await import("../js/core/bookPlan.js");
+  for (const mystery of [0, 2]) for (const mural of [{ cols: 2, rows: 2 }, { cols: 3, rows: 3 }]) for (const count of [1, 5, 30]) {
+    const sp = { growth: 1, mystery, nature: true, mural };
+    const plan = addSpecialPages(planBook({ count, seed: 4 }), { seed: 4, ...sp });
+    const real = plan.map((p, i) => (p.special?.type === "mural" && !p.special.guide ? i : -1)).filter(i => i >= 0);
+    assert.deepEqual(muralTilePositions(plan.length, sp), real);
+  }
+});
