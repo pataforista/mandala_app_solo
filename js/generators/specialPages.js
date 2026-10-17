@@ -5,7 +5,7 @@ import { generateMandalaClassic } from "./mandalaClassic.js";
 import { generateMysteryMandala, generateMysterySolutions, MYSTERY_SHAPES } from "./mysteryMandala.js";
 import { generateNaturePage, NATURE_TEXT } from "./natureSymmetry.js";
 import { generateMuralPage, tileName } from "./muralPage.js";
-import { svgText } from "../core/svgText.js";
+import { svgText, FOOTER_BASELINE_MM } from "../core/svgText.js";
 
 const NO_IMAGE = { centerArt: null, figure: null, figureRing: null };
 
@@ -19,7 +19,7 @@ export function generateSpecialPage(doc, opts) {
         growth: sp.of > 1 ? sp.stage / (sp.of - 1) : 1, minBands: 8 });
       const m = Number.isFinite(doc.page.marginMm) ? doc.page.marginMm : 10;
       const label = sp.stage === sp.of - 1 ? `Mandala que crece · etapa ${sp.stage + 1} de ${sp.of}: completo` : `Mandala que crece · etapa ${sp.stage + 1} de ${sp.of}`;
-      doc.body.push(svgText(m, doc.page.hMm - Math.max(4.2, m * 0.42), label, { size: 2.8, anchor: "start", fill: "#444" }));
+      doc.body.push(svgText(m, doc.page.hMm - FOOTER_BASELINE_MM, label, { size: 2.8, anchor: "start", fill: "#444" }));
       return doc;
     }
     case "mystery":

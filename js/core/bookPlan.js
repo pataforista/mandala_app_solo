@@ -226,8 +226,6 @@ export function addSpecialPages(plan, opts = {}) {
       p.complexity = cx;
       p.strokeScale = strokeScaleFor(cx, baseComplexity);
     });
-  } else if (difficulty !== "fija") {
-    for (const p of pages) if (p.special && p.special.type !== "solutions") p.strokeScale = 1;
   }
   return pages;
 }

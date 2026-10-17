@@ -6,7 +6,7 @@
 // dibujo continúa sin saltos. Una hoja guía muestra el mapa para armarlo.
 import { generateMandalaClassic } from "./mandalaClassic.js";
 import { PathBuilder } from "../core/pathBuilder.js";
-import { svgText, wrapLines } from "../core/svgText.js";
+import { svgText, wrapLines, FOOTER_BASELINE_MM } from "../core/svgText.js";
 
 const COLS = "ABCDEFGH";
 const cache = new Map();
@@ -22,7 +22,10 @@ export const tileName = (col, row) => `${COLS[col]}${row + 1}`;
 
 // El mandala completo se dibuja una sola vez por libro (todas las hojas lo comparten)
 function muralBody(opts, W, H) {
-  const key = JSON.stringify([opts.seed, opts.styleMode, opts.petals, opts.complexity, opts.strokeWidthMm, opts.outlineMode, opts.textures, W.toFixed(2), H.toFixed(2)]);
+  // La clave incluye TODAS las opciones de dibujo: con una clave parcial, cambiar p. ej. el
+  // espaciado entre la revisión y la descarga devolvía el mural viejo
+  const { mural: _m, special: _s, ...drawOpts } = opts;
+  const key = JSON.stringify([drawOpts, W.toFixed(2), H.toFixed(2)]);
   if (cache.has(key)) return cache.get(key);
   const v = { page: { wMm: W, hMm: H, marginMm: 0 }, seed: opts.seed >>> 0, meta: {}, defs: [], body: [] };
   const cells = Math.max(W, H) / 280; // ≈ número de hojas a lo largo del lado mayor
@@ -63,7 +66,7 @@ export function generateMuralPage(doc, opts) {
   cut.moveTo(m, m).lineTo(m + tw, m).lineTo(m + tw, m + th).lineTo(m, m + th).close();
   doc.body.push(cut.toPath({ stroke, strokeWidthMm: mainW, linejoin: "miter", linecap: "butt" }));
   // Rótulo en el margen inferior izquierdo (el número de página va al centro)
-  const y = page.hMm - Math.max(4.2, m * 0.42);
+  const y = page.hMm - FOOTER_BASELINE_MM;
   doc.body.push(svgText(m, y, `Mural · hoja ${tileName(col, row)} (columna ${COLS[col]}, fila ${row + 1})`, { size: 2.8, anchor: "start", fill: "#444" }));
   // Vecinas: flechas discretas que ayudan a orientar la hoja al armar
   const hint = [];

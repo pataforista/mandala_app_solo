@@ -527,3 +527,19 @@ test("mural: cada hoja muestra su rectángulo exacto del diseño y la guía rotu
   const guide = renderDocToSvgString(special({ ...sp, guide: true }));
   for (const t of ["A1", "B1", "A2", "B2"]) assert.match(guide, new RegExp(`>${t}</text>`));
 });
+
+test("rótulos del pie de página: fuera de la franja de 6,35 mm que KDP prohíbe", () => {
+  for (const sp of [{ type: "grow", stage: 1, of: 4 }, { type: "mural", cols: 2, rows: 2, col: 1, row: 1 }]) {
+    const d = special(sp);
+    for (const m of renderDocToSvgString(d).matchAll(/<text x="[\d.]+" y="([\d.]+)" font-family="[^"]+" font-size="([\d.]+)"/g)) {
+      // Línea base + descendentes (~25 % del cuerpo) a ≥ 6,35 mm del corte inferior
+      assert.ok(d.page.hMm - (parseFloat(m[1]) + parseFloat(m[2]) * 0.25) >= 6.35, `${sp.type}: rótulo a ${(d.page.hMm - parseFloat(m[1])).toFixed(2)} mm`);
+    }
+  }
+});
+
+test("mural: cambiar una opción de dibujo no devuelve el mural de la caché", () => {
+  const a = renderDocToSvgString(special({ type: "mural", cols: 2, rows: 2, col: 0, row: 0 }, { spacing: 0.3 }));
+  const b = renderDocToSvgString(special({ type: "mural", cols: 2, rows: 2, col: 0, row: 0 }, { spacing: 0.8 }));
+  assert.notEqual(a, b);
+});

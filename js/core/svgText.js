@@ -5,6 +5,10 @@
 const FONT = "Georgia, 'Times New Roman', serif";
 const CHAR_EM = 0.5; // ancho medio de un carácter en una serif, en em
 
+// Línea base de los rótulos del margen inferior. KDP sin sangrado exige que todo quede a
+// ≥ 6,35 mm del corte; con letra de 2,8 mm las descendentes bajan ~0,7 mm más.
+export const FOOTER_BASELINE_MM = 7.4;
+
 export function escapeXml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -29,9 +33,3 @@ export function svgText(x, y, text, { size = 3.5, weight = "normal", anchor = "m
   return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${FONT}" font-size="${size.toFixed(2)}" font-weight="${weight}"${italic ? ' font-style="italic"' : ""} text-anchor="${anchor}" fill="${fill}">${escapeXml(text)}</text>`;
 }
 
-/** Bloque centrado de varias líneas; devuelve { parts, bottom }. */
-export function textBlock(cx, y, text, maxW, { size = 3.5, weight = "normal", lineGap = 1.38, italic = false } = {}) {
-  const lines = wrapLines(text, maxW, size);
-  const parts = lines.map((l, i) => svgText(cx, y + i * size * lineGap, l, { size, weight, italic }));
-  return { parts, bottom: y + (lines.length - 1) * size * lineGap, lines: lines.length };
-}
