@@ -39,7 +39,10 @@ export function evenPageCount(pages) {
  * Con reverso en blanco, cada mandala queda en página impar (derecha) y su reverso vacío,
  * para que el marcador que traspasa el papel no arruine el siguiente dibujo.
  */
-export function bookLayout({ mandalas, blankBack = true, titlePage = true, copyrightPage = false }) {
+export function bookLayout({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, keepBack = [], pad = true }) {
+  // keepBack: mandalas que conservan el reverso en blanco aunque el libro sea a doble cara
+  // (las hojas del mural se recortan: un dibujo al reverso se destruiría)
+  const keep = new Set(keepBack);
   const pages = [];
   if (titlePage) pages.push({ kind: "title" });
   if (copyrightPage) pages.push({ kind: "copyright" });
@@ -48,9 +51,10 @@ export function bookLayout({ mandalas, blankBack = true, titlePage = true, copyr
   if (!titlePage && copyrightPage && blankBack) pages.push({ kind: "blank" });
   for (let i = 0; i < mandalas; i++) {
     pages.push({ kind: "mandala", index: i });
-    if (blankBack) pages.push({ kind: "blank" });
+    if (blankBack || keep.has(i)) pages.push({ kind: "blank" });
   }
-  if (pages.length % 2) pages.push({ kind: "blank" });
+  // pad = false: sin la página de relleno, para saber si el total natural es impar
+  if (pad && pages.length % 2) pages.push({ kind: "blank" });
   return pages;
 }
 

@@ -98,6 +98,7 @@ Fuente: [Trim size, bleed and margins (KDP)](https://kdp.amazon.com/help/topic/G
 | PDF aplanado, sin transparencias | ✘ cada página llevaba máscara alfa (SMask) | ✔ PNG en gris de 8 bits sin alfa (además ~4× más ligero) |
 | Número de páginas par | a veces impar | siempre par |
 | Mandalas en página derecha con reverso en blanco | ✔ | ✔ |
+| Sin páginas en blanco (opcional, «Reverso de cada página»: doble cara) | — | otro dibujo al reverso; si el total sale impar se añade un mandala en vez de una hoja en blanco. Las hojas del mural conservan el reverso en blanco (se recortan) |
 | Página de derechos de autor | — | opcional (activada por defecto) |
 
 Al subir a KDP elige: **tinta negra, papel blanco, sin sangrado (No bleed)** y el mismo tamaño de corte

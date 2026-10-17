@@ -1733,12 +1733,13 @@ function bindUI() {
   // Sólo las imágenes con uso elegido a mano Y que pasan la lista de verificación
   const chosenFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && figureStatus(m).ready);
   const pendingFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && !figureStatus(m).ready);
-  const bookBlankBackEl = document.getElementById("bookBlankBack");
+  // Reverso: "blanco" | "negro" | "ninguno" (doble cara, sin páginas en blanco)
+  const bookBackEl = document.getElementById("bookBack");
+  const backMode = () => bookBackEl?.value || "blanco";
   const bookTitlePageEl = document.getElementById("bookTitlePage");
   const bookCopyrightEl = document.getElementById("bookCopyright");
   const bookColorTestEl = document.getElementById("bookColorTest");
   const bookPageNumbersEl = document.getElementById("bookPageNumbers");
-  const bookBlackBackEl = document.getElementById("bookBlackBack");
   const bookDpiEl = document.getElementById("bookDpi");
   const bookSummaryEl = document.getElementById("bookSummary");
 
@@ -1757,14 +1758,37 @@ function bindUI() {
       mural: mural ? { cols: mural[0], rows: mural[1] } : null,
     };
   };
-  const totalPlanPages = () => bookCount() + specialPageCount(specialOpts());
-  const bookLayoutOpts = () => ({
-    mandalas: totalPlanPages(),
-    blankBack: bookBlankBackEl.checked,
+  // Hojas del mural (índice en el plan): van al final, antes de las soluciones
+  const muralTileIdx = (total) => {
+    const sp = specialOpts();
+    if (!sp.mural) return [];
+    const tiles = sp.mural.cols * sp.mural.rows, sol = sp.mystery > 0 ? 1 : 0;
+    return Array.from({ length: tiles }, (_, k) => total - sol - tiles + k);
+  };
+  const layoutFor = (regular) => {
+    const total = regular + specialPageCount(specialOpts());
+    const off = bookColorTestEl?.checked ? 1 : 0;
+    const doubleSided = backMode() === "ninguno";
+    return {
+      mandalas: total,
+      blankBack: !doubleSided,
+      // A doble cara, el mural conserva sus reversos en blanco: se recorta
+      keepBack: doubleSided ? muralTileIdx(total).map(i => i + off) : [],
     titlePage: bookTitlePageEl.checked,
     copyrightPage: !!bookCopyrightEl?.checked,
     colorTest: !!bookColorTestEl?.checked,
-  });
+    };
+  };
+  // A doble cara, un total impar dejaría la última página en blanco: se añade un mandala
+  const regularCount = () => {
+    const n = bookCount();
+    if (backMode() !== "ninguno") return n;
+    const lo = layoutFor(n);
+    // Sin el relleno: bookPageCount siempre devuelve un total par
+    const natural = bookLayout({ ...lo, mandalas: lo.mandalas + (lo.colorTest ? 1 : 0), pad: false }).length;
+    return natural % 2 ? n + 1 : n;
+  };
+  const bookLayoutOpts = () => layoutFor(regularCount());
   // El margen depende del grosor del libro (medianil de KDP): se calcula con el total
   const bookMargin = (total) => kdpSafeMarginMm(total, 10);
 
@@ -1783,7 +1807,12 @@ function bindUI() {
     const tips = [];
     if (!/^KDP_/.test(state.preset)) tips.push("💡 8.5×11 in es el formato más común en libros de mandalas; A4 y Carta también los acepta KDP.");
     if (bookCount() < 40) tips.push(`💡 ${bookCount()} mandalas: los libros mejor valorados traen entre 40 y 100.`);
-    if (!bookBlankBackEl.checked) tips.push("⚠️ Sin reverso en blanco: el marcador de una página arruina el dibujo del otro lado. Es la queja n.º 1 en las reseñas.");
+    if (backMode() === "ninguno") {
+      tips.push("💡 Doble cara: ideal para lápices de colores. Con marcadores la tinta puede traspasar al dibujo del otro lado.");
+      if (regularCount() > bookCount()) tips.push(`➕ Se añade 1 mandala (${regularCount()} en total) para que la última página no quede en blanco.`);
+      const sp0 = specialOpts();
+      if (sp0.mural) tips.push(`⚠️ El mural se recorta: sus ${sp0.mural.cols * sp0.mural.rows} hojas conservan el reverso en blanco. Quita el mural si no quieres ninguna página en blanco.`);
+    }
     if (state.strokeWidth < 0.45) tips.push("💡 Trazo fino (< 0,45 mm): bonito en pantalla, pero en papel de KDP se ve gris. Prueba «Adulto · Trazo grueso» o sube el grosor.");
     const sp = specialOpts(), extra = [];
     if (sp.growth) extra.push(`${sp.growth} mandala(s) que crece(n) (${sp.growth * GROWTH_STAGES} págs.)`);
@@ -1792,7 +1821,6 @@ function bindUI() {
     if (sp.mural) extra.push(`mural de ${sp.mural.cols}×${sp.mural.rows} hojas + guía`);
     if (extra.length) bookSummaryEl.innerHTML += `<br>✨ ${bookCount()} mandalas + ${extra.join(", ")}.`;
     if (tips.length) bookSummaryEl.innerHTML += "<br>" + tips.join("<br>");
-    if (bookBlackBackEl) bookBlackBackEl.disabled = !bookBlankBackEl.checked;
     const chosen = chosenFigures();
     const info = document.getElementById("bookImagesInfo");
     if (info) {
@@ -1826,7 +1854,7 @@ function bindUI() {
   };
 
   const buildBook = () => {
-    const regular = bookCount();
+    const regular = regularCount();
     const baseSeed = state.seed >>> 0;
     const isClassic = state.generatorType === "classic";
     const chosen = isClassic ? chosenFigures() : [];
@@ -2050,7 +2078,7 @@ function bindUI() {
         author: (bookAuthorEl?.value || "").trim(),
         ...layoutOpts,
         pageNumbers: bookPageNumbersEl.checked,
-        blackBack: !!bookBlackBackEl?.checked && layoutOpts.blankBack,
+        blackBack: backMode() === "negro",
         marginMm,
         dpi: parseInt(bookDpiEl?.value, 10) || 300,
         onProgress: (done, tot, label) => {
@@ -2089,7 +2117,7 @@ function bindUI() {
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
     document.addEventListener("figures-changed", updateBookSummary);
-    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl, bookDpiEl, coloringPresetEl, strokeWidthEl].forEach(el =>
+    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl, bookDpiEl, coloringPresetEl, strokeWidthEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     updateBookSummary();

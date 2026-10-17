@@ -585,8 +585,11 @@
                 <sl-input id="bookTitle" label="Título (hoja de título)" size="small" placeholder="Mandalas para Colorear"></sl-input>
                 <sl-input id="bookSubtitle" label="Subtítulo (opcional)" size="small" placeholder="50 diseños antiestrés"></sl-input>
                 <sl-input id="bookAuthor" label="Autor / sello (opcional)" size="small"></sl-input>
-                <sl-checkbox id="bookBlankBack" checked>Página en blanco al reverso (evita que el marcador traspase)</sl-checkbox>
-                <sl-checkbox id="bookBlackBack">Reverso negro (oculta lo que traspase el marcador; lleva más tinta)</sl-checkbox>
+                <sl-select id="bookBack" label="Reverso de cada página" size="small" value="blanco">
+                  <sl-option value="blanco">En blanco (recomendado: el marcador no arruina otro dibujo)</sl-option>
+                  <sl-option value="negro">Negro (oculta lo que traspase el marcador; más tinta)</sl-option>
+                  <sl-option value="ninguno">Sin páginas en blanco: otro dibujo al reverso (doble cara)</sl-option>
+                </sl-select>
                 <sl-select id="bookDpi" label="Nitidez de impresión" size="small" value="300">
                   <sl-option value="300">Estándar · 300 DPI (mínimo de KDP)</sl-option>
                   <sl-option value="600">Alta · 600 DPI (líneas más nítidas; PDF más pesado y lento)</sl-option>

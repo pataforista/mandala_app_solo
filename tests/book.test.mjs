@@ -553,6 +553,24 @@ test("girasol: la nota cita las espirales que tiene el dibujo, y son Fibonacci c
     assert.ok(FIB.indexOf(b) === FIB.indexOf(a) + 1, `${preset} ${complexity}: ${a} y ${b}`);
     const svg = renderDocToSvgString(d);
     assert.match(svg, new RegExp(`en este dibujo hay ${a} y ${b}\\.`));
-    assert.doesNotMatch(svg, /@a|@b/);
+    assert.match(svg, new RegExp(`como ${b} y ${a + b}, aunque`), "el ejemplo real es el par siguiente");
+    assert.doesNotMatch(svg, /@[a-d]/);
   }
+});
+
+test("doble cara: sin páginas en blanco salvo los reversos que se piden (hojas del mural)", () => {
+  const L = bookLayout({ mandalas: 9, blankBack: false, titlePage: true });
+  assert.equal(L.filter(p => p.kind === "blank").length, 0, "título + 9 = 10 páginas, ninguna en blanco");
+  // Las hojas del mural (índices 7–8) conservan su reverso; el resto, no
+  const M = bookLayout({ mandalas: 9, blankBack: false, titlePage: true, keepBack: [7, 8] });
+  const blanks = M.map((p, i) => (p.kind === "blank" ? M[i - 1] : null)).filter(Boolean);
+  assert.deepEqual(blanks.map(p => p.index), [7, 8]);
+  assert.equal(M.length, 12);
+  // Total impar: bookLayout rellena con una página en blanco al final. La app lo evita
+  // añadiendo un mandala más; aquí se comprueba que el relleno sólo ocurre en ese caso
+  const odd = bookLayout({ mandalas: 9, blankBack: false, titlePage: true, keepBack: [8] });
+  assert.equal(odd[odd.length - 1].kind, "blank");
+  assert.equal(bookLayout({ mandalas: 10, blankBack: false, titlePage: true, keepBack: [9] }).length % 2, 0);
+  // pad: false revela el total natural (impar) que la app corrige con un mandala más
+  assert.equal(bookLayout({ mandalas: 9, blankBack: false, titlePage: true, keepBack: [8], pad: false }).length, 11);
 });

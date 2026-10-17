@@ -21,9 +21,10 @@ export const NATURE_TEXT = {
   girasol: {
     title: "Girasol · el ángulo áureo",
     // @a y @b: las espirales que tiene ESTE dibujo, contadas al dibujarlo (21 y 34, o 34 y 55,
-    // según el número de flósculos). Dos caracteres, igual que los números: el corte de
-    // líneas no cambia al sustituirlos.
-    body: "En el modelo clásico del girasol, cada flósculo queda girado unos 137,5° respecto al anterior: el ángulo áureo. Como ese giro nunca se repite exactamente, las semillas se empaquetan casi sin huecos. Busca las espirales que corren en los dos sentidos: en este dibujo hay @a y @b. En los girasoles reales suelen contarse números consecutivos de Fibonacci, como 34 y 55, aunque no siempre.",
+    // según el número de flósculos); @c y @d: el par de Fibonacci siguiente, frecuente en
+    // girasoles reales, para no repetir la misma cifra. Dos caracteres, igual que los
+    // números: el corte de líneas no cambia al sustituirlos.
+    body: "En el modelo clásico del girasol, cada flósculo queda girado unos 137,5° respecto al anterior: el ángulo áureo. Como ese giro nunca se repite exactamente, las semillas se empaquetan casi sin huecos. Busca las espirales que corren en los dos sentidos: en este dibujo hay @a y @b. En los girasoles reales suelen contarse números consecutivos de Fibonacci, como @c y @d, aunque no siempre.",
   },
   estrella: {
     title: "Estrella de mar · simetría de cinco",
@@ -76,7 +77,11 @@ export function generateNaturePage(doc, opts) {
   const g = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, R: Math.min(x1 - x0, y1 - y0) / 2 - 1, rng, cF, mainW, detailW, emit };
   const drawn = (DRAW[kind] || DRAW.girasol)(g) || {};
   // La nota cita lo que el lector puede contar en esta página, no una cifra genérica
-  const fill = (s) => (drawn.spirals ? s.replace("@a", drawn.spirals[0]).replace("@b", drawn.spirals[1]) : s);
+  const fill = (s) => {
+    if (!drawn.spirals) return s;
+    const [a, b] = drawn.spirals;
+    return s.replace("@a", a).replace("@b", b).replace("@c", b).replace("@d", a + b);
+  };
   doc.body.push(...out, ...text.map(fill));
   if (doc.meta) { doc.meta.nature = kind; if (drawn.spirals) doc.meta.spirals = drawn.spirals; }
   return doc;

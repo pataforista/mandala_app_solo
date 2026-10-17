@@ -349,8 +349,8 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
 /**
  * Páginas totales de un libro (incluye el relleno a número par que exige la imprenta).
  */
-export function bookPageCount({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, colorTest = false }) {
-  return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage }).length;
+export function bookPageCount({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, colorTest = false, keepBack = [] }) {
+  return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, keepBack }).length;
 }
 
 /** Rasteriza un SVG en un canvas con fondo blanco. */
@@ -437,7 +437,7 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
   const {
     preset, genOpts, title = "Mandalas para Colorear", subtitle = "", author = "",
     titlePage = true, copyrightPage = false, copyrightText = "", colorTest = false,
-    blankBack = true, blackBack = false, pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
+    blankBack = true, blackBack = false, keepBack = [], pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
   } = opts;
 
   const { wMm, hMm } = createDoc({ preset }).page;
@@ -462,7 +462,7 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
     throw new Error(`Este navegador no puede dibujar páginas de ${wPx}×${hPx} px (${dpi} DPI). Elige 300 DPI o usa un ordenador.`);
   }
   // La prueba de color ocupa el lugar de un mandala más (con su reverso)
-  const layout = bookLayout({ mandalas: count + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage });
+  const layout = bookLayout({ mandalas: count + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, keepBack });
   const total = layout.length;
   const yieldUI = () => new Promise(r => setTimeout(r, 0));
 
