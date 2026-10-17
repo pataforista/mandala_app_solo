@@ -537,9 +537,9 @@
               texto sin fuentes externas se ajustan solos a las reglas de KDP. Parte de la semilla y el nivel de «Diseñar».
             </p>
             <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="50"></sl-input>
-            <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="mixta">
+            <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="progresiva">
+              <sl-option value="progresiva">Creciente: de fácil a difícil (recomendado)</sl-option>
               <sl-option value="mixta">Mixta (alterna)</sl-option>
-              <sl-option value="progresiva">Progresiva (de fácil a difícil)</sl-option>
               <sl-option value="fija">Fija (la complejidad actual)</sl-option>
             </sl-select>
             <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco</sl-checkbox>
@@ -557,6 +557,23 @@
               <sl-checkbox class="bookComp" value="gigante" checked>Gigante</sl-checkbox>
               <sl-checkbox class="bookComp" value="medio" checked>Medio mandala</sl-checkbox>
             </div>
+            <sl-details id="bookSpecials" summary="✨ Páginas sorprendentes" open>
+              <div class="control-group">
+                <sl-select id="bookGrowth" label="Mandala que crece" size="small" value="1" help-text="El mismo mandala en 4 páginas seguidas: cada una añade anillos.">
+                  <sl-option value="0">Ninguno</sl-option>
+                  <sl-option value="1">1 secuencia (4 páginas)</sl-option>
+                  <sl-option value="2">2 secuencias (8 páginas)</sl-option>
+                  <sl-option value="3">3 secuencias (12 páginas)</sl-option>
+                </sl-select>
+                <sl-input id="bookMystery" type="number" label="Mandalas misteriosos" size="small" min="0" max="7" value="3" help-text="Esconden una figura que aparece al colorear. Las soluciones van al final."></sl-input>
+                <sl-checkbox id="bookNature" checked>Capítulo «Simetrías de la naturaleza» (girasol, estrella de mar, copo de nieve y diatomea, con una nota científica)</sl-checkbox>
+                <sl-select id="bookMural" label="Mural para armar (al final del libro)" size="small" value="3x3" help-text="Un mandala gigante repartido en varias hojas, con guía para unirlas.">
+                  <sl-option value="ninguno">Ninguno</sl-option>
+                  <sl-option value="2x2">2×2 hojas</sl-option>
+                  <sl-option value="3x3">3×3 hojas</sl-option>
+                </sl-select>
+              </div>
+            </sl-details>
             <sl-button id="reviewBook" variant="default" size="medium" pill style="width: 100%;">
               <sl-icon slot="prefix" name="grid-3x3-gap"></sl-icon>
               Revisar páginas antes de crear

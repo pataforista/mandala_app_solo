@@ -424,3 +424,106 @@ test("nivel «trazo grueso»: páginas válidas y sin líneas finas en los encua
     assert.equal(thin.length, 0, `${composition} ${styleMode}: trazos finos ${thin.slice(0, 5)}`);
   }
 });
+
+// ---------- Páginas sorprendentes ----------
+import { addSpecialPages, specialPageCount, GROWTH_STAGES } from "../js/core/bookPlan.js";
+import { generateSpecialPage } from "../js/generators/specialPages.js";
+import { mysteryGrid, MYSTERY_KEYS, generateMysteryMandala } from "../js/generators/mysteryMandala.js";
+import { NATURE_KINDS } from "../js/generators/natureSymmetry.js";
+import { muralGeometry } from "../js/generators/muralPage.js";
+
+const special = (sp, extra = {}) => {
+  const d = createDoc({ preset: "KDP_8_5x11", seed: 5, marginMm: 12 });
+  generateSpecialPage(d, { ...BASE, seed: 5, special: sp, ...extra });
+  return d;
+};
+
+test("plan con páginas sorprendentes: cuenta exacta, grupos juntos y dificultad creciente en todo el libro", () => {
+  const sp = { growth: 2, mystery: 3, nature: true, mural: { cols: 3, rows: 3 } };
+  const plan = addSpecialPages(planBook({ count: 30, seed: 8, difficulty: "progresiva" }), { seed: 8, ...sp, difficulty: "progresiva" });
+  assert.equal(plan.length, 30 + specialPageCount(sp));
+  // Cada secuencia que crece: GROWTH_STAGES páginas seguidas, etapas en orden, misma semilla
+  for (const g of ["g0", "g1"]) {
+    const idx = plan.map((p, i) => (p.special?.group === g ? i : -1)).filter(i => i >= 0);
+    assert.equal(idx.length, GROWTH_STAGES);
+    assert.equal(idx[idx.length - 1] - idx[0], GROWTH_STAGES - 1, "etapas seguidas");
+    assert.deepEqual(idx.map(i => plan[i].special.stage), [0, 1, 2, 3]);
+    assert.equal(new Set(idx.map(i => plan[i].seed)).size, 1);
+    assert.equal(new Set(idx.map(i => plan[i].complexity)).size, 1, "la secuencia no cambia de complejidad");
+  }
+  assert.equal(plan[plan.length - 1].special.type, "solutions");
+  assert.ok(plan[plan.length - 2 - 9].special.guide, "guía del mural antes de sus 9 hojas");
+  // Dificultad creciente: nunca baja de una página a la siguiente
+  const cx = plan.filter(p => p.special?.type !== "solutions").map(p => p.complexity);
+  for (let i = 1; i < cx.length; i++) assert.ok(cx[i] >= cx[i - 1], `baja en ${i}: ${cx[i - 1]} → ${cx[i]}`);
+  assert.ok(cx[0] <= 45 && cx[cx.length - 1] >= 150);
+  // Determinista
+  assert.deepEqual(addSpecialPages(planBook({ count: 30, seed: 8, difficulty: "progresiva" }), { seed: 8, ...sp, difficulty: "progresiva" }), plan);
+});
+
+test("mandala que crece: cada etapa añade anillos y conserva exactamente los interiores", () => {
+  for (const seed of [1, 7, 42]) {
+    const stages = [0, 1, 2, 3].map(stage => {
+      const d = createDoc({ preset: "KDP_8_5x11", seed, marginMm: 12 });
+      generateSpecialPage(d, { ...BASE, seed, special: { type: "grow", stage, of: 4 } });
+      return d;
+    });
+    const drawn = stages.map(d => d.meta.bands.drawn);
+    for (let i = 1; i < 4; i++) assert.ok(drawn[i] > drawn[i - 1], `seed ${seed}: ${drawn}`);
+    assert.equal(drawn[3], stages[3].meta.bands.total, "la última etapa es el mandala completo");
+    // El núcleo (lo último que se dibuja) es idéntico en todas las etapas
+    const core = (d) => d.body.filter(x => x.startsWith("<path")).slice(-3).join("");
+    for (const d of stages) assert.equal(core(d), core(stages[0]));
+  }
+});
+
+test("mandala misterioso: todas las celdas llevan marca y cada figura marca una parte razonable", () => {
+  for (const shape of MYSTERY_KEYS) {
+    const g = mysteryGrid({ cx: 0, cy: 0, R: 90, shape, complexity: 130 });
+    const cells = g.rings.reduce((s, r) => s + r.n, 0) + 1;
+    const frac = (g.marked.size + (g.coreMarked ? 1 : 0)) / cells;
+    assert.ok(frac > 0.06 && frac < 0.5, `${shape}: ${(frac * 100).toFixed(1)} % marcado`);
+    // Celdas coloreables: anillo ≥ 3 mm de alto
+    assert.ok(g.t >= 3, `${shape}: anillo de ${g.t.toFixed(2)} mm`);
+    const d = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 12 });
+    generateMysteryMandala(d, { seed: 2, shape });
+    const svg = renderDocToSvgString(d);
+    assert.doesNotMatch(svg, /NaN|Infinity|undefined/);
+    assert.ok(d.meta.mystery.marked > 0);
+  }
+  // La solución rellena celdas; el acertijo no
+  const solved = special({ type: "solutions", entries: [{ label: "Página 9 · gato", shape: "gato", seed: 3, complexity: 130 }] });
+  assert.match(renderDocToSvgString(solved), /fill="#4a4a4a"/);
+  assert.doesNotMatch(renderDocToSvgString(special({ type: "mystery", shape: "gato" })), /fill="#4a4a4a"/);
+});
+
+test("simetrías de la naturaleza: SVG válido, nota al pie y dibujo dentro del margen", () => {
+  for (const kind of NATURE_KINDS) for (const preset of ["KDP_8_5x11", "KDP_6x9", "KDP_8_5x8_5"]) {
+    const d = createDoc({ preset, seed: 4, marginMm: 12 });
+    generateSpecialPage(d, { ...BASE, seed: 4, special: { type: "nature", kind } });
+    const svg = renderDocToSvgString(d);
+    assert.doesNotMatch(svg, /NaN|Infinity|undefined/, `${kind} ${preset}`);
+    assert.match(svg, /<text /, `${kind}: falta la nota`);
+    const b = bbox(d.body.filter(x => x.startsWith("<path")));
+    assert.ok(b.x0 >= 12 - 0.5 && b.y0 >= 12 - 0.5 && b.x1 <= d.page.wMm - 12 + 0.5 && b.y1 <= d.page.hMm - 12 + 0.5, `${kind} ${preset} sale del margen`);
+  }
+});
+
+test("mural: cada hoja muestra su rectángulo exacto del diseño y la guía rotula todas", () => {
+  const sp = { type: "mural", cols: 2, rows: 2 };
+  const tiles = [];
+  for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) tiles.push(special({ ...sp, col, row }));
+  const { m, tw, th } = muralGeometry(tiles[0].page, 2, 2);
+  tiles.forEach((d, k) => {
+    const svg = renderDocToSvgString(d);
+    assert.doesNotMatch(svg, /NaN|Infinity|undefined/);
+    assert.match(svg, new RegExp(`<rect x="${m}" y="${m}" width="${tw}" height="${th}"`));
+    const col = k % 2, row = Math.floor(k / 2);
+    assert.match(svg, new RegExp(`translate\\(${(m - col * tw).toFixed(3)} ${(m - row * th).toFixed(3)}\\)`));
+  });
+  // Todas las hojas recortan el MISMO mural
+  const inner = (d) => renderDocToSvgString(d).split(/<g transform="translate\([^)]*\)">/)[1].split("</g></g>")[0].replace(/-[a-z0-9]+-\d+\)/g, ")");
+  assert.equal(inner(tiles[0]), inner(tiles[3]));
+  const guide = renderDocToSvgString(special({ ...sp, guide: true }));
+  for (const t of ["A1", "B1", "A2", "B2"]) assert.match(guide, new RegExp(`>${t}</text>`));
+});

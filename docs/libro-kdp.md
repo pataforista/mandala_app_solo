@@ -68,6 +68,22 @@ Quejas frecuentes en reseñas: doble cara, papel que traspasa, líneas pixeladas
 | Celdas abiertas en el borde de las páginas recortadas sin marco | el recorte no dejaba línea | una línea cierra el borde del recorte |
 | Mini mandalas con el centro como una mancha negra | los límites de celda escalaban con el radio: un disco de 15 mm tenía celdas de 1 mm | mínimos absolutos: celda ≥ 2 mm², ancho de celda ≥ 3,2 mm, núcleo ≥ 3,5 mm, cuentas sólo en bandas ≥ 3 mm |
 
+### Páginas sorprendentes (Libro KDP → ✨ Páginas sorprendentes)
+
+Se suman a los mandalas normales. Planificador: `addSpecialPages` en `js/core/bookPlan.js`;
+dibujo: `js/generators/specialPages.js`.
+
+| Página | Qué es | Detalle técnico |
+|---|---|---|
+| **Mandala que crece** (1–3 secuencias) | el mismo mandala en 4 páginas seguidas; cada una añade anillos | `growth` en el motor clásico: misma semilla y motivos; el sorteo de las bandas no dibujadas se consume igual, así el interior es idéntico en cada etapa. Mínimo 8 bandas, primera etapa ≈ 50 % del radio |
+| **Mandala misterioso** (0–7) | rejilla polar que esconde una figura (corazón, estrella, gato, mariposa, luna, pez, casa) | todas las celdas llevan marca: punto = oscuro, raya = claro; si sólo la figura llevara marca se vería antes de colorear. Figuras como predicados geométricos (`mysteryMandala.js`). Página de soluciones al final, con el número de página real |
+| **Simetrías de la naturaleza** | girasol (modelo de Vogel, ángulo áureo), estrella de mar (pentarradial con placa madrepórica), copo de nieve (6 brazos, ramas a ±60°), diatomea | nota científica al pie de cada una, redactada con cautela |
+| **Mural para armar** (2×2 o 3×3) | un mandala gigante repartido en hojas, con guía | cada hoja recorta su rectángulo exacto dentro de los márgenes de KDP; la línea de corte cierra las celdas; rótulo «hoja B2» y vecinas en el margen |
+
+**Dificultad creciente (por defecto):** la complejidad sube a lo largo del libro completo, páginas
+especiales incluidas. Una secuencia que crece o un mural comparten una sola complejidad (si no,
+la etapa 3 no sería el mismo mandala que la 2).
+
 ## 2. Requisitos de KDP que el PDF cumple
 
 Fuente: [Trim size, bleed and margins (KDP)](https://kdp.amazon.com/help/topic/G201857950).
