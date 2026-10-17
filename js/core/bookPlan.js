@@ -34,6 +34,29 @@ export function bestSellerProfile(preset = "KDP_8_5x8_5") {
   };
 }
 
+/**
+ * Grosor de línea según la dificultad de la página. Los libros de mayor calidad no usan
+ * el mismo trazo en una página relajada que en una desafiante: una página sencilla con
+ * línea fina se ve pobre y una muy detallada con línea gruesa se empasta. Página más
+ * sencilla que la base ⇒ línea más gruesa (hasta +60 %); más compleja ⇒ algo más fina
+ * (hasta −15 %, nunca por debajo del mínimo de impresión que aplica quien la use).
+ */
+export function strokeScaleFor(complexity, baseComplexity) {
+  const r = Math.pow(Math.max(1, baseComplexity) / Math.max(1, complexity), 0.4);
+  return Math.round(Math.min(1.6, Math.max(0.85, r)) * 100) / 100;
+}
+
+/** Trazo final de una página: nunca por debajo de 0,35 mm (las líneas finas se pierden al imprimir). */
+export const MIN_PRINT_STROKE_MM = 0.35;
+export const MAX_AUTO_STROKE_MM = 1.2;
+export function pageStrokeMm(baseMm, scale = 1) {
+  let mm = baseMm * scale;
+  // El aumento automático no pasa de 1,2 mm: más grueso empasta las celdas pequeñas.
+  // Si el usuario eligió un trazo mayor, se respeta (nunca se adelgaza por este tope).
+  if (scale > 1) mm = Math.min(mm, Math.max(baseMm, MAX_AUTO_STROKE_MM));
+  return Math.round(Math.max(MIN_PRINT_STROKE_MM, mm) * 100) / 100;
+}
+
 function shuffled(rng, arr) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
@@ -72,7 +95,7 @@ export function shuffleBag(rng, options, weights = null) {
  *   images?: number (nº de imágenes elegidas a mano; cada una aparece UNA vez, repartidas
  *            a lo largo del libro para que no queden amontonadas al principio)
  * }
- * Devuelve [{ seed, styleMode, composition, frameStyle, petals, complexity, centerArt }]
+ * Devuelve [{ seed, styleMode, composition, frameStyle, petals, complexity, strokeScale, centerArt }]
  */
 export function planBook(opts) {
   const {
@@ -109,12 +132,118 @@ export function planBook(opts) {
     if (centerArt && composition === "medio") composition = "fondo";
     pages.push({
       seed: ((seed >>> 0) + i) >>> 0,
+      strokeScale: difficulty === "fija" ? 1 : strokeScaleFor(complexity, baseComplexity),
       styleMode: nextStyle(),
       composition,
       frameStyle: nextFrame(),
       petals: nextPetals(),
       complexity,
       centerArt,
+    });
+  }
+  return pages;
+}
+
+// ---------- Páginas sorprendentes ----------
+export const GROWTH_STAGES = 4;
+const MYSTERY_ORDER = ["corazon", "estrella", "gato", "mariposa", "luna", "pez", "casa"];
+const NATURE_ORDER = ["girasol", "estrella", "copo", "diatomea"];
+
+/** Cuántas páginas añaden las opciones especiales (sin contar los reversos). */
+export function specialPageCount({ growth = 0, mystery = 0, nature = false, mural = null } = {}) {
+  return growth * GROWTH_STAGES + mystery + (nature ? NATURE_ORDER.length : 0)
+    + (mural ? mural.cols * mural.rows + 1 : 0) + (mystery > 0 ? 1 : 0);
+}
+
+/**
+ * Posiciones (índice en el plan) de las hojas del mural, sin construir el plan.
+ * addSpecialPages las pone al final, antes de la página de soluciones; si eso cambia,
+ * cambia también aquí (lo comprueba una prueba).
+ */
+export function muralTilePositions(total, { mystery = 0, mural = null } = {}) {
+  if (!mural) return [];
+  const tiles = mural.cols * mural.rows, sol = mystery > 0 ? 1 : 0;
+  return Array.from({ length: tiles }, (_, k) => total - sol - tiles + k);
+}
+
+/**
+ * Inserta las páginas especiales en un plan de planBook y, en dificultad progresiva,
+ * reparte la complejidad sobre el libro COMPLETO (la última página es la más difícil).
+ *  - growth: nº de secuencias «mandala que crece» (GROWTH_STAGES páginas seguidas cada una)
+ *  - mystery: nº de mandalas misteriosos (repartidos; las soluciones van al final)
+ *  - nature: capítulo de simetrías naturales (bloque de 4 páginas hacia el 60 % del libro)
+ *  - mural: { cols, rows } o null (hoja guía + hojas, al final: es el gran cierre)
+ * Las páginas de un mismo grupo (secuencia o mural) comparten semilla y complejidad:
+ * si no, la etapa 3 no sería «el mismo mandala» que la 2.
+ */
+export function addSpecialPages(plan, opts = {}) {
+  const {
+    seed = 1, growth = 0, mystery = 0, nature = false, mural = null,
+    difficulty = "mixta", baseComplexity = 130,
+    styles = BOOK_STYLES, styleWeights = null, petals = [12, 16, 18, 20, 24],
+  } = opts;
+  const rng = mulberry32(((seed >>> 0) ^ 0x5BEC1A15) >>> 0);
+  const nextStyle = shuffleBag(rng, styles, styleWeights);
+  const nextPetals = shuffleBag(rng, petals);
+  const sub = (k) => ((seed >>> 0) * 31 + 0x9E3779B1 * (k + 1)) >>> 0;
+  const blank = { composition: "centro", frameStyle: "ninguno", centerArt: null, strokeScale: 1, complexity: baseComplexity };
+  const pages = plan.map(p => ({ ...p }));
+  // Insertar sin partir un bloque (secuencia que crece) por la mitad
+  const insertAt = (idx, block) => {
+    let i = Math.max(0, Math.min(pages.length, idx));
+    while (i > 0 && i < pages.length && pages[i].special?.group != null && pages[i - 1].special?.group === pages[i].special.group) i++;
+    pages.splice(i, 0, ...block);
+  };
+  let key = 0;
+
+  for (let g = 0; g < growth; g++) {
+    const s = sub(key++), styleMode = nextStyle(), pet = nextPetals();
+    const block = Array.from({ length: GROWTH_STAGES }, (_, st) => ({
+      ...blank, seed: s, styleMode, petals: pet, frameStyle: "redondeado",
+      special: { type: "grow", group: `g${g}`, stage: st, of: GROWTH_STAGES },
+    }));
+    insertAt(Math.round(((g + 0.5) * pages.length) / growth), block);
+  }
+  const shapes = MYSTERY_ORDER.slice();
+  for (let i = shapes.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [shapes[i], shapes[j]] = [shapes[j], shapes[i]]; }
+  for (let k = 0; k < mystery; k++) {
+    insertAt(Math.round(((k + 0.75) * pages.length) / (mystery + 0.5)), [{
+      ...blank, seed: sub(key++), styleMode: nextStyle(), petals: 16,
+      special: { type: "mystery", shape: shapes[k % shapes.length], n: 0, of: mystery },
+    }]);
+  }
+  // Numeración en orden de aparición (las inserciones no siguen el orden del libro)
+  let mk = 0;
+  for (const p of pages) if (p.special?.type === "mystery") p.special.n = ++mk;
+  if (nature) {
+    insertAt(Math.round(pages.length * 0.6), NATURE_ORDER.map((kind) => ({
+      ...blank, seed: sub(key++), styleMode: "floral", petals: 12, special: { type: "nature", kind },
+    })));
+  }
+  if (mural) {
+    const s = sub(key++), styleMode = nextStyle(), pet = nextPetals();
+    const group = "mural";
+    pages.push({ ...blank, seed: s, styleMode, petals: pet, special: { type: "mural", group, guide: true, cols: mural.cols, rows: mural.rows } });
+    for (let row = 0; row < mural.rows; row++) for (let col = 0; col < mural.cols; col++) {
+      pages.push({ ...blank, seed: s, styleMode, petals: pet, special: { type: "mural", group, cols: mural.cols, rows: mural.rows, col, row } });
+    }
+  }
+  if (mystery > 0) pages.push({ ...blank, seed: sub(key++), styleMode: "floral", petals: 12, special: { type: "solutions" } });
+
+  // Dificultad creciente sobre el libro completo. Los grupos toman la complejidad de su
+  // primera página; las soluciones no cuentan (no se colorean).
+  if (difficulty === "progresiva") {
+    const top = Math.max(baseComplexity, 200);
+    const N = pages.length;
+    const groupCx = new Map();
+    pages.forEach((p, i) => {
+      if (p.special?.type === "solutions") return;
+      const t = N > 1 ? i / (N - 1) : 0;
+      let cx = Math.round(40 + t * (top - 40));
+      const g = p.special?.group;
+      if (g != null) { if (!groupCx.has(g)) groupCx.set(g, cx); cx = groupCx.get(g); }
+      p.complexity = cx;
+      p.strokeScale = strokeScaleFor(cx, baseComplexity);
     });
   }
   return pages;

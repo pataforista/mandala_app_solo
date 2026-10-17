@@ -44,6 +44,21 @@ con simetría alta y sin marcos pesados (`bestSellerProfile` en `js/core/bookPla
 
 Para usar tus propias composiciones elige «Elegir yo las composiciones».
 
+### Comparación con los más vendidos y mejoras de calidad (octubre 2026)
+
+Revisión del top de Amazon «Mandalas & Patterns Coloring Books for Grown-Ups» (captura de la lista,
+no datos de ventas propios): #1 *Large Print Easy Color & Frame* (31 diseños de trazo grueso, una cara),
+#2 *Mindfulness Patterns* (50 diseños, una cara), #3 *100 Amazing Patterns* (100 diseños, una cara).
+Quejas frecuentes en reseñas: doble cara, papel que traspasa, líneas pixeladas y celdas diminutas.
+
+| Mejora | Dónde | Qué resuelve |
+|---|---|---|
+| Nivel «Adulto · Trazo grueso» (1 mm, celdas ≥ 6 mm², sin texturas) | Diseñar → Nivel de dificultad | el segmento n.º 1 en ventas no tenía equivalente adulto |
+| Trazo según la dificultad de cada página (`strokeScaleFor`) | modo libro, dificultad mixta o progresiva | página fácil hasta +60 % de grosor; difícil hasta −15 %, nunca < 0,35 mm |
+| Reverso negro opcional (panel dentro de los márgenes) | Libro KDP → Textos y páginas extra | oculta lo que traspase el marcador; KDP sin sangrado no admite tinta hasta el corte |
+| Nitidez 600 DPI opcional | Libro KDP → Textos y páginas extra | líneas más limpias; avisa si el navegador (Safari móvil) no admite lienzos tan grandes |
+| 50 mandalas por defecto y consejos de calidad en el resumen | Libro KDP | formato, cantidad, reverso en blanco y trazo fino |
+
 ### Composiciones corregidas (revisión del libro de 30 mandalas, semilla 3164907524)
 
 | Problema visto en el PDF | Causa | Corrección |
@@ -52,6 +67,22 @@ Para usar tus propias composiciones elige «Elegir yo las composiciones».
 | «Medio mandala» cortado también por los lados | radio de 0,62 × ancho | radio ≤ 0,48 × ancho: sólo lo corta la línea de base |
 | Celdas abiertas en el borde de las páginas recortadas sin marco | el recorte no dejaba línea | una línea cierra el borde del recorte |
 | Mini mandalas con el centro como una mancha negra | los límites de celda escalaban con el radio: un disco de 15 mm tenía celdas de 1 mm | mínimos absolutos: celda ≥ 2 mm², ancho de celda ≥ 3,2 mm, núcleo ≥ 3,5 mm, cuentas sólo en bandas ≥ 3 mm |
+
+### Páginas sorprendentes (Libro KDP → ✨ Páginas sorprendentes)
+
+Se suman a los mandalas normales. Planificador: `addSpecialPages` en `js/core/bookPlan.js`;
+dibujo: `js/generators/specialPages.js`.
+
+| Página | Qué es | Detalle técnico |
+|---|---|---|
+| **Mandala que crece** (1–3 secuencias) | el mismo mandala en 4 páginas seguidas; cada una añade anillos | `growth` en el motor clásico: misma semilla y motivos; el sorteo de las bandas no dibujadas se consume igual, así el interior es idéntico en cada etapa. Mínimo 8 bandas, primera etapa ≈ 50 % del radio |
+| **Mandala misterioso** (0–7) | rejilla polar que esconde una figura (corazón, estrella, gato, mariposa, luna, pez, casa) | todas las celdas llevan marca: punto = oscuro, raya = claro; si sólo la figura llevara marca se vería antes de colorear. Figuras como predicados geométricos (`mysteryMandala.js`). Página de soluciones al final, con el número de página real |
+| **Simetrías de la naturaleza** | girasol (modelo de Vogel, ángulo áureo), estrella de mar (pentarradial con placa madrepórica), copo de nieve (6 brazos, ramas a ±60°), diatomea | nota científica al pie de cada una, redactada con cautela |
+| **Mural para armar** (2×2 o 3×3) | un mandala gigante repartido en hojas, con guía | cada hoja recorta su rectángulo exacto dentro de los márgenes de KDP; la línea de corte cierra las celdas; rótulo «hoja B2» y vecinas en el margen |
+
+**Dificultad creciente (por defecto):** la complejidad sube a lo largo del libro completo, páginas
+especiales incluidas. Una secuencia que crece o un mural comparten una sola complejidad (si no,
+la etapa 3 no sería el mismo mandala que la 2).
 
 ## 2. Requisitos de KDP que el PDF cumple
 
@@ -67,6 +98,7 @@ Fuente: [Trim size, bleed and margins (KDP)](https://kdp.amazon.com/help/topic/G
 | PDF aplanado, sin transparencias | ✘ cada página llevaba máscara alfa (SMask) | ✔ PNG en gris de 8 bits sin alfa (además ~4× más ligero) |
 | Número de páginas par | a veces impar | siempre par |
 | Mandalas en página derecha con reverso en blanco | ✔ | ✔ |
+| Sin páginas en blanco (opcional, «Reverso de cada página»: doble cara) | — | otro dibujo al reverso; si el total sale impar se añade un mandala en vez de una hoja en blanco. Las hojas del mural conservan el reverso en blanco (se recortan) |
 | Página de derechos de autor | — | opcional (activada por defecto) |
 
 Al subir a KDP elige: **tinta negra, papel blanco, sin sangrado (No bleed)** y el mismo tamaño de corte

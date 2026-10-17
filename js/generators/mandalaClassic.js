@@ -81,6 +81,8 @@ export function generateMandalaClassic(doc, opts) {
   const artFrac = art ? Math.max(0.25, Math.min(0.6, art.scale ?? 0.42)) : 0;
   let B = outlineMode ? 4 + Math.round(cF * 2 + rng() * 0.8) : 5 + Math.round(cF * 4 + rng() * 1.2);
   if (art) B = Math.max(3, B - Math.round(artFrac * 6));
+  // Mínimo de bandas: un mural gigante o una secuencia «que crece» necesitan más anillos
+  if (opts.minBands) B = Math.max(B, opts.minBands);
   // Mandalas pequeños de relleno: pocas bandas o las celdas se vuelven incoloreables
   if (opts.maxBands) B = Math.max(2, Math.min(B, opts.maxBands));
   // Núcleo con tamaño absoluto mínimo: en los mini mandalas un núcleo de 1–2 mm
@@ -357,15 +359,31 @@ export function generateMandalaClassic(doc, opts) {
     if (includeFrames) { const p2 = mainPB(); rect(p2, m + 2.5, m + 2.5, page.wMm - m - 2.5, page.hMm - m - 2.5, rr * 0.6); emit(p2, detailW); }
   }
 
+  // «Mandala que crece» (opts.growth ∈ [0, 1]): sólo se dibujan las bandas interiores.
+  // Todas las etapas comparten semilla, bandas y motivos: el lector ve el MISMO mandala
+  // ganar anillos, no mandalas distintos. La primera etapa ya ocupa ~50 % del radio.
+  let kDraw = B;
+  if (Number.isFinite(opts.growth)) {
+    let kMin = 2;
+    while (kMin < B && bands[kMin - 1].r1 < R * 0.5) kMin++;
+    // Siempre quedan al menos 3 anillos por añadir: 4 etapas distintas
+    kMin = Math.max(2, Math.min(kMin, B - 3));
+    kDraw = Math.min(B, kMin + Math.round((B - kMin) * Math.max(0, Math.min(1, opts.growth))));
+  }
   for (let k = B - 1; k >= 0; k--) {
     const b = bands[k];
+    // El sorteo se consume aunque la banda no se dibuje: así cada etapa reproduce
+    // exactamente los anillos interiores de la anterior
+    const extraRing = includeFrames && detail && k > 0 && b.motif !== "beads" && bands[k - 1].motif !== "beads" && (b.r1 - b.r0) > 9 && rng() < 0.35;
+    if (k >= kDraw) continue;
     MOTIFS[b.motif](b);
     // Disco interior: tapa la base de los pétalos y traza el anillo separador
     const disc = mainPB(); circle(disc, cx, cy, b.r0); emit(disc, mainW, "#fff");
-    if (includeFrames && detail && k > 0 && b.motif !== "beads" && bands[k - 1].motif !== "beads" && (b.r1 - b.r0) > 9 && rng() < 0.35) {
+    if (extraRing) {
       const inner = mainPB(); circle(inner, cx, cy, b.r0 - Math.max(2.4, (b.r1 - b.r0) * 0.16)); emit(inner, detailW);
     }
   }
+  if (doc?.meta) doc.meta.bands = { total: B, drawn: kDraw };
 
   // ---------- Núcleo: medallón con la imagen ----------
   if (art) {

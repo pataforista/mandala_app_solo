@@ -388,3 +388,212 @@ test("perfil «más vendidos»: centrado domina, sin medios mandalas, simetría 
     assert.ok(plan.filter(p => p.styleMode === "floral").length > plan.filter(p => p.styleMode === "azteca").length, preset);
   }
 });
+
+test("trazo por página: más grueso en páginas fáciles, más fino en difíciles, nunca < 0,35 mm", async () => {
+  const { strokeScaleFor, pageStrokeMm, MIN_PRINT_STROKE_MM } = await import("../js/core/bookPlan.js");
+  assert.equal(strokeScaleFor(130, 130), 1);
+  assert.ok(strokeScaleFor(40, 130) > 1.4, "página fácil: línea claramente más gruesa");
+  assert.ok(strokeScaleFor(40, 130) <= 1.6);
+  assert.ok(strokeScaleFor(260, 130) < 1 && strokeScaleFor(260, 130) >= 0.85);
+  assert.equal(pageStrokeMm(0.3, 0.85), MIN_PRINT_STROKE_MM);
+  assert.equal(pageStrokeMm(0.55, 1.6), 0.88);
+  // Tope del aumento automático: 1,2 mm; un trazo elegido mayor se respeta
+  assert.equal(pageStrokeMm(1.0, 1.6), 1.2);
+  assert.equal(pageStrokeMm(1.5, 1.6), 1.5);
+  assert.equal(pageStrokeMm(1.0, 0.85), 0.85);
+
+  const prog = planBook({ count: 20, seed: 5, difficulty: "progresiva", baseComplexity: 130 });
+  assert.ok(prog[0].strokeScale > prog[19].strokeScale, "progresiva: la línea se afina al avanzar");
+  for (let i = 1; i < prog.length; i++) assert.ok(prog[i].strokeScale <= prog[i - 1].strokeScale);
+  const fija = planBook({ count: 10, seed: 5, difficulty: "fija", baseComplexity: 130 });
+  assert.ok(fija.every(p => p.strokeScale === 1), "fija: el trazo que eligió el usuario");
+});
+
+test("nivel «trazo grueso»: páginas válidas y sin líneas finas en los encuadres del perfil", () => {
+  const BOLD = { complexity: 85, strokeWidthMm: 1.0, petals: 16, includeFrames: true, pageBorder: true,
+    textures: false, spacing: 0.5, densityFactor: 0.5, minCellAreaMm2: 6, detailSimplification: 0.75, organicLevel: 0.2 };
+  const prof = bestSellerProfile("KDP_8_5x11");
+  for (const composition of prof.compositions) for (const styleMode of ["floral", "geometric", "islamico"]) {
+    const d = createDoc({ preset: "KDP_8_5x11", seed: 11, marginMm: 12 });
+    generateMandalaClassic(d, { ...BOLD, seed: 11, composition, styleMode, frameStyle: "ninguno" });
+    const svg = renderDocToSvgString(d);
+    assert.doesNotMatch(svg, /NaN|Infinity|undefined/, `${composition} ${styleMode}`);
+    const widths = [...svg.matchAll(/stroke-width="([\d.]+)"/g)].map(m => parseFloat(m[1]));
+    assert.ok(widths.length > 0);
+    // Trazo principal 1 mm y detalle 0,7 mm. Los mandalas pequeños (constelación, fondo)
+    // usan 0,75× a propósito para no empastarse: su detalle queda en ~0,52 mm.
+    // Sólo los puntos sólidos (0,2 mm, rellenos) pueden ser más finos.
+    assert.ok(Math.max(...widths) >= 0.99, `${composition} ${styleMode}: falta el trazo de 1 mm`);
+    const thin = widths.filter(w => w > 0.21 && w < 0.5);
+    assert.equal(thin.length, 0, `${composition} ${styleMode}: trazos finos ${thin.slice(0, 5)}`);
+  }
+});
+
+// ---------- Páginas sorprendentes ----------
+import { addSpecialPages, specialPageCount, GROWTH_STAGES } from "../js/core/bookPlan.js";
+import { generateSpecialPage } from "../js/generators/specialPages.js";
+import { mysteryGrid, MYSTERY_KEYS, generateMysteryMandala } from "../js/generators/mysteryMandala.js";
+import { NATURE_KINDS } from "../js/generators/natureSymmetry.js";
+import { muralGeometry } from "../js/generators/muralPage.js";
+
+const special = (sp, extra = {}) => {
+  const d = createDoc({ preset: "KDP_8_5x11", seed: 5, marginMm: 12 });
+  generateSpecialPage(d, { ...BASE, seed: 5, special: sp, ...extra });
+  return d;
+};
+
+test("plan con páginas sorprendentes: cuenta exacta, grupos juntos y dificultad creciente en todo el libro", () => {
+  const sp = { growth: 2, mystery: 3, nature: true, mural: { cols: 3, rows: 3 } };
+  const plan = addSpecialPages(planBook({ count: 30, seed: 8, difficulty: "progresiva" }), { seed: 8, ...sp, difficulty: "progresiva" });
+  assert.equal(plan.length, 30 + specialPageCount(sp));
+  // Cada secuencia que crece: GROWTH_STAGES páginas seguidas, etapas en orden, misma semilla
+  for (const g of ["g0", "g1"]) {
+    const idx = plan.map((p, i) => (p.special?.group === g ? i : -1)).filter(i => i >= 0);
+    assert.equal(idx.length, GROWTH_STAGES);
+    assert.equal(idx[idx.length - 1] - idx[0], GROWTH_STAGES - 1, "etapas seguidas");
+    assert.deepEqual(idx.map(i => plan[i].special.stage), [0, 1, 2, 3]);
+    assert.equal(new Set(idx.map(i => plan[i].seed)).size, 1);
+    assert.equal(new Set(idx.map(i => plan[i].complexity)).size, 1, "la secuencia no cambia de complejidad");
+  }
+  assert.equal(plan[plan.length - 1].special.type, "solutions");
+  assert.ok(plan[plan.length - 2 - 9].special.guide, "guía del mural antes de sus 9 hojas");
+  // Dificultad creciente: nunca baja de una página a la siguiente
+  const cx = plan.filter(p => p.special?.type !== "solutions").map(p => p.complexity);
+  for (let i = 1; i < cx.length; i++) assert.ok(cx[i] >= cx[i - 1], `baja en ${i}: ${cx[i - 1]} → ${cx[i]}`);
+  assert.ok(cx[0] <= 45 && cx[cx.length - 1] >= 150);
+  // Determinista
+  assert.deepEqual(addSpecialPages(planBook({ count: 30, seed: 8, difficulty: "progresiva" }), { seed: 8, ...sp, difficulty: "progresiva" }), plan);
+});
+
+test("mandala que crece: cada etapa añade anillos y conserva exactamente los interiores", () => {
+  for (const seed of [1, 7, 42]) {
+    const stages = [0, 1, 2, 3].map(stage => {
+      const d = createDoc({ preset: "KDP_8_5x11", seed, marginMm: 12 });
+      generateSpecialPage(d, { ...BASE, seed, special: { type: "grow", stage, of: 4 } });
+      return d;
+    });
+    const drawn = stages.map(d => d.meta.bands.drawn);
+    for (let i = 1; i < 4; i++) assert.ok(drawn[i] > drawn[i - 1], `seed ${seed}: ${drawn}`);
+    assert.equal(drawn[3], stages[3].meta.bands.total, "la última etapa es el mandala completo");
+    // El núcleo (lo último que se dibuja) es idéntico en todas las etapas
+    const core = (d) => d.body.filter(x => x.startsWith("<path")).slice(-3).join("");
+    for (const d of stages) assert.equal(core(d), core(stages[0]));
+  }
+});
+
+test("mandala misterioso: todas las celdas llevan marca y cada figura marca una parte razonable", () => {
+  for (const shape of MYSTERY_KEYS) {
+    const g = mysteryGrid({ cx: 0, cy: 0, R: 90, shape, complexity: 130 });
+    const cells = g.rings.reduce((s, r) => s + r.n, 0) + 1;
+    const frac = (g.marked.size + (g.coreMarked ? 1 : 0)) / cells;
+    assert.ok(frac > 0.06 && frac < 0.5, `${shape}: ${(frac * 100).toFixed(1)} % marcado`);
+    // Celdas coloreables: anillo ≥ 3 mm de alto
+    assert.ok(g.t >= 3, `${shape}: anillo de ${g.t.toFixed(2)} mm`);
+    const d = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 12 });
+    generateMysteryMandala(d, { seed: 2, shape });
+    const svg = renderDocToSvgString(d);
+    assert.doesNotMatch(svg, /NaN|Infinity|undefined/);
+    assert.ok(d.meta.mystery.marked > 0);
+  }
+  // La solución rellena celdas; el acertijo no
+  const solved = special({ type: "solutions", entries: [{ label: "Página 9 · gato", shape: "gato", seed: 3, complexity: 130 }] });
+  assert.match(renderDocToSvgString(solved), /fill="#4a4a4a"/);
+  assert.doesNotMatch(renderDocToSvgString(special({ type: "mystery", shape: "gato" })), /fill="#4a4a4a"/);
+});
+
+test("simetrías de la naturaleza: SVG válido, nota al pie y dibujo dentro del margen", () => {
+  for (const kind of NATURE_KINDS) for (const preset of ["KDP_8_5x11", "KDP_6x9", "KDP_8_5x8_5"]) {
+    const d = createDoc({ preset, seed: 4, marginMm: 12 });
+    generateSpecialPage(d, { ...BASE, seed: 4, special: { type: "nature", kind } });
+    const svg = renderDocToSvgString(d);
+    assert.doesNotMatch(svg, /NaN|Infinity|undefined/, `${kind} ${preset}`);
+    assert.match(svg, /<text /, `${kind}: falta la nota`);
+    const b = bbox(d.body.filter(x => x.startsWith("<path")));
+    assert.ok(b.x0 >= 12 - 0.5 && b.y0 >= 12 - 0.5 && b.x1 <= d.page.wMm - 12 + 0.5 && b.y1 <= d.page.hMm - 12 + 0.5, `${kind} ${preset} sale del margen`);
+  }
+});
+
+test("mural: cada hoja muestra su rectángulo exacto del diseño y la guía rotula todas", () => {
+  const sp = { type: "mural", cols: 2, rows: 2 };
+  const tiles = [];
+  for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) tiles.push(special({ ...sp, col, row }));
+  const { m, tw, th } = muralGeometry(tiles[0].page, 2, 2);
+  tiles.forEach((d, k) => {
+    const svg = renderDocToSvgString(d);
+    assert.doesNotMatch(svg, /NaN|Infinity|undefined/);
+    assert.match(svg, new RegExp(`<rect x="${m}" y="${m}" width="${tw}" height="${th}"`));
+    const col = k % 2, row = Math.floor(k / 2);
+    assert.match(svg, new RegExp(`translate\\(${(m - col * tw).toFixed(3)} ${(m - row * th).toFixed(3)}\\)`));
+  });
+  // Todas las hojas recortan el MISMO mural
+  const inner = (d) => renderDocToSvgString(d).split(/<g transform="translate\([^)]*\)">/)[1].split("</g></g>")[0].replace(/-[a-z0-9]+-\d+\)/g, ")");
+  assert.equal(inner(tiles[0]), inner(tiles[3]));
+  const guide = renderDocToSvgString(special({ ...sp, guide: true }));
+  for (const t of ["A1", "B1", "A2", "B2"]) assert.match(guide, new RegExp(`>${t}</text>`));
+});
+
+test("rótulos del pie de página: fuera de la franja de 6,35 mm que KDP prohíbe", () => {
+  for (const sp of [{ type: "grow", stage: 1, of: 4 }, { type: "mural", cols: 2, rows: 2, col: 1, row: 1 }]) {
+    const d = special(sp);
+    for (const m of renderDocToSvgString(d).matchAll(/<text x="[\d.]+" y="([\d.]+)" font-family="[^"]+" font-size="([\d.]+)"/g)) {
+      // Línea base + descendentes (~25 % del cuerpo) a ≥ 6,35 mm del corte inferior
+      assert.ok(d.page.hMm - (parseFloat(m[1]) + parseFloat(m[2]) * 0.25) >= 6.35, `${sp.type}: rótulo a ${(d.page.hMm - parseFloat(m[1])).toFixed(2)} mm`);
+    }
+  }
+});
+
+test("mural: cambiar una opción de dibujo no devuelve el mural de la caché", () => {
+  const a = renderDocToSvgString(special({ type: "mural", cols: 2, rows: 2, col: 0, row: 0 }, { spacing: 0.3 }));
+  const b = renderDocToSvgString(special({ type: "mural", cols: 2, rows: 2, col: 0, row: 0 }, { spacing: 0.8 }));
+  assert.notEqual(a, b);
+});
+
+test("girasol: la nota cita las espirales que tiene el dibujo, y son Fibonacci consecutivos", () => {
+  const FIB = [8, 13, 21, 34, 55, 89];
+  for (const preset of ["KDP_8_5x11", "KDP_6x9", "KDP_8_5x8_5"]) for (const complexity of [40, 130, 220]) {
+    const d = createDoc({ preset, seed: 3, marginMm: 12 });
+    generateSpecialPage(d, { ...BASE, seed: 3, complexity, special: { type: "nature", kind: "girasol" } });
+    const [a, b] = d.meta.spirals;
+    assert.ok(FIB.indexOf(b) === FIB.indexOf(a) + 1, `${preset} ${complexity}: ${a} y ${b}`);
+    const svg = renderDocToSvgString(d);
+    assert.match(svg, new RegExp(`en este dibujo hay ${a} y ${b}\\.`));
+    assert.match(svg, new RegExp(`como ${b} y ${a + b}, aunque`), "el ejemplo real es el par siguiente");
+    assert.doesNotMatch(svg, /@[a-d]/);
+  }
+});
+
+test("doble cara: sin páginas en blanco salvo los reversos que se piden (hojas del mural)", () => {
+  const L = bookLayout({ mandalas: 9, blankBack: false, titlePage: true });
+  assert.equal(L.filter(p => p.kind === "blank").length, 0, "título + 9 = 10 páginas, ninguna en blanco");
+  // Las hojas del mural (índices 7–8) conservan su reverso; el resto, no
+  const M = bookLayout({ mandalas: 9, blankBack: false, titlePage: true, keepBack: [7, 8] });
+  const blanks = M.map((p, i) => (p.kind === "blank" ? M[i - 1] : null)).filter(Boolean);
+  assert.deepEqual(blanks.map(p => p.index), [7, 8]);
+  assert.equal(M.length, 12);
+  // Total impar: bookLayout rellena con una página en blanco al final. La app lo evita
+  // añadiendo un mandala más; aquí se comprueba que el relleno sólo ocurre en ese caso
+  const odd = bookLayout({ mandalas: 9, blankBack: false, titlePage: true, keepBack: [8] });
+  assert.equal(odd[odd.length - 1].kind, "blank");
+  assert.equal(bookLayout({ mandalas: 10, blankBack: false, titlePage: true, keepBack: [9] }).length % 2, 0);
+  // pad: false revela el total natural (impar) que la app corrige con un mandala más
+  assert.equal(bookLayout({ mandalas: 9, blankBack: false, titlePage: true, keepBack: [8], pad: false }).length, 11);
+});
+
+test("muralTilePositions coincide con dónde addSpecialPages pone las hojas del mural", async () => {
+  const { muralTilePositions } = await import("../js/core/bookPlan.js");
+  for (const mystery of [0, 2]) for (const mural of [{ cols: 2, rows: 2 }, { cols: 3, rows: 3 }]) for (const count of [1, 5, 30]) {
+    const sp = { growth: 1, mystery, nature: true, mural };
+    const plan = addSpecialPages(planBook({ count, seed: 4 }), { seed: 4, ...sp });
+    const real = plan.map((p, i) => (p.special?.type === "mural" && !p.special.guide ? i : -1)).filter(i => i >= 0);
+    assert.deepEqual(muralTilePositions(plan.length, sp), real);
+  }
+});
+
+test("misteriosos numerados en orden de aparición, con rótulo en su página", () => {
+  const plan = addSpecialPages(planBook({ count: 20, seed: 6 }), { seed: 6, mystery: 4 });
+  const ms = plan.filter(p => p.special?.type === "mystery");
+  assert.deepEqual(ms.map(p => p.special.n), [1, 2, 3, 4]);
+  assert.ok(ms.every(p => p.special.of === 4));
+  const svg = renderDocToSvgString(special(ms[1].special));
+  assert.match(svg, />Misterioso 2 de 4 · solución al final</);
+});

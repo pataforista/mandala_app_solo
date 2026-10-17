@@ -349,8 +349,8 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
 /**
  * Páginas totales de un libro (incluye el relleno a número par que exige la imprenta).
  */
-export function bookPageCount({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, colorTest = false }) {
-  return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage }).length;
+export function bookPageCount({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, colorTest = false, keepBack = [] }) {
+  return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, keepBack }).length;
 }
 
 /** Rasteriza un SVG en un canvas con fondo blanco. */
@@ -378,6 +378,21 @@ function blankCanvas(widthPx, heightPx) {
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, widthPx, heightPx);
   return canvas;
+}
+
+/** ¿Puede el navegador dibujar en un lienzo de w×h? (Safari devuelve un lienzo vacío si no.) */
+function canvasWorks(w, h) {
+  try {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    if (!ctx) return false;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(w - 1, h - 1, 1, 1);
+    const ok = ctx.getImageData(w - 1, h - 1, 1, 1).data[3] === 255;
+    c.width = c.height = 0; // libera la memoria en el acto
+    return ok;
+  } catch { return false; }
 }
 
 /** Canvas → PNG gris de 8 bits sin alfa (sin transparencias en el PDF). */
@@ -410,8 +425,10 @@ function drawTextBlock(ctx, text, { x, y, maxW, sizePx, weight = "normal", font 
  * Libro completo para imprimir en Amazon KDP (tapa blanda, interior B/N, sin sangrado).
  * Orden: [título][copyright|blanco][prueba de color][blanco][m1][blanco][m2]…, siempre par.
  * opts: { preset, genOpts(i) -> opciones del generador, title, subtitle, author,
- *         titlePage, copyrightPage, copyrightText, colorTest, blankBack, pageNumbers,
+ *         titlePage, copyrightPage, copyrightText, colorTest, blankBack, blackBack, pageNumbers,
  *         dpi, marginMm, onProgress }
+ * blackBack: el reverso de cada mandala lleva un panel negro dentro de los márgenes
+ * (sin sangrado KDP no admite tinta hasta el corte). Oculta lo que traspase el marcador.
  */
 export async function downloadBookPdf(filename, generateFn, count, opts) {
   if (!window.jspdf || !window.jspdf.jsPDF) {
@@ -420,7 +437,7 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
   const {
     preset, genOpts, title = "Mandalas para Colorear", subtitle = "", author = "",
     titlePage = true, copyrightPage = false, copyrightText = "", colorTest = false,
-    blankBack = true, pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
+    blankBack = true, blackBack = false, keepBack = [], pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
   } = opts;
 
   const { wMm, hMm } = createDoc({ preset }).page;
@@ -439,8 +456,13 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
   const pxPerMm = dpi / 25.4;
   const wPx = Math.ceil(wMm * pxPerMm);
   const hPx = Math.ceil(hMm * pxPerMm);
+  // Algunos navegadores (Safari en iPhone/iPad) limitan el lienzo a ~16 Mpx y devuelven
+  // una página en blanco sin avisar. Mejor fallar con un mensaje claro.
+  if (!canvasWorks(wPx, hPx)) {
+    throw new Error(`Este navegador no puede dibujar páginas de ${wPx}×${hPx} px (${dpi} DPI). Elige 300 DPI o usa un ordenador.`);
+  }
   // La prueba de color ocupa el lugar de un mandala más (con su reverso)
-  const layout = bookLayout({ mandalas: count + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage });
+  const layout = bookLayout({ mandalas: count + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, keepBack });
   const total = layout.length;
   const yieldUI = () => new Promise(r => setTimeout(r, 0));
 
@@ -499,6 +521,17 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
       canvas = await svgToCanvas(renderDocToSvgString(doc), wPx, hPx);
       numberCanvas(canvas, pageNo);
       label = `Mandala ${i + 1} de ${count}`;
+    } else if (blackBack && p > 0 && layout[p - 1].kind === "mandala") {
+      // Reverso de un mandala: panel negro dentro de la zona segura
+      canvas = blankCanvas(wPx, hPx);
+      const ctx = canvas.getContext("2d");
+      const m = marginMm * pxPerMm, r = 4 * pxPerMm;
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(m, m, wPx - 2 * m, hPx - 2 * m, r);
+      else ctx.rect(m, m, wPx - 2 * m, hPx - 2 * m);
+      ctx.fill();
+      label = "Reverso negro";
     } else {
       label = "Página en blanco";
     }

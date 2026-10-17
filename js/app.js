@@ -11,7 +11,10 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES } from "./core/bookPlan.js";
+import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
+import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
+import { escapeXml } from "./core/svgText.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
@@ -302,6 +305,32 @@ const COLORING_PRESETS = {
     layer6Intensity: 0.8,
     layer7Intensity: 0.65,
     layer8Intensity: 0.35,
+    outlineMode: false,
+  },
+  letra_grande: {
+    // Adulto · Trazo grueso («large print»): el segmento que más se vende en Amazon.
+    // Diseños de detalle moderado con línea de 1 mm, celdas amplias y sin texturas
+    // (las texturas finas son justo lo que empasta una página de trazo grueso).
+    // Sigue siendo adulto: más bandas y simetría que el nivel infantil.
+    generatorType: "classic",
+    complexity: 85,
+    organic: 0.2,
+    strokeWidth: 1.0,
+    spacing: 0.5,
+    densityFactor: 0.5,
+    minCellArea: 6.0,
+    detailSimplification: 0.75,
+    textures: false,
+    frames: true,
+    pageBorder: true,
+    layer1Intensity: 0.85,
+    layer2Intensity: 0.85,
+    layer3Intensity: 0.85,
+    layer4Intensity: 0.8,
+    layer5Intensity: 0.3,
+    layer6Intensity: 0.85,
+    layer7Intensity: 0.65,
+    layer8Intensity: 0,
     outlineMode: false,
   },
   experto: {
@@ -1705,21 +1734,55 @@ function bindUI() {
   // Sólo las imágenes con uso elegido a mano Y que pasan la lista de verificación
   const chosenFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && figureStatus(m).ready);
   const pendingFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && !figureStatus(m).ready);
-  const bookBlankBackEl = document.getElementById("bookBlankBack");
+  // Reverso: "blanco" | "negro" | "ninguno" (doble cara, sin páginas en blanco)
+  const bookBackEl = document.getElementById("bookBack");
+  const backMode = () => bookBackEl?.value || "blanco";
   const bookTitlePageEl = document.getElementById("bookTitlePage");
   const bookCopyrightEl = document.getElementById("bookCopyright");
   const bookColorTestEl = document.getElementById("bookColorTest");
   const bookPageNumbersEl = document.getElementById("bookPageNumbers");
+  const bookDpiEl = document.getElementById("bookDpi");
   const bookSummaryEl = document.getElementById("bookSummary");
 
   const bookCount = () => Math.min(120, Math.max(1, parseInt(bookPagesEl?.value, 10) || 1));
-  const bookLayoutOpts = () => ({
-    mandalas: bookCount(),
-    blankBack: bookBlankBackEl.checked,
+  // Páginas sorprendentes: se suman a los mandalas normales
+  const bookGrowthEl = document.getElementById("bookGrowth");
+  const bookMysteryEl = document.getElementById("bookMystery");
+  const bookNatureEl = document.getElementById("bookNature");
+  const bookMuralEl = document.getElementById("bookMural");
+  const specialOpts = () => {
+    const mural = bookMuralEl?.value && bookMuralEl.value !== "ninguno" ? bookMuralEl.value.split("x").map(Number) : null;
+    return {
+      growth: Math.max(0, Math.min(3, parseInt(bookGrowthEl?.value, 10) || 0)),
+      mystery: Math.max(0, Math.min(7, parseInt(bookMysteryEl?.value, 10) || 0)),
+      nature: !!bookNatureEl?.checked,
+      mural: mural ? { cols: mural[0], rows: mural[1] } : null,
+    };
+  };
+  const layoutFor = (regular) => {
+    const total = regular + specialPageCount(specialOpts());
+    const off = bookColorTestEl?.checked ? 1 : 0;
+    const doubleSided = backMode() === "ninguno";
+    return {
+      mandalas: total,
+      blankBack: !doubleSided,
+      // A doble cara, el mural conserva sus reversos en blanco: se recorta
+      keepBack: doubleSided ? muralTilePositions(total, specialOpts()).map(i => i + off) : [],
     titlePage: bookTitlePageEl.checked,
     copyrightPage: !!bookCopyrightEl?.checked,
     colorTest: !!bookColorTestEl?.checked,
-  });
+    };
+  };
+  // A doble cara, un total impar dejaría la última página en blanco: se añade un mandala
+  const regularCount = () => {
+    const n = bookCount();
+    if (backMode() !== "ninguno") return n;
+    const lo = layoutFor(n);
+    // Sin el relleno: bookPageCount siempre devuelve un total par
+    const natural = bookLayout({ ...lo, mandalas: lo.mandalas + (lo.colorTest ? 1 : 0), pad: false }).length;
+    return natural % 2 ? n + 1 : n;
+  };
+  const bookLayoutOpts = () => layoutFor(regularCount());
   // El margen depende del grosor del libro (medianil de KDP): se calcula con el total
   const bookMargin = (total) => kdpSafeMarginMm(total, 10);
 
@@ -1728,19 +1791,38 @@ function bindUI() {
     const total = bookPageCount(bookLayoutOpts());
     const margin = bookMargin(total);
     const { wMm, hMm } = getCurrentDoc().page;
-    const checks = kdpChecklist({ pages: total, marginMm: margin, dpi: 300 });
+    const dpi = parseInt(bookDpiEl?.value, 10) || 300;
+    const checks = kdpChecklist({ pages: total, marginMm: margin, dpi });
     const bad = checks.filter(c => !c.ok);
     bookSummaryEl.innerHTML =
-      `${total} páginas · ${wMm}×${hMm} mm · margen ${margin.toFixed(1)} mm<br>` +
+      `${total} páginas · ${wMm}×${hMm} mm · margen ${margin.toFixed(1)} mm · ${dpi} DPI<br>` +
       (bad.length ? bad.map(c => `⚠️ ${c.msg}`).join("<br>") : "✅ Cumple los requisitos de interior de KDP (sin sangrado).");
+    // Consejos de calidad (no bloquean): lo que distingue a los libros mejor valorados
+    const tips = [];
+    if (!/^KDP_/.test(state.preset)) tips.push("💡 8.5×11 in es el formato más común en libros de mandalas; A4 y Carta también los acepta KDP.");
+    if (bookCount() < 40) tips.push(`💡 ${bookCount()} mandalas: los libros mejor valorados traen entre 40 y 100.`);
+    if (backMode() === "ninguno") {
+      tips.push("💡 Doble cara: ideal para lápices de colores. Con marcadores la tinta puede traspasar al dibujo del otro lado.");
+      if (regularCount() > bookCount()) tips.push(`➕ Se añade 1 mandala (${regularCount()} en total) para que la última página no quede en blanco.`);
+      const sp0 = specialOpts();
+      if (sp0.mural) tips.push(`⚠️ El mural se recorta: sus ${sp0.mural.cols * sp0.mural.rows} hojas conservan el reverso en blanco. Quita el mural si no quieres ninguna página en blanco.`);
+    }
+    if (state.strokeWidth < 0.45) tips.push("💡 Trazo fino (< 0,45 mm): bonito en pantalla, pero en papel de KDP se ve gris. Prueba «Adulto · Trazo grueso» o sube el grosor.");
+    const sp = specialOpts(), extra = [];
+    if (sp.growth) extra.push(`${sp.growth} mandala(s) que crece(n) (${sp.growth * GROWTH_STAGES} págs.)`);
+    if (sp.mystery) extra.push(`${sp.mystery} misterioso(s) + soluciones`);
+    if (sp.nature) extra.push("capítulo de simetrías naturales (4 págs.)");
+    if (sp.mural) extra.push(`mural de ${sp.mural.cols}×${sp.mural.rows} hojas + guía`);
+    if (extra.length) bookSummaryEl.innerHTML += `<br>✨ ${bookCount()} mandalas + ${extra.join(", ")}.`;
+    if (tips.length) bookSummaryEl.innerHTML += "<br>" + tips.join("<br>");
     const chosen = chosenFigures();
     const info = document.getElementById("bookImagesInfo");
     if (info) {
       info.innerHTML = chosen.length
-        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano: ` + chosen.map(m => `${m.name} (${FIGURE_USES.find(u => u[0] === m.use)[1].toLowerCase()})`).join(", ")
+        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano: ` + chosen.map(m => `${escapeXml(m.name)} (${FIGURE_USES.find(u => u[0] === m.use)[1].toLowerCase()})`).join(", ")
         : "Ninguna imagen lista: el libro será sólo de mandalas. Para incluir una, elige su uso en «Mis imágenes».";
       const pend = pendingFigures();
-      if (pend.length) info.innerHTML += `<br>❌ No entran (no están listas): ${pend.map(m => m.name).join(", ")}. Revisa su lista de verificación.`;
+      if (pend.length) info.innerHTML += `<br>❌ No entran (no están listas): ${pend.map(m => escapeXml(m.name)).join(", ")}. Revisa su lista de verificación.`;
     }
     if (chosen.length > bookCount()) bookSummaryEl.innerHTML += `<br>⚠️ Hay ${chosen.length} imágenes elegidas y sólo ${bookCount()} páginas: sobran ${chosen.length - bookCount()}.`;
   };
@@ -1766,7 +1848,7 @@ function bindUI() {
   };
 
   const buildBook = () => {
-    const count = bookCount();
+    const regular = regularCount();
     const baseSeed = state.seed >>> 0;
     const isClassic = state.generatorType === "classic";
     const chosen = isClassic ? chosenFigures() : [];
@@ -1776,8 +1858,8 @@ function bindUI() {
     // «Lo más vendido»: composiciones, estilos, marcos y pétalos con los pesos del perfil
     const prof = vary && bestSeller() ? bestSellerProfile(state.preset) : null;
     // Plan de todo el libro antes de dibujar: sin rachas de estilos ni encuadres repetidos
-    const plan = planBook({
-      count, seed: baseSeed,
+    const regularPlan = planBook({
+      count: regular, seed: baseSeed,
       styles: vary ? prof?.styles : [state.styleMode],
       styleWeights: prof?.styleWeights ?? null,
       petals: prof?.petals,
@@ -1789,18 +1871,51 @@ function bindUI() {
       baseComplexity: base.complexity,
       images: chosen.length,
     });
+    // Páginas sorprendentes y, en modo progresivo, dificultad creciente en TODO el libro
+    const plan = addSpecialPages(regularPlan, {
+      seed: baseSeed, ...specialOpts(),
+      difficulty: bookDifficultyEl?.value || "progresiva",
+      baseComplexity: base.complexity,
+      styles: vary ? prof?.styles : [state.styleMode], styleWeights: prof?.styleWeights ?? null,
+    });
+    const count = plan.length;
     const overrides = currentOverrides();
+    // Las páginas de un grupo (secuencia que crece, mural) cambian juntas
+    const ovKey = (i) => (plan[i].special?.group != null ? `g:${plan[i].special.group}` : i);
+    const seedOf = (i) => { const ov = overrides.get(ovKey(i)); return ov?.bump ? ((plan[i].seed + 0x9E3779B1 * ov.bump) >>> 0) : plan[i].seed; };
+    // Soluciones: número de página real de cada mandala misterioso en el PDF
+    const solutionEntries = () => {
+      const lo = bookLayoutOpts();
+      const layout = bookLayout({ ...lo, mandalas: count + (lo.colorTest ? 1 : 0) });
+      const off = lo.colorTest ? 1 : 0;
+      return plan.map((p, j) => ({ p, j })).filter(({ p }) => p.special?.type === "mystery").map(({ p, j }) => ({
+        // El número del misterioso va impreso en su propia página: sirve aunque el libro
+        // no lleve números de página
+        label: `Misterioso ${p.special.n} (pág. ${layout.findIndex(q => q.kind === "mandala" && q.index === j + off) + 1}) · ${MYSTERY_SHAPES[p.special.shape]?.name || p.special.shape}`,
+        shape: p.special.shape, seed: seedOf(j), complexity: p.complexity,
+      }));
+    };
     // Registro de fuentes: qué imagen va en qué página (trazabilidad de derechos)
     const sourceLog = [];
 
     const makeOpts = (i) => {
       const pg = plan[i];
-      const ov = overrides.get(i);
-      // «Otro diseño» desplaza la semilla de esa página sin tocar las demás
-      const seed = ov?.bump ? ((pg.seed + 0x9E3779B1 * ov.bump) >>> 0) : pg.seed;
+      const ov = overrides.get(ovKey(i));
+      // «Otro diseño» desplaza la semilla de esa página (o de su grupo) sin tocar las demás
+      const seed = seedOf(i);
+      if (pg.special) {
+        const special = { ...pg.special };
+        if (special.type === "solutions") special.entries = solutionEntries();
+        const o = { ...base, seed, complexity: pg.complexity, petals: pg.petals, styleMode: pg.styleMode,
+          strokeWidthMm: pageStrokeMm(base.strokeWidthMm, pg.strokeScale ?? 1), special };
+        sourceLog[i] = { mandala: i + 1, composition: specialLabel(special), style: o.styleMode, image: "", source: "" };
+        return o;
+      }
       // Mismo redondeo de pétalos que la vista previa en calidad alta (WYSIWYG)
       const o = { ...base, seed, complexity: pg.complexity,
-        petals: vary ? pg.petals : Math.max(6, Math.round(state.petals / 2) * 2) };
+        petals: vary ? pg.petals : Math.max(6, Math.round(state.petals / 2) * 2),
+        // Página fácil ⇒ línea más gruesa; difícil ⇒ algo más fina (nunca < 0,35 mm)
+        strokeWidthMm: pageStrokeMm(base.strokeWidthMm, pg.strokeScale ?? 1) };
       if (vary) o.styleMode = pg.styleMode;
       if (state.generatorType === "radial") {
         return { ...o, spiroEnabled: state.spiroEnabled, alternation: 0.3, harmony: 0.5, taper: 0.2,
@@ -1819,7 +1934,7 @@ function bindUI() {
       return { ...o, imagePoints: currentImagePoints, imageScale: state.imageScale,
         imageIntensity: state.imageIntensity, imageMirror: state.imageMirror };
     };
-    return { count, baseSeed, plan, makeOpts, sourceLog, isClassic, comps, generatorFn: getGeneratorFn(state.generatorType) };
+    return { count, baseSeed, plan, makeOpts, ovKey, sourceLog, isClassic, comps, generatorFn: withSpecialPages(getGeneratorFn(state.generatorType)) };
   };
 
   // ---------- Revisión de páginas ----------
@@ -1845,11 +1960,13 @@ function bindUI() {
 
   const fillCard = (card, book, i) => {
     const { svg, opts } = pageSvg(book, i);
-    const changed = currentOverrides().has(i);
+    const changed = currentOverrides().has(book.ovKey(i));
     card.classList.toggle("changed", changed);
     card.querySelector(".thumb").innerHTML = svg;
     card.querySelector(".meta").textContent =
-      `${i + 1} · ${COMP_NAMES[opts.figure ? "figura" : opts.figureRing ? "anillos" : opts.composition] || opts.composition || ""} · ${STYLE_NAMES[opts.styleMode] || opts.styleMode || ""}`;
+      opts.special
+        ? `${i + 1} · ✨ ${specialLabel(opts.special)}`
+        : `${i + 1} · ${COMP_NAMES[opts.figure ? "figura" : opts.figureRing ? "anillos" : opts.composition] || opts.composition || ""} · ${STYLE_NAMES[opts.styleMode] || opts.styleMode || ""}`;
   };
 
   const openReview = async () => {
@@ -1861,11 +1978,12 @@ function bindUI() {
       const card = document.createElement("div");
       card.className = "review-card";
       card.innerHTML = `<div class="thumb"><sl-spinner></sl-spinner></div><div class="meta"></div>
-        <div class="actions"><sl-button size="small" variant="danger" outline data-act="seed"><sl-icon slot="prefix" name="trash"></sl-icon>Borrar y crear otro</sl-button>${book.isClassic && bookVaryEl.checked ? '<sl-button size="small" data-act="comp">Otro encuadre</sl-button>' : ""}</div>`;
+        <div class="actions">${book.plan[i].special?.type === "solutions" ? "" : `<sl-button size="small" variant="danger" outline data-act="seed"><sl-icon slot="prefix" name="trash"></sl-icon>${book.plan[i].special?.group != null ? "Cambiar todo el grupo" : "Borrar y crear otro"}</sl-button>`}${book.isClassic && bookVaryEl.checked && !book.plan[i].special ? '<sl-button size="small" data-act="comp">Otro encuadre</sl-button>' : ""}</div>`;
       card.addEventListener("click", (e) => {
         const act = e.target.closest("sl-button")?.dataset.act;
         if (!act) return;
-        const ov = { ...(currentOverrides().get(i) || {}) };
+        const key = book.ovKey(i);
+        const ov = { ...(currentOverrides().get(key) || {}) };
         if (act === "seed") ov.bump = (ov.bump || 0) + 1;
         if (act === "comp") {
           const b = buildBook();
@@ -1873,10 +1991,17 @@ function bindUI() {
           const list = b.comps.length > 1 ? b.comps : Object.keys(COMP_WEIGHTS);
           ov.composition = list[(list.indexOf(cur) + 1) % list.length];
         }
-        currentOverrides().set(i, ov);
-        // El reemplazo se dibuja en el acto, en el mismo lugar del libro
-        fillCard(card, buildBook(), i);
-        card.animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 350 });
+        currentOverrides().set(key, ov);
+        // El reemplazo se dibuja en el acto, en el mismo lugar del libro. Con él se
+        // redibujan su grupo (etapas, hojas del mural) y la página de soluciones
+        const nb = buildBook();
+        const cards = [...reviewGrid.children];
+        nb.plan.forEach((p, k) => {
+          if (k === i || nb.ovKey(k) === key || (p.special?.type === "solutions" && book.plan[i].special?.type === "mystery")) {
+            fillCard(cards[k], nb, k);
+            cards[k].animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 350 });
+          }
+        });
         updateReviewInfo();
       });
       reviewGrid.appendChild(card);
@@ -1920,6 +2045,10 @@ function bindUI() {
   document.querySelectorAll(".bookComp").forEach(b => b.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); }));
   bookVaryEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateGeneratorUI(); });
   bookDifficultyEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); });
+  [bookGrowthEl, bookMysteryEl, bookNatureEl, bookMuralEl].forEach(el => el?.addEventListener("sl-change", () => {
+    bookOverrides = new Map(); updateReviewInfo(); updateBookSummary();
+  }));
+  bookMysteryEl?.addEventListener("sl-input", updateBookSummary);
 
   const downloadBook = async () => {
     const layoutOpts = bookLayoutOpts();
@@ -1945,8 +2074,9 @@ function bindUI() {
         author: (bookAuthorEl?.value || "").trim(),
         ...layoutOpts,
         pageNumbers: bookPageNumbersEl.checked,
+        blackBack: backMode() === "negro",
         marginMm,
-        dpi: 300,
+        dpi: parseInt(bookDpiEl?.value, 10) || 300,
         onProgress: (done, tot, label) => {
           if (progressBar && progressStatus) {
             const percent = Math.round((done / tot) * 100);
@@ -1983,7 +2113,7 @@ function bindUI() {
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
     document.addEventListener("figures-changed", updateBookSummary);
-    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl].forEach(el =>
+    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl, bookDpiEl, coloringPresetEl, strokeWidthEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     updateBookSummary();

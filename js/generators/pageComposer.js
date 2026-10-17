@@ -211,9 +211,13 @@ export function composePage(doc, opts, drawMandala) {
       break;
     }
     case "constelacion": {
-      const R = maxR * (0.7 + rng() * 0.08);
+      // opts.mainScale (mural): mandala principal más grande y centrado. El sorteo se
+      // consume igual, para no alterar las páginas normales con la misma semilla.
+      const rR = 0.7 + rng() * 0.08;
+      const R = maxR * (opts.mainScale ?? rR);
       // En hojas verticales el mandala sube un poco y deja aire abajo para los pequeños
-      const oy = ah > aw * 1.15 ? -(ah / 2 - R) * (0.25 + rng() * 0.35) : 0;
+      const rOy = ah > aw * 1.15 ? -(ah / 2 - R) * (0.25 + rng() * 0.35) : 0;
+      const oy = opts.mainScale ? 0 : rOy;
       content.push(...sub(acx, acy + oy, R));
       obstacles.push({ x: acx, y: acy + oy, r: R });
       fill = { minis: true };
