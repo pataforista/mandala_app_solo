@@ -20,19 +20,22 @@ export const NATURE_KINDS = ["girasol", "estrella", "copo", "diatomea"];
 export const NATURE_TEXT = {
   girasol: {
     title: "Girasol · el ángulo áureo",
-    body: "Cada flósculo nace girado unos 137,5° respecto al anterior: el ángulo áureo. Como ese giro nunca se repite exactamente, las semillas se reparten sin dejar huecos. Busca las espirales que corren en los dos sentidos; en los girasoles reales suelen contarse números consecutivos de Fibonacci, como 34 y 55.",
+    // @a y @b: las espirales que tiene ESTE dibujo, contadas al dibujarlo (21 y 34, o 34 y 55,
+    // según el número de flósculos). Dos caracteres, igual que los números: el corte de
+    // líneas no cambia al sustituirlos.
+    body: "En el modelo clásico del girasol, cada flósculo queda girado unos 137,5° respecto al anterior: el ángulo áureo. Como ese giro nunca se repite exactamente, las semillas se empaquetan casi sin huecos. Busca las espirales que corren en los dos sentidos: en este dibujo hay @a y @b. En los girasoles reales suelen contarse números consecutivos de Fibonacci, como 34 y 55, aunque no siempre.",
   },
   estrella: {
     title: "Estrella de mar · simetría de cinco",
-    body: "Los equinodermos adultos tienen simetría pentarradial: cinco partes iguales alrededor de un eje. Sus larvas, en cambio, nadan con simetría bilateral, como la nuestra, y se reorganizan durante la metamorfosis. El pequeño círculo fuera del centro, la placa madrepórica, rompe la simetría: por ahí entra el agua a su sistema vascular.",
+    body: "Los equinodermos adultos tienen simetría pentarradial: cinco partes iguales alrededor de un eje. Sus larvas, en cambio, nadan con simetría bilateral, como la nuestra, y se reorganizan durante la metamorfosis. El pequeño círculo fuera del centro, la placa madrepórica, rompe la simetría: comunica con el mar el sistema hidráulico que mueve sus pies, el sistema vascular acuífero.",
   },
   copo: {
     title: "Copo de nieve · simetría de seis",
-    body: "El hielo cristaliza en una red hexagonal; por eso cada copo tiene seis brazos. Los brazos crecen casi al mismo ritmo porque viven la misma temperatura y humedad durante la caída: ninguno copia a los otros. Como cada copo atraviesa nubes distintas, es muy improbable encontrar dos iguales.",
+    body: "El hielo cristaliza en una red hexagonal; por eso los copos estrellados tienen seis brazos. Los brazos crecen casi igual porque viven, al mismo tiempo, los mismos cambios de temperatura y humedad durante la caída: ninguno copia a los otros. Como cada copo atraviesa nubes distintas, es muy improbable encontrar dos iguales.",
   },
   diatomea: {
     title: "Diatomea · un vidrio vivo",
-    body: "Las diatomeas son algas de una sola célula que construyen su pared con sílice, el material del vidrio, perforada por poros en filas radiales. Ernst Haeckel las dibujó en «Kunstformen der Natur» (1904). Se estima que producen alrededor de una quinta parte del oxígeno de la Tierra.",
+    body: "Las diatomeas son algas de una sola célula que construyen su pared con sílice, el mismo compuesto del vidrio. En las diatomeas céntricas, como esta, los poros forman filas radiales. Ernst Haeckel las dibujó en «Kunstformen der Natur» (1899-1904). Se estima que producen entre una quinta y una cuarta parte del oxígeno de la Tierra.",
   },
 };
 
@@ -71,10 +74,29 @@ export function generateNaturePage(doc, opts) {
 
   const x0 = m + 3, x1 = page.wMm - m - 3, y0 = m + 3, y1 = page.hMm - m - 3 - capH;
   const g = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, R: Math.min(x1 - x0, y1 - y0) / 2 - 1, rng, cF, mainW, detailW, emit };
-  (DRAW[kind] || DRAW.girasol)(g);
-  doc.body.push(...out, ...text);
-  if (doc.meta) doc.meta.nature = kind;
+  const drawn = (DRAW[kind] || DRAW.girasol)(g) || {};
+  // La nota cita lo que el lector puede contar en esta página, no una cifra genérica
+  const fill = (s) => (drawn.spirals ? s.replace("@a", drawn.spirals[0]).replace("@b", drawn.spirals[1]) : s);
+  doc.body.push(...out, ...text.map(fill));
+  if (doc.meta) { doc.meta.nature = kind; if (drawn.spirals) doc.meta.spirals = drawn.spirals; }
   return doc;
+}
+
+/**
+ * Espirales (parástiquias) que el ojo sigue en el borde del disco: cada flósculo exterior
+ * se une a sus dos vecinos más cercanos, y la diferencia de índice con cada vecino es el
+ * número de espirales de esa familia. Devuelve los dos números más frecuentes, de menor a
+ * mayor (p. ej. [21, 34]). Se cuentan en el 20 % exterior, donde el lector las cuenta.
+ */
+export function visibleSpirals(pts) {
+  const N = pts.length, counts = new Map();
+  for (let i = Math.floor(N * 0.8); i < N; i++) {
+    const near = [];
+    for (let j = 0; j < N; j++) if (j !== i) near.push([Math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]), Math.abs(j - i)]);
+    near.sort((a, b) => a[0] - b[0]);
+    for (const [, k] of near.slice(0, 2)) counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => k).sort((a, b) => a - b);
 }
 
 // ---------- Primitivas ----------
@@ -129,13 +151,16 @@ const DRAW = {
     const rho = c * 0.62;
     const fl = new PathBuilder();
     const turn = rng() * TAU;
+    const pts = [];
     for (let n = 1; ; n++) {
       const r = c * Math.sqrt(n + 0.5);
       if (r + rho > rDisc - 3.4) break;
       const t = turn + n * GOLDEN_ANGLE;
-      circle(fl, cx + r * Math.cos(t), cy + r * Math.sin(t), rho);
+      pts.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
+      circle(fl, ...pts[pts.length - 1], rho);
     }
     emit(fl, mainW);
+    return { spirals: visibleSpirals(pts) };
   },
 
   // Dendrita estelar: ramas a ±60° del brazo, paralelas a los brazos vecinos

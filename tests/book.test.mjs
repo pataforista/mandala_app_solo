@@ -543,3 +543,16 @@ test("mural: cambiar una opción de dibujo no devuelve el mural de la caché", (
   const b = renderDocToSvgString(special({ type: "mural", cols: 2, rows: 2, col: 0, row: 0 }, { spacing: 0.8 }));
   assert.notEqual(a, b);
 });
+
+test("girasol: la nota cita las espirales que tiene el dibujo, y son Fibonacci consecutivos", () => {
+  const FIB = [8, 13, 21, 34, 55, 89];
+  for (const preset of ["KDP_8_5x11", "KDP_6x9", "KDP_8_5x8_5"]) for (const complexity of [40, 130, 220]) {
+    const d = createDoc({ preset, seed: 3, marginMm: 12 });
+    generateSpecialPage(d, { ...BASE, seed: 3, complexity, special: { type: "nature", kind: "girasol" } });
+    const [a, b] = d.meta.spirals;
+    assert.ok(FIB.indexOf(b) === FIB.indexOf(a) + 1, `${preset} ${complexity}: ${a} y ${b}`);
+    const svg = renderDocToSvgString(d);
+    assert.match(svg, new RegExp(`en este dibujo hay ${a} y ${b}\\.`));
+    assert.doesNotMatch(svg, /@a|@b/);
+  }
+});
