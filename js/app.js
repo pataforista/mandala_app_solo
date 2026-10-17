@@ -11,7 +11,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm } from "./core/bookPlan.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
@@ -302,6 +302,32 @@ const COLORING_PRESETS = {
     layer6Intensity: 0.8,
     layer7Intensity: 0.65,
     layer8Intensity: 0.35,
+    outlineMode: false,
+  },
+  letra_grande: {
+    // Adulto · Trazo grueso («large print»): el segmento que más se vende en Amazon.
+    // Diseños de detalle moderado con línea de 1 mm, celdas amplias y sin texturas
+    // (las texturas finas son justo lo que empasta una página de trazo grueso).
+    // Sigue siendo adulto: más bandas y simetría que el nivel infantil.
+    generatorType: "classic",
+    complexity: 85,
+    organic: 0.2,
+    strokeWidth: 1.0,
+    spacing: 0.5,
+    densityFactor: 0.5,
+    minCellArea: 6.0,
+    detailSimplification: 0.75,
+    textures: false,
+    frames: true,
+    pageBorder: true,
+    layer1Intensity: 0.85,
+    layer2Intensity: 0.85,
+    layer3Intensity: 0.85,
+    layer4Intensity: 0.8,
+    layer5Intensity: 0.3,
+    layer6Intensity: 0.85,
+    layer7Intensity: 0.65,
+    layer8Intensity: 0,
     outlineMode: false,
   },
   experto: {
@@ -1710,6 +1736,8 @@ function bindUI() {
   const bookCopyrightEl = document.getElementById("bookCopyright");
   const bookColorTestEl = document.getElementById("bookColorTest");
   const bookPageNumbersEl = document.getElementById("bookPageNumbers");
+  const bookBlackBackEl = document.getElementById("bookBlackBack");
+  const bookDpiEl = document.getElementById("bookDpi");
   const bookSummaryEl = document.getElementById("bookSummary");
 
   const bookCount = () => Math.min(120, Math.max(1, parseInt(bookPagesEl?.value, 10) || 1));
@@ -1728,11 +1756,20 @@ function bindUI() {
     const total = bookPageCount(bookLayoutOpts());
     const margin = bookMargin(total);
     const { wMm, hMm } = getCurrentDoc().page;
-    const checks = kdpChecklist({ pages: total, marginMm: margin, dpi: 300 });
+    const dpi = parseInt(bookDpiEl?.value, 10) || 300;
+    const checks = kdpChecklist({ pages: total, marginMm: margin, dpi });
     const bad = checks.filter(c => !c.ok);
     bookSummaryEl.innerHTML =
-      `${total} páginas · ${wMm}×${hMm} mm · margen ${margin.toFixed(1)} mm<br>` +
+      `${total} páginas · ${wMm}×${hMm} mm · margen ${margin.toFixed(1)} mm · ${dpi} DPI<br>` +
       (bad.length ? bad.map(c => `⚠️ ${c.msg}`).join("<br>") : "✅ Cumple los requisitos de interior de KDP (sin sangrado).");
+    // Consejos de calidad (no bloquean): lo que distingue a los libros mejor valorados
+    const tips = [];
+    if (!/^KDP_/.test(state.preset)) tips.push("💡 8.5×11 in es el formato más común en libros de mandalas; A4 y Carta también los acepta KDP.");
+    if (bookCount() < 40) tips.push(`💡 ${bookCount()} mandalas: los libros mejor valorados traen entre 40 y 100.`);
+    if (!bookBlankBackEl.checked) tips.push("⚠️ Sin reverso en blanco: el marcador de una página arruina el dibujo del otro lado. Es la queja n.º 1 en las reseñas.");
+    if (state.strokeWidth < 0.45) tips.push("💡 Trazo fino (< 0,45 mm): bonito en pantalla, pero en papel de KDP se ve gris. Prueba «Adulto · Trazo grueso» o sube el grosor.");
+    if (tips.length) bookSummaryEl.innerHTML += "<br>" + tips.join("<br>");
+    if (bookBlackBackEl) bookBlackBackEl.disabled = !bookBlankBackEl.checked;
     const chosen = chosenFigures();
     const info = document.getElementById("bookImagesInfo");
     if (info) {
@@ -1800,7 +1837,9 @@ function bindUI() {
       const seed = ov?.bump ? ((pg.seed + 0x9E3779B1 * ov.bump) >>> 0) : pg.seed;
       // Mismo redondeo de pétalos que la vista previa en calidad alta (WYSIWYG)
       const o = { ...base, seed, complexity: pg.complexity,
-        petals: vary ? pg.petals : Math.max(6, Math.round(state.petals / 2) * 2) };
+        petals: vary ? pg.petals : Math.max(6, Math.round(state.petals / 2) * 2),
+        // Página fácil ⇒ línea más gruesa; difícil ⇒ algo más fina (nunca < 0,35 mm)
+        strokeWidthMm: pageStrokeMm(base.strokeWidthMm, pg.strokeScale ?? 1) };
       if (vary) o.styleMode = pg.styleMode;
       if (state.generatorType === "radial") {
         return { ...o, spiroEnabled: state.spiroEnabled, alternation: 0.3, harmony: 0.5, taper: 0.2,
@@ -1945,8 +1984,9 @@ function bindUI() {
         author: (bookAuthorEl?.value || "").trim(),
         ...layoutOpts,
         pageNumbers: bookPageNumbersEl.checked,
+        blackBack: !!bookBlackBackEl?.checked && layoutOpts.blankBack,
         marginMm,
-        dpi: 300,
+        dpi: parseInt(bookDpiEl?.value, 10) || 300,
         onProgress: (done, tot, label) => {
           if (progressBar && progressStatus) {
             const percent = Math.round((done / tot) * 100);
@@ -1983,7 +2023,7 @@ function bindUI() {
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
     document.addEventListener("figures-changed", updateBookSummary);
-    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl].forEach(el =>
+    [bookPagesEl, bookBlankBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl, bookDpiEl, coloringPresetEl, strokeWidthEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     updateBookSummary();

@@ -375,6 +375,7 @@
             <sl-select id="coloringPreset" label="Nivel de dificultad" size="small" value="adulto" help-text="Se aplica al elegirlo.">
               <sl-option value="ninos">Niños (5-8 años) - Muy simple</sl-option>
               <sl-option value="ninos_grande">Niños grandes (9-12) - Simple</sl-option>
+              <sl-option value="letra_grande">Adulto - Trazo grueso (fácil de colorear)</sl-option>
               <sl-option value="adulto">Adulto - Balanceado</sl-option>
               <sl-option value="experto">Experto - Detallado</sl-option>
               <sl-option value="zen">Zen - Minimalista</sl-option>
@@ -535,7 +536,7 @@
               Interior completo (sin sangrado, B/N): cada página es un mandala distinto. Márgenes, páginas pares y
               texto sin fuentes externas se ajustan solos a las reglas de KDP. Parte de la semilla y el nivel de «Diseñar».
             </p>
-            <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="30"></sl-input>
+            <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="50"></sl-input>
             <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="mixta">
               <sl-option value="mixta">Mixta (alterna)</sl-option>
               <sl-option value="progresiva">Progresiva (de fácil a difícil)</sl-option>
@@ -568,6 +569,11 @@
                 <sl-input id="bookSubtitle" label="Subtítulo (opcional)" size="small" placeholder="50 diseños antiestrés"></sl-input>
                 <sl-input id="bookAuthor" label="Autor / sello (opcional)" size="small"></sl-input>
                 <sl-checkbox id="bookBlankBack" checked>Página en blanco al reverso (evita que el marcador traspase)</sl-checkbox>
+                <sl-checkbox id="bookBlackBack">Reverso negro (oculta lo que traspase el marcador; lleva más tinta)</sl-checkbox>
+                <sl-select id="bookDpi" label="Nitidez de impresión" size="small" value="300">
+                  <sl-option value="300">Estándar · 300 DPI (mínimo de KDP)</sl-option>
+                  <sl-option value="600">Alta · 600 DPI (líneas más nítidas; PDF más pesado y lento)</sl-option>
+                </sl-select>
                 <sl-checkbox id="bookTitlePage" checked>Incluir hoja de título</sl-checkbox>
                 <sl-checkbox id="bookCopyright" checked>Incluir página de derechos de autor</sl-checkbox>
                 <sl-checkbox id="bookColorTest">Incluir página para probar colores</sl-checkbox>

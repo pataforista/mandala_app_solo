@@ -34,6 +34,24 @@ export function bestSellerProfile(preset = "KDP_8_5x8_5") {
   };
 }
 
+/**
+ * Grosor de línea según la dificultad de la página. Los libros de mayor calidad no usan
+ * el mismo trazo en una página relajada que en una desafiante: una página sencilla con
+ * línea fina se ve pobre y una muy detallada con línea gruesa se empasta. Página más
+ * sencilla que la base ⇒ línea más gruesa (hasta +60 %); más compleja ⇒ algo más fina
+ * (hasta −15 %, nunca por debajo del mínimo de impresión que aplica quien la use).
+ */
+export function strokeScaleFor(complexity, baseComplexity) {
+  const r = Math.pow(Math.max(1, baseComplexity) / Math.max(1, complexity), 0.4);
+  return Math.round(Math.min(1.6, Math.max(0.85, r)) * 100) / 100;
+}
+
+/** Trazo final de una página: nunca por debajo de 0,35 mm (las líneas finas se pierden al imprimir). */
+export const MIN_PRINT_STROKE_MM = 0.35;
+export function pageStrokeMm(baseMm, scale = 1) {
+  return Math.round(Math.max(MIN_PRINT_STROKE_MM, baseMm * scale) * 100) / 100;
+}
+
 function shuffled(rng, arr) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
@@ -72,7 +90,7 @@ export function shuffleBag(rng, options, weights = null) {
  *   images?: number (nº de imágenes elegidas a mano; cada una aparece UNA vez, repartidas
  *            a lo largo del libro para que no queden amontonadas al principio)
  * }
- * Devuelve [{ seed, styleMode, composition, frameStyle, petals, complexity, centerArt }]
+ * Devuelve [{ seed, styleMode, composition, frameStyle, petals, complexity, strokeScale, centerArt }]
  */
 export function planBook(opts) {
   const {
@@ -109,6 +127,7 @@ export function planBook(opts) {
     if (centerArt && composition === "medio") composition = "fondo";
     pages.push({
       seed: ((seed >>> 0) + i) >>> 0,
+      strokeScale: difficulty === "fija" ? 1 : strokeScaleFor(complexity, baseComplexity),
       styleMode: nextStyle(),
       composition,
       frameStyle: nextFrame(),

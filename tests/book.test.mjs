@@ -388,3 +388,39 @@ test("perfil «más vendidos»: centrado domina, sin medios mandalas, simetría 
     assert.ok(plan.filter(p => p.styleMode === "floral").length > plan.filter(p => p.styleMode === "azteca").length, preset);
   }
 });
+
+test("trazo por página: más grueso en páginas fáciles, más fino en difíciles, nunca < 0,35 mm", async () => {
+  const { strokeScaleFor, pageStrokeMm, MIN_PRINT_STROKE_MM } = await import("../js/core/bookPlan.js");
+  assert.equal(strokeScaleFor(130, 130), 1);
+  assert.ok(strokeScaleFor(40, 130) > 1.4, "página fácil: línea claramente más gruesa");
+  assert.ok(strokeScaleFor(40, 130) <= 1.6);
+  assert.ok(strokeScaleFor(260, 130) < 1 && strokeScaleFor(260, 130) >= 0.85);
+  assert.equal(pageStrokeMm(0.3, 0.85), MIN_PRINT_STROKE_MM);
+  assert.equal(pageStrokeMm(0.55, 1.6), 0.88);
+
+  const prog = planBook({ count: 20, seed: 5, difficulty: "progresiva", baseComplexity: 130 });
+  assert.ok(prog[0].strokeScale > prog[19].strokeScale, "progresiva: la línea se afina al avanzar");
+  for (let i = 1; i < prog.length; i++) assert.ok(prog[i].strokeScale <= prog[i - 1].strokeScale);
+  const fija = planBook({ count: 10, seed: 5, difficulty: "fija", baseComplexity: 130 });
+  assert.ok(fija.every(p => p.strokeScale === 1), "fija: el trazo que eligió el usuario");
+});
+
+test("nivel «trazo grueso»: páginas válidas y sin líneas finas en los encuadres del perfil", () => {
+  const BOLD = { complexity: 85, strokeWidthMm: 1.0, petals: 16, includeFrames: true, pageBorder: true,
+    textures: false, spacing: 0.5, densityFactor: 0.5, minCellAreaMm2: 6, detailSimplification: 0.75, organicLevel: 0.2 };
+  const prof = bestSellerProfile("KDP_8_5x11");
+  for (const composition of prof.compositions) for (const styleMode of ["floral", "geometric", "islamico"]) {
+    const d = createDoc({ preset: "KDP_8_5x11", seed: 11, marginMm: 12 });
+    generateMandalaClassic(d, { ...BOLD, seed: 11, composition, styleMode, frameStyle: "ninguno" });
+    const svg = renderDocToSvgString(d);
+    assert.doesNotMatch(svg, /NaN|Infinity|undefined/, `${composition} ${styleMode}`);
+    const widths = [...svg.matchAll(/stroke-width="([\d.]+)"/g)].map(m => parseFloat(m[1]));
+    assert.ok(widths.length > 0);
+    // Trazo principal 1 mm y detalle 0,7 mm. Los mandalas pequeños (constelación, fondo)
+    // usan 0,75× a propósito para no empastarse: su detalle queda en ~0,52 mm.
+    // Sólo los puntos sólidos (0,2 mm, rellenos) pueden ser más finos.
+    assert.ok(Math.max(...widths) >= 0.99, `${composition} ${styleMode}: falta el trazo de 1 mm`);
+    const thin = widths.filter(w => w > 0.21 && w < 0.5);
+    assert.equal(thin.length, 0, `${composition} ${styleMode}: trazos finos ${thin.slice(0, 5)}`);
+  }
+});

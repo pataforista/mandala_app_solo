@@ -44,6 +44,21 @@ con simetría alta y sin marcos pesados (`bestSellerProfile` en `js/core/bookPla
 
 Para usar tus propias composiciones elige «Elegir yo las composiciones».
 
+### Comparación con los más vendidos y mejoras de calidad (octubre 2026)
+
+Revisión del top de Amazon «Mandalas & Patterns Coloring Books for Grown-Ups» (captura de la lista,
+no datos de ventas propios): #1 *Large Print Easy Color & Frame* (31 diseños de trazo grueso, una cara),
+#2 *Mindfulness Patterns* (50 diseños, una cara), #3 *100 Amazing Patterns* (100 diseños, una cara).
+Quejas frecuentes en reseñas: doble cara, papel que traspasa, líneas pixeladas y celdas diminutas.
+
+| Mejora | Dónde | Qué resuelve |
+|---|---|---|
+| Nivel «Adulto · Trazo grueso» (1 mm, celdas ≥ 6 mm², sin texturas) | Diseñar → Nivel de dificultad | el segmento n.º 1 en ventas no tenía equivalente adulto |
+| Trazo según la dificultad de cada página (`strokeScaleFor`) | modo libro, dificultad mixta o progresiva | página fácil hasta +60 % de grosor; difícil hasta −15 %, nunca < 0,35 mm |
+| Reverso negro opcional (panel dentro de los márgenes) | Libro KDP → Textos y páginas extra | oculta lo que traspase el marcador; KDP sin sangrado no admite tinta hasta el corte |
+| Nitidez 600 DPI opcional | Libro KDP → Textos y páginas extra | líneas más limpias; avisa si el navegador (Safari móvil) no admite lienzos tan grandes |
+| 50 mandalas por defecto y consejos de calidad en el resumen | Libro KDP | formato, cantidad, reverso en blanco y trazo fino |
+
 ### Composiciones corregidas (revisión del libro de 30 mandalas, semilla 3164907524)
 
 | Problema visto en el PDF | Causa | Corrección |
