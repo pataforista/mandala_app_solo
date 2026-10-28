@@ -152,7 +152,7 @@ const DRAW = {
     const disc = new PathBuilder(); circle(disc, cx, cy, rDisc); emit(disc, mainW, "#fff");
     const rim = new PathBuilder(); circle(rim, cx, cy, rDisc - 2.6); emit(rim, detailW);
     // Más complejidad ⇒ más flósculos, pero nunca de menos de ~3 mm de diámetro
-    const c = Math.max(2.45, Math.min(4.4, rDisc / Math.sqrt(200 + cF * 280)));
+    const c = Math.max(3.0, Math.min(5.0, rDisc / Math.sqrt(150 + cF * 200))); // flósculos más grandes
     const rho = c * 0.62;
     const fl = new PathBuilder();
     const turn = rng() * TAU;
@@ -170,8 +170,8 @@ const DRAW = {
 
   // Dendrita estelar: ramas a ±60° del brazo, paralelas a los brazos vecinos
   copo({ cx, cy, R, rng, mainW, detailW, emit }) {
-    const ws = Math.max(2.2, R * 0.034);   // medio ancho del brazo
-    const wb = Math.max(1.75, R * 0.024);  // medio ancho de las ramas
+    const ws = Math.max(2.8, R * 0.042);   // medio ancho del brazo
+    const wb = Math.max(2.2, R * 0.030);   // medio ancho de las ramas
     const rc = R * 0.17;                   // placa central
     const rt = Math.max(4, R * 0.075);     // placa de la punta
     const tipD = R - rt;

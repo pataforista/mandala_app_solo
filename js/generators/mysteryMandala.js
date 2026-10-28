@@ -77,7 +77,7 @@ export function mysteryGrid({ cx, cy, R, shape = "corazon", complexity = 130 }) 
   const cF = Math.max(0, Math.min(1, (complexity - 20) / 300));
   const Rg = R * 0.86;
   const rCore = Math.max(4, Rg * 0.07);
-  const nR = 15 + Math.round(cF * 8);
+  const nR = 12 + Math.round(cF * 5); // menos anillos = celdas más grandes
   const t = (Rg - rCore) / nR;
   const S = Rg * 0.66; // la figura ocupa ~2/3 del disco: se reconoce y no toca el borde
   const inside = (r, a) => test((r * Math.cos(a)) / S, -(r * Math.sin(a)) / S);
@@ -105,8 +105,8 @@ export function generateMysteryMandala(doc, opts) {
   const page = doc.page;
   const m = Number.isFinite(page.marginMm) ? page.marginMm : 10;
   const rng = mulberry32(((seed >>> 0) ^ 0x3157E41) >>> 0);
-  const mainW = Math.max(0.3, strokeWidthMm);
-  const detailW = Math.max(0.3, strokeWidthMm * 0.7);
+  const mainW = Math.max(0.7, strokeWidthMm);
+  const detailW = Math.max(0.5, strokeWidthMm * 0.65);
   const bottomText = instructions ? 9 : 0;
   const cx = opts.center?.x ?? page.wMm / 2;
   const cy = opts.center?.y ?? (page.hMm - bottomText) / 2;

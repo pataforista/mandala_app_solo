@@ -63,8 +63,8 @@ export function addLotusPetal(pb, center, rIn, rOut, angle, angSpread) {
     .close();
 
   // Inner detail curve
-  const iRIn = rIn + (rOut - rIn) * 0.25;
-  const iROut = rIn + (rOut - rIn) * 0.65;
+  const iRIn = rIn + (rOut - rIn) * 0.3;  // curva interna más grande
+  const iROut = rIn + (rOut - rIn) * 0.7;
   const iCpL = polar(iRIn + (iROut - iRIn) * 0.5, angle - halfSpread * 0.45, center.x, center.y);
   const iCpR = polar(iRIn + (iROut - iRIn) * 0.5, angle + halfSpread * 0.45, center.x, center.y);
   const iTip = polar(iROut, angle, center.x, center.y);

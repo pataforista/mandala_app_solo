@@ -43,7 +43,7 @@ export function drawFigure({ figure, A, seed = 1, styleMode = "floral", fillInsi
 
   // Holgura respecto a las líneas: dentro, ceñida (como en los libros); fuera, más aire
   // (≥1 mm: entre dos líneas tiene que caber la punta de un rotulador)
-  const gapIn = 1.1, gapOut = 2;
+  const gapIn = 1.5, gapOut = 2.5; // más aire entre motivos
   const avail = new Float32Array(gw * gh);
   for (let i = 0; i < avail.length; i++) {
     const z = zone[i];
@@ -58,8 +58,8 @@ export function drawFigure({ figure, A, seed = 1, styleMode = "floral", fillInsi
   const d = Math.max(0, Math.min(1, density));
   // Coloreable ante todo: ningún motivo con radio < ~2.5 mm (celdas de ≥ 5 mm) y nada
   // de confeti. Más densidad ⇒ motivos algo más pequeños y más numerosos.
-  const minR = outlineMode ? 4.5 : 4.2 - d * 1.7;
-  const maxIn = 16 - d * 4, maxOut = 12 - d * 3;
+  const minR = outlineMode ? 5.5 : 5.0 - d * 1.2;
+  const maxIn = 18 - d * 3, maxOut = 14 - d * 2.5;
   let minis = 0;
   for (let guard = 0; guard < 2500; guard++) {
     let best = -1, bestScore = 0;

@@ -33,7 +33,7 @@ function muralBody(opts, W, H) {
     ...opts, special: undefined, composition: "constelacion", mainScale: 0.97, frameStyle: "ninguno", pageBorder: false,
     includeFrames: true, centerArt: null, figure: null, figureRing: null,
     // Más anillos que un mandala de una hoja: si no, el mural es una página ampliada
-    minBands: Math.round(6 + cells * 3),
+    minBands: Math.round(5 + cells * 2), // menos bandas = celdas más grandes
   });
   const res = { defs: v.defs, body: v.body };
   if (cache.size > 4) cache.clear();

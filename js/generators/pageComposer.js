@@ -204,7 +204,7 @@ export function composePage(doc, opts, drawMandala) {
       break;
     }
     case "fondo": {
-      const R = maxR * (0.8 + rng() * 0.06);
+      const R = maxR * (0.88 + rng() * 0.05);
       content.push(...sub(acx, acy, R));
       obstacles.push({ x: acx, y: acy, r: R });
       fill = { minis: false };
@@ -265,7 +265,7 @@ export function composePage(doc, opts, drawMandala) {
       break;
     }
     default: {
-      const R = maxR;
+      const R = maxR * 0.98; // el disco ocupa casi todo el espacio disponible
       content.push(...sub(acx, acy, R));
       obstacles.push({ x: acx, y: acy, r: R });
     }
@@ -319,7 +319,7 @@ function packFill({ A, obstacles, rng, gap, minis, style, outlineMode, stroke, m
 
   const out = [];
   const main = new PathBuilder(), detail = new PathBuilder(), dots = new PathBuilder();
-  const maxMini = minis ? 34 : 11;
+  const maxMini = minis ? 28 : 14; // mandalas de relleno más grandes
   const dotMin = outlineMode ? 3.2 : 1.6; // por debajo, confeti que estorba al colorear
   let miniCount = 0;
   for (let guard = 0; guard < 600; guard++) {
@@ -336,9 +336,9 @@ function packFill({ A, obstacles, rng, gap, minis, style, outlineMode, stroke, m
     const rot = rng() * TAU;
     if (minis && r >= 13 && miniCount < 14) {
       out.push(...sub(best.x, best.y, r, miniOpts(miniCount++, r)));
-    } else if (r >= 4.2) {
+    } else if (r >= 5.0) {
       drawFiller(pickKind(), main, detail, best.x, best.y, r, rot, rng, !outlineMode);
-    } else if (r >= 2.4) {
+    } else if (r >= 3.0) {
       drawFiller(rng() < 0.5 ? "ring" : (rng() < 0.5 ? "heart" : "star"), main, detail, best.x, best.y, r, rot, rng, false);
     } else {
       circle(dots, best.x, best.y, Math.max(0.55, r * 0.5));

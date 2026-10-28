@@ -8,7 +8,7 @@ export function circleSegments(r, seg = 8, sagMm = 0.04) {
   return Math.min(256, Math.max(8, seg, need));
 }
 
-export function addCircle(pb, cx, cy, r, seg = 24) {
+export function addCircle(pb, cx, cy, r, seg = 32) {
   if (r <= 0.05) return;
   seg = circleSegments(r, seg);
   const step = (Math.PI * 2) / seg;
