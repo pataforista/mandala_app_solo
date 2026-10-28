@@ -19,6 +19,7 @@ import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
+import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
 
 const historyMan = new StateHistory();
 const imgProc = new ImageProcessor();
@@ -96,6 +97,7 @@ const closeGalleryBtn = document.getElementById("closeGallery");
 
 const seedText = document.getElementById("seedText");
 const pathsText = document.getElementById("pathsText");
+const commercialScoreEl = document.getElementById("commercialScore");
 
 const kaleidoscopeEl = document.getElementById("kaleidoscope");
 const texturesEl = document.getElementById("textures");
@@ -287,14 +289,14 @@ const COLORING_PRESETS = {
   },
   adulto: {
     // Adulto - Balanceado (default)
-    complexity: 130,
-    organic: 0.25,
-    strokeWidth: 0.55,
-    spacing: 0.3,
-    densityFactor: 0.7,
-    minCellArea: 3.0,
-    detailSimplification: 0.5,
-    textures: true,
+    complexity: 110,
+    organic: 0.2,
+    strokeWidth: 0.8,
+    spacing: 0.4,
+    densityFactor: 0.65,
+    minCellArea: 5.0,
+    detailSimplification: 0.6,
+    textures: false,
     frames: true,
     pageBorder: true,
     layer1Intensity: 0.85,
@@ -307,6 +309,29 @@ const COLORING_PRESETS = {
     layer8Intensity: 0.35,
     outlineMode: false,
   },
+  bestseller: {
+    // Lo que más vende en Amazon KDP: trazo grueso, celdas grandes y sin texturas finas
+    generatorType: "classic",
+    complexity: 95,
+    organic: 0.2,
+    strokeWidth: 0.9,
+    spacing: 0.45,
+    densityFactor: 0.6,
+    minCellArea: 6.0,
+    detailSimplification: 0.65,
+    textures: false,
+    frames: true,
+    pageBorder: true,
+    layer1Intensity: 0.85,
+    layer2Intensity: 0.85,
+    layer3Intensity: 0.8,
+    layer4Intensity: 0.75,
+    layer5Intensity: 0.2,
+    layer6Intensity: 0.85,
+    layer7Intensity: 0.6,
+    layer8Intensity: 0,
+    outlineMode: false,
+  },
   letra_grande: {
     // Adulto · Trazo grueso («large print»): el segmento que más se vende en Amazon.
     // Diseños de detalle moderado con línea de 1 mm, celdas amplias y sin texturas
@@ -315,10 +340,10 @@ const COLORING_PRESETS = {
     generatorType: "classic",
     complexity: 85,
     organic: 0.2,
-    strokeWidth: 1.0,
+    strokeWidth: 1.1,
     spacing: 0.5,
     densityFactor: 0.5,
-    minCellArea: 6.0,
+    minCellArea: 7.0,
     detailSimplification: 0.75,
     textures: false,
     frames: true,
@@ -741,6 +766,11 @@ function render() {
   const svgEl = stage.querySelector("svg");
   const pathCount = svgEl ? svgEl.querySelectorAll("path").length : 0;
   pathsText.textContent = String(pathCount);
+  if (commercialScoreEl) {
+    const { score } = commercialScore(measureSvg(svgStr), { strokeWidthMm: state.strokeWidth, minCellAreaMm2: state.minCellArea });
+    commercialScoreEl.textContent = String(score);
+    commercialScoreEl.style.color = score >= 80 ? "#2e7d32" : score >= 60 ? "#f57c00" : "#c62828";
+  }
 
   // Track recent seeds
   if (!recentSeeds.includes(state.seed)) {
@@ -1857,6 +1887,10 @@ function bindUI() {
     const comps = allowedCompositions();
     // «Lo más vendido»: composiciones, estilos, marcos y pétalos con los pesos del perfil
     const prof = vary && bestSeller() ? bestSellerProfile(state.preset) : null;
+    if (prof) {
+      prof.styles = ["floral", "floral", "floral", "geometric", "geometric", "islamico"];
+      prof.styleWeights = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
+    }
     // Plan de todo el libro antes de dibujar: sin rachas de estilos ni encuadres repetidos
     const regularPlan = planBook({
       count: regular, seed: baseSeed,

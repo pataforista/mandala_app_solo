@@ -31,7 +31,7 @@ export function generateMandalaRadial(doc, opts) {
     offsetXmm = 0,
     offsetYmm = 0,
     minStrokeMm = 0.30,
-    minCellAreaMm2 = 2.0,
+    minCellAreaMm2 = 5.0,  // comercial: celdas de al menos 5 mm²
 
     // Núcleo
     binduRadiusFrac = 0.10,
@@ -121,7 +121,12 @@ export function generateMandalaRadial(doc, opts) {
       shapeWeights: { petal_round: 1.5, petal_pointy: 1.2, petal_teardrop: 1.2, arch: 1.5, diamond: 1.2, paisley_element: 0.8, peacock_feather: 0.7, lotus_petal_advanced: 0.9, petal_heart: 0.7, fleur: 0.8, islamic_interlace: 0.5 },
       center: ["sunburst", "compass", "lotus_ring", "dot_orbit"], frames: ["beads", "scallop"] },
   ];
-  const archetype = ARCHETYPES[Math.floor(rng() * ARCHETYPES.length)];
+  // Sesgo comercial: los arquetipos que más se venden salen con más frecuencia
+  const ARCHETYPE_WEIGHTS = { bloom: 3, botanical: 2, classic: 2, lace: 1.5, star: 1, sunray: 0.8 };
+  const archWeight = (a) => ARCHETYPE_WEIGHTS[a.name] ?? 1;
+  let archT = rng() * ARCHETYPES.reduce((s, a) => s + archWeight(a), 0);
+  let archetype = ARCHETYPES[0];
+  for (const a of ARCHETYPES) { archT -= archWeight(a); if (archT <= 0) { archetype = a; break; } }
 
   // Nivel orgánico efectivo: parámetro del usuario + sesgo del arquetipo.
   // Techo en 0.85 (salvo que el usuario pida más): por encima, el wobble
@@ -134,7 +139,7 @@ export function generateMandalaRadial(doc, opts) {
   const _polarW = (r, theta, intensity = 0.5) => polarW(r, theta, intensity, organicLevel, wPhase1, wPhase2);
 
   // --- Jerarquía de trazo base ---
-  const strokeBase = Math.max(minStrokeMm, strokeWidthMm);
+  const strokeBase = Math.max(0.7, strokeWidthMm); // mínimo comercial
 
   function getStrokesForRadius(r, role) {
     const rFrac = (r - rMin) / (rMax - rMin || 1);
@@ -157,12 +162,12 @@ export function generateMandalaRadial(doc, opts) {
   const simpRaw = _clamp(((opts.detailSimplification ?? 0) - 0.5) * 2, 0, 1);
   const simplify = opts.outlineMode ? Math.max(0.5, simpRaw) : simpRaw;
 
-  const ringCount = _clamp(Math.round((5 + cN * 7) * _lerp(1, 0.55, simplify)), 3, 12);
+  const ringCount = _clamp(Math.round((4 + cN * 5) * _lerp(1, 0.6, simplify)), 3, 9);
 
   // Con muchos pétalos las celdas angulares se estrechan: bajar la densidad de
   // detalle evita que el conjunto se sature en negro y deje de ser coloreable.
   const petalsCrowd = _clamp((petals - 12) / 36, 0, 1);
-  const subProb = _lerp(0.18, 0.72, cN) * _lerp(1, 0.7, petalsCrowd) * (1 - simplify);
+  const subProb = _lerp(0.10, 0.45, cN) * _lerp(1, 0.6, petalsCrowd) * (1 - simplify);
   const detailProb = _lerp(0.35, 0.85, cN) * _lerp(1, 0.55, petalsCrowd) * (1 - simplify);
 
   // --- Rejilla radial ---

@@ -8,9 +8,10 @@
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder, coloringCullArea } from "../core/pathBuilder.js";
 import { wantsComposition, composePage } from "./pageComposer.js";
+import { fitBandCount } from "../core/bandMetrics.js";
 
 const TAU = Math.PI * 2;
-const MIN_LINE_MM = 0.3; // por debajo, la imprenta lo reproduce gris o lo pierde
+const MIN_LINE_MM = 0.55; // por debajo, la imprenta lo reproduce gris o lo pierde
 
 // Pesos de motivos por estilo: el estilo cambia el "acento" sin romper la gramática
 const STYLE_WEIGHTS = {
@@ -25,7 +26,8 @@ const STYLE_WEIGHTS = {
 
 // Proporción ancho-de-celda / alto-de-banda que mejor luce cada motivo
 const ASPECT = { petal: 0.75, round: 0.85, lotus: 0.8, leaf: 0.6, scallop: 1.5, heart: 1.0, beads: 1.0, triangle: 0.9, diamond: 1.2, ogee: 0.8, chevron: 1.4 };
-const SILHOUETTE = ["lotus", "lotus", "round", "petal", "scallop", "ogee"];
+// La silueta es lo que se reconoce al hojear: más peso en lotus, la forma más reconocible
+const SILHOUETTE = ["lotus", "lotus", "lotus", "scallop", "scallop", "ogee", "ogee"];
 
 export function generateMandalaClassic(doc, opts) {
   // Encuadres de página (fondo, constelación, esquinas…): dibujan el disco con esta misma función
@@ -57,8 +59,10 @@ export function generateMandalaClassic(doc, opts) {
   const detail = !outlineMode && detailSimplification < 0.85;
   const richDetail = detail && cF > 0.35 && detailSimplification < 0.6;
 
-  const mainW = Math.max(MIN_LINE_MM, strokeWidthMm);
-  const detailW = Math.max(MIN_LINE_MM, strokeWidthMm * 0.7);
+  // Tres niveles de tinta: silueta/contorno, detalle y "vestido" (nervios y acentos)
+  const mainW = Math.max(0.8, strokeWidthMm);
+  const detailW = Math.max(MIN_LINE_MM, strokeWidthMm * 0.65);
+  const vestW = Math.max(0.4, strokeWidthMm * 0.5);
   const cull = coloringCullArea(opts);
   // Escala: el diseño debe verse igual en 6×9 que en 8.5×11. Pero un mandala pequeño
   // (relleno de constelación, esquinas) no es una copia reducida: por debajo de ~2 mm²
@@ -79,7 +83,8 @@ export function generateMandalaClassic(doc, opts) {
   // Medallón central con una imagen subida (ya convertida a líneas): núcleo grande, menos bandas
   const art = opts.centerArt && opts.centerArt.href ? opts.centerArt : null;
   const artFrac = art ? Math.max(0.25, Math.min(0.6, art.scale ?? 0.42)) : 0;
-  let B = outlineMode ? 4 + Math.round(cF * 2 + rng() * 0.8) : 5 + Math.round(cF * 4 + rng() * 1.2);
+  // Rango comercial: 4–7 bandas (antes 5–10). Más anillos = celdas más pequeñas
+  let B = outlineMode ? 3 + Math.round(cF * 1.5 + rng() * 0.6) : 4 + Math.round(cF * 2.5 + rng() * 0.8);
   if (art) B = Math.max(3, B - Math.round(artFrac * 6));
   // Mínimo de bandas: un mural gigante o una secuencia «que crece» necesitan más anillos
   if (opts.minBands) B = Math.max(B, opts.minBands);
@@ -87,11 +92,14 @@ export function generateMandalaClassic(doc, opts) {
   if (opts.maxBands) B = Math.max(2, Math.min(B, opts.maxBands));
   // Núcleo con tamaño absoluto mínimo: en los mini mandalas un núcleo de 1–2 mm
   // se imprime como una mancha negra
-  const rCore = art ? R * artFrac : Math.max(R * (0.11 + rng() * 0.05), Math.min(R * 0.3, 3.5));
+  // Núcleo lo bastante grande para colorearlo con un lápiz (~7 mm de diámetro como mínimo)
+  const rCore = art ? R * artFrac : Math.max(R * (0.14 + rng() * 0.04), Math.min(R * 0.32, 5.5));
+  // Jerarquía: la silueta y una banda héroe dominan; el núcleo queda algo más pequeño
   const weights = Array.from({ length: B }, (_, k) => {
-    let w = 0.75 + rng() * 0.7;
-    if (k === B - 1) w *= 1.9;          // banda exterior: silueta protagonista
-    if (k === B - 2) w *= 1.15;
+    let w = 0.7 + rng() * 0.5;
+    if (k === B - 1) w *= 2.4;          // silueta muy protagonista
+    if (k === B - 2) w *= 1.6;          // banda héroe
+    if (k === 0) w *= 0.8;              // núcleo relativo más pequeño
     return w;
   });
   // Bandas estrechas de cuentas ("respiros"): 1–2, nunca adyacentes ni exteriores
@@ -123,14 +131,13 @@ export function generateMandalaClassic(doc, opts) {
     else if (beadSlots.has(b.k) && h >= 3) b.motif = "beads"; // cuentas de <1 mm = puntos negros
     else b.motif = pickMotif(prev);
     prev = b.motif;
-    // Conteo armónico cuyo ancho de celda se acerca a la proporción ideal del motivo
-    const target = ASPECT[b.motif] * h;
+    // Conteo armónico por banda: el que deja celdas con la proporción del motivo y área
+    // coloreable. Sólo armónicos de N, así la simetría sigue siendo exacta en cada banda
     // Celda mínima ~4.5 mm (a escala de página): más estrecha no se colorea bien
     const minArc = Math.max(4.5 * (R / 90), 3.2);
     const ok = harmonics.filter(n => TAU * rm / n >= minArc);
     const pool = ok.length ? ok : [harmonics[0]];
-    b.n = pool.reduce((best, n) =>
-      Math.abs(Math.log((TAU * rm / n) / target)) < Math.abs(Math.log((TAU * rm / best) / target)) ? n : best, pool[0]);
+    b.n = fitBandCount({ r0: b.r0, r1: b.r1, candidates: pool, aspect: ASPECT[b.motif], minArea: minCell });
     b.off = -Math.PI / 2 + ((b.k % 2) ? Math.PI / b.n : 0);
   }
 
@@ -199,14 +206,15 @@ export function generateMandalaClassic(doc, opts) {
   const MOTIFS = {
     petal(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.96);
-      const m = mainPB(), d = detailPB();
+      const m = mainPB(), d = detailPB(), v = detailPB();
       for (let i = 0; i < b.n; i++) {
         const a = b.off + i * step;
         petalShape(m, b.r0 - h * 0.06, b.r1, a, w);
         if (detail) petalShape(d, b.r0 + h * 0.18, b.r1 - h * 0.2, a, w * 0.55);
-        if (richDetail) { M(d, b.r0 + h * 0.28, a); L(d, b.r1 - h * 0.36, a); }
+        // Nervio como lente estrecha cerrada: coloreable, no una línea suelta
+        if (richDetail) petalShape(v, b.r0 + h * 0.28, b.r1 - h * 0.36, a, w * 0.12);
       }
-      emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.22); emit(d, detailW);
+      emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.22); emit(d, detailW); emit(v, vestW);
     },
     round(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.94);

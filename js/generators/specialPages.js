@@ -16,7 +16,7 @@ export function generateSpecialPage(doc, opts) {
       // El mismo mandala en cada etapa: misma semilla, bandas y motivos; sólo cambia
       // cuántos anillos se dibujan
       generateMandalaClassic(doc, { ...opts, ...NO_IMAGE, special: undefined, composition: "centro", frameStyle: "redondeado",
-        growth: sp.of > 1 ? sp.stage / (sp.of - 1) : 1, minBands: 8 });
+        growth: sp.of > 1 ? sp.stage / (sp.of - 1) : 1, minBands: 6 });
       const m = Number.isFinite(doc.page.marginMm) ? doc.page.marginMm : 10;
       const label = sp.stage === sp.of - 1 ? `Mandala que crece · etapa ${sp.stage + 1} de ${sp.of}: completo` : `Mandala que crece · etapa ${sp.stage + 1} de ${sp.of}`;
       doc.body.push(svgText(m, doc.page.hMm - FOOTER_BASELINE_MM, label, { size: 2.8, anchor: "start", fill: "#444" }));

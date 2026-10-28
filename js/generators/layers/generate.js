@@ -50,10 +50,10 @@ export function generateMandalaLayers(doc, opts) {
     layer2Intensity = 0.55,
     layer3Intensity = 0.45,
     layer4Intensity = 0.5,
-    layer5Intensity = 0.4,
+    layer5Intensity = 0.25, // detalles finos: menos, para que no se empasten en papel
     layer6Intensity = 0.45,
     layer7Intensity = 0.35,
-    layer8Intensity = 0.3,
+    layer8Intensity = 0.15, // texturas finas: se pierden en impresión KDP
     styleMode = "sashiko",
     organicLevel = 0.2,
     complexity = 110,
@@ -231,7 +231,7 @@ export function generateMandalaLayers(doc, opts) {
   if (layer2Intensity > 0.05) {
     const pb = newPB();
     const rIn = R * R1 + 2; 
-    const rOut = rIn + (R * R2 - rIn) * layer2Intensity;
+    const rOut = rIn + (R * R2 - rIn) * Math.min(1, layer2Intensity * 1.2); // pétalos internos con más espacio radial
     const count = petals;
     const angStep = (Math.PI * 2) / count;
 
@@ -290,7 +290,7 @@ export function generateMandalaLayers(doc, opts) {
         } else {
           // Compound petal - simplified without inner details for more coloring space
           addCompoundPetal(pb, center, rIn, kROut, aC, angStep,
-            false, false, layer2Intensity > 0.5, fineW);
+            false, false, false, fineW); // sin vena: menos detalle que colorear
         }
       }
     }
@@ -681,7 +681,8 @@ export function generateMandalaLayers(doc, opts) {
   }
 
   // ==================== L8: TEXTURAS CULTURALES (Enhanced) ====================
-  if (layer8Intensity > 0.1 && textures) {
+  // Modo comercial (trazo ≥ 0,8 mm): las texturas finas se imprimen empastadas; sólo sashiko las justifica
+  if (layer8Intensity > 0.1 && textures && !(strokeWidthMm >= 0.8 && style !== "sashiko")) {
     const pb = newPB();
 
     if (style === "sashiko") {
@@ -831,7 +832,7 @@ export function generateMandalaLayers(doc, opts) {
     }
 
     // Pearl dots along outer frame
-    addPearlRing(pb, center.x, center.y, R + 1.5, petals * 4, 0.4);
+    addPearlRing(pb, center.x, center.y, R + 1.5, petals * 3, 0.6); // menos perlas, más grandes
 
     pushPath(pb, detailW);
   }
