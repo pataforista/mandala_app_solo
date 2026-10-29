@@ -31,6 +31,18 @@ const SILHOUETTE = ["lotus", "lotus", "lotus", "scallop", "scallop", "ogee", "og
 
 const MOTIFS_OK = (m) => Object.prototype.hasOwnProperty.call(ASPECT, m);
 
+// Perfiles de estructura: cuánto pesa cada parte del disco. Con un solo perfil todas las
+// páginas tenían la misma arquitectura (corona enorme + círculo + interior denso) y se
+// veían iguales al hojear aunque cambiaran los motivos. Sólo escalan pesos: no consumen
+// sorteos, así que una página con el perfil por defecto no cambia.
+//  sil: peso de la silueta · hero: banda bajo la silueta · core: radio del núcleo (× R)
+export const STRUCTURES = {
+  corona:     { sil: 2.4, hero: 1.6, core: null },  // silueta protagonista (el de siempre)
+  equilibrio: { sil: 1.35, hero: 1.15, core: null }, // bandas parejas: anillos concéntricos
+  nucleo:     { sil: 1.7, hero: 1.0, core: 0.3, dropBand: true }, // flor central grande
+  heroe:      { sil: 1.2, hero: 2.8, core: null },  // una banda media domina
+};
+
 export function generateMandalaClassic(doc, opts) {
   // Encuadres de página (fondo, constelación, esquinas…): dibujan el disco con esta misma función
   if (wantsComposition(opts)) return composePage(doc, opts, generateMandalaClassic);
@@ -87,7 +99,10 @@ export function generateMandalaClassic(doc, opts) {
   const artFrac = art ? Math.max(0.25, Math.min(0.6, art.scale ?? 0.42)) : 0;
   // Rango comercial: 4–7 bandas (antes 5–10). Más anillos = celdas más pequeñas
   let B = outlineMode ? 3 + Math.round(cF * 1.5 + rng() * 0.6) : 4 + Math.round(cF * 2.5 + rng() * 0.8);
+  const ST = STRUCTURES[opts.structure] || STRUCTURES.corona;
   if (art) B = Math.max(3, B - Math.round(artFrac * 6));
+  // Núcleo grande: una banda menos (el espacio lo ocupa la flor central)
+  else if (ST.dropBand && !opts.minBands) B = Math.max(3, B - 1);
   // Mínimo de bandas: un mural gigante o una secuencia «que crece» necesitan más anillos
   if (opts.minBands) B = Math.max(B, opts.minBands);
   // Mandalas pequeños de relleno: pocas bandas o las celdas se vuelven incoloreables
@@ -95,12 +110,13 @@ export function generateMandalaClassic(doc, opts) {
   // Núcleo con tamaño absoluto mínimo: en los mini mandalas un núcleo de 1–2 mm
   // se imprime como una mancha negra
   // Núcleo lo bastante grande para colorearlo con un lápiz (~7 mm de diámetro como mínimo)
-  const rCore = art ? R * artFrac : Math.max(R * (0.14 + rng() * 0.04), Math.min(R * 0.32, 5.5));
+  const rCoreBase = art ? R * artFrac : Math.max(R * (0.14 + rng() * 0.04), Math.min(R * 0.32, 5.5));
+  const rCore = !art && ST.core ? Math.max(rCoreBase, R * ST.core) : rCoreBase;
   // Jerarquía: la silueta y una banda héroe dominan; el núcleo queda algo más pequeño
   const weights = Array.from({ length: B }, (_, k) => {
     let w = 0.7 + rng() * 0.5;
-    if (k === B - 1) w *= 2.4;          // silueta muy protagonista
-    if (k === B - 2) w *= 1.6;          // banda héroe
+    if (k === B - 1) w *= ST.sil;       // silueta (muy protagonista en «corona»)
+    if (k === B - 2) w *= ST.hero;      // banda héroe
     if (k === 0) w *= 0.8;              // núcleo relativo más pequeño
     return w;
   });
@@ -400,7 +416,7 @@ export function generateMandalaClassic(doc, opts) {
   if (doc?.meta) {
     doc.meta.bands = { total: B, drawn: kDraw };
     // Firma de cada disco dibujado (para medir repetición entre páginas)
-    (doc.meta.discs ??= []).push({ R, N, motifs: bands.map(b => b.motif), counts: bands.map(b => b.n) });
+    (doc.meta.discs ??= []).push({ R, N, structure: opts.structure || "corona", motifs: bands.map(b => b.motif), counts: bands.map(b => b.n), radii: bands.map(b => +(b.r1 / R).toFixed(3)) });
   }
 
   // ---------- Núcleo: medallón con la imagen ----------

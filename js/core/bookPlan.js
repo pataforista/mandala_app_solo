@@ -27,6 +27,37 @@ const SILHOUETTES_BY_STYLE = {
   celtico:   ["round", "heart", "leaf", "scallop", "ogee", "lotus"],
 };
 
+// Estructura del disco (ver STRUCTURES en mandalaClassic.js) y tema de fondo (ver
+// BACKGROUNDS en pageComposer.js). Se reparten igual que la silueta: sin repetir en
+// páginas seguidas y equilibrados en el libro.
+export const BOOK_STRUCTURES = ["corona", "heroe", "equilibrio", "nucleo"];
+const STRUCTURE_WEIGHTS = [3, 2, 2, 1]; // «núcleo» puntúa algo menos: sale menos
+export const SCATTER_BACKGROUNDS = ["jardin", "cielo", "hojas", "dulce"];
+export const PATTERN_BACKGROUNDS = ["ondas", "rombos", "rayos"];
+// Composiciones con espacio libre que se decora (el resto no usa tema de fondo)
+const FILLED = new Set(["fondo", "constelacion", "esquinas", "medio"]);
+
+/** Tema de fondo equilibrado: el menos usado entre los posibles, distinto del anterior. */
+export function backgroundPicker(rng) {
+  const used = new Map();
+  let last = null;
+  return (composition) => {
+    if (!FILLED.has(composition)) return null;
+    const allowed = composition === "fondo" ? [...SCATTER_BACKGROUNDS, ...PATTERN_BACKGROUNDS] : SCATTER_BACKGROUNDS;
+    let pool = allowed.filter(b => b !== last);
+    if (!pool.length) pool = allowed;
+    // Cuenta por encuadre: si no, los temas sueltos (que también usan constelación y
+    // esquinas) parecían «muy usados» y el fondo decorado repetía siempre las tramas
+    const n = (b) => used.get(`${composition}|${b}`) || 0;
+    const min = Math.min(...pool.map(n));
+    const least = pool.filter(b => n(b) === min);
+    const pick = least[Math.floor(rng() * least.length)];
+    used.set(`${composition}|${pick}`, n(pick) + 1);
+    last = pick;
+    return pick;
+  };
+}
+
 // Familias visuales: lo que el ojo distingue al hojear. Loto, pétalo y ojiva tienen
 // nombres distintos pero se ven como la misma corona de puntas.
 export const SILHOUETTE_FAMILY = {
@@ -203,6 +234,8 @@ export function planBook(opts) {
   const nextPetals = shuffleBag(rng, petals);
   // Generador propio: añadir la silueta no cambia los sorteos de las demás dimensiones
   const nextSilhouette = silhouettePicker(mulberry32(((seed >>> 0) ^ 0x51A0E77E) >>> 0));
+  const nextStructure = shuffleBag(mulberry32(((seed >>> 0) ^ 0x57A0C7E5) >>> 0), BOOK_STRUCTURES, STRUCTURE_WEIGHTS);
+  const nextBackground = backgroundPicker(mulberry32(((seed >>> 0) ^ 0xBAC6A0D5) >>> 0));
 
   // Páginas con imagen: espaciadas de forma uniforme (k + ½) · count / images
   const imageAt = new Map();
@@ -230,6 +263,8 @@ export function planBook(opts) {
       strokeScale: difficulty === "fija" ? 1 : strokeScaleFor(complexity, baseComplexity),
       styleMode,
       silhouette: nextSilhouette(styleMode, composition),
+      structure: nextStructure(),
+      background: nextBackground(composition),
       composition,
       frameStyle: nextFrame(),
       petals: nextPetals(),

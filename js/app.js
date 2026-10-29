@@ -11,7 +11,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, SILHOUETTE_FAMILY, alternateSilhouette } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, alternateSilhouette, BOOK_STRUCTURES } from "./core/bookPlan.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
 import { escapeXml } from "./core/svgText.js";
@@ -20,6 +20,7 @@ import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.j
 import { packFigures, unpackFigures } from "./core/figurePack.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
+import { pageFingerprint, fingerprintSimilarity, similarPairs, TWIN_THRESHOLD } from "./core/variety.js";
 
 const historyMan = new StateHistory();
 const imgProc = new ImageProcessor();
@@ -1967,6 +1968,8 @@ function bindUI() {
         o.frameStyle = pg.frameStyle;
         // «Borrar y crear otro» también cambia la silueta: con la misma, el reemplazo
         // se parecería demasiado al dibujo descartado
+        if (pg.structure) o.structure = ov?.bump ? BOOK_STRUCTURES[(BOOK_STRUCTURES.indexOf(pg.structure) + ov.bump) % BOOK_STRUCTURES.length] : pg.structure;
+        if (pg.background) o.background = pg.background;
         if (pg.silhouette) o.silhouette = ov?.bump ? alternateSilhouette(o.styleMode || pg.styleMode, pg.silhouette, ov.bump) : pg.silhouette;
         // Cada imagen elegida aparece una vez, con el uso que se le asignó a mano;
         // el resto de páginas son mandalas sin imagen
@@ -2013,18 +2016,15 @@ function bindUI() {
   const scoreColor = (n) => (n >= 80 ? "#2e7d32" : n >= WEAK_SCORE ? "#f57c00" : "#c62828");
   const reviewQualityEl = document.getElementById("reviewQuality");
   const reviewFixBtn = document.getElementById("reviewFixWeak");
-  // Firma visual de una página: encuadre + estilo + familia de la silueta (null si no aplica)
-  const pageSignature = (book, i) => {
-    if (book.plan[i].special) return null;
-    const o = book.makeOpts(i);
-    return o.figure || o.figureRing || !o.silhouette ? null : `${o.composition}|${o.styleMode}|${SILHOUETTE_FAMILY[o.silhouette]}`;
-  };
-  const twinsNear = (book, i) => {
-    const a = pageSignature(book, i);
-    if (!a) return false;
-    for (let j = Math.max(0, i - 4); j < Math.min(book.plan.length, i + 5); j++) if (j !== i && pageSignature(book, j) === a) return true;
-    return false;
-  };
+  // Repetición: huella geométrica de cada página (variety.js), medida sobre el dibujo.
+  // Las páginas especiales no se comparan (las etapas de un mandala que crece se parecen
+  // a propósito).
+  const reviewFps = new Map(); // índice → huella (o null)
+  const fpOf = (svg, o) => (o.special ? null : pageFingerprint(svg, getCurrentDoc().page));
+  const fpList = (n) => Array.from({ length: n }, (_, k) => reviewFps.get(k) || null);
+  const twinPairs = (n) => similarPairs(fpList(n));
+  // ¿Esta huella sería gemela de alguna otra página del libro?
+  const twinOfAny = (fp, i, n) => fp && fpList(n).some((g, k) => k !== i && g && fingerprintSimilarity(fp, g) >= TWIN_THRESHOLD);
   const weakPages = () => [...reviewScores].filter(([, sc]) => sc != null && sc < WEAK_SCORE).map(([i]) => i);
   const updateQualitySummary = (book) => {
     if (!reviewQualityEl) return;
@@ -2043,15 +2043,38 @@ function bindUI() {
                 : ` Las págs. ${g.join(", ")} son de un grupo (mandala que crece o mural): cámbialas con «Cambiar todo el grupo».`)(weak.filter(i => !fixable.includes(i)).map(i => i + 1))
             : "")
         : "ninguna floja ✅.");
-    // Variedad: páginas a menos de 5 de distancia con el mismo encuadre, estilo y familia
-    // de silueta se perciben como el mismo dibujo al hojear
-    const sig = book.plan.map((_, i) => pageSignature(book, i));
-    const twins = [];
-    sig.forEach((a, i) => { if (a) for (let j = i + 1; j < Math.min(sig.length, i + 5); j++) if (sig[j] === a) twins.push(`${i + 1}–${j + 1}`); });
-    const fams = new Set(sig.filter(Boolean).map(x => x.split("|")[2]));
-    reviewQualityEl.innerHTML += `<br><br>Variedad: ${fams.size} formas exteriores distintas · ` +
-      (twins.length ? `<b style="color:#f57c00">${twins.length} par(es) muy parecidos y cercanos</b>: págs. ${twins.join(", ")} (usa «Borrar y crear otro» en una de cada par).` : "sin páginas gemelas cercanas ✅.");
-    if (reviewFixBtn) { reviewFixBtn.disabled = !fixable.length; reviewFixBtn.textContent = fixable.length ? `Rehacer páginas flojas (${fixable.length})` : "Rehacer páginas flojas"; }
+    // Variedad: pares de páginas gemelas en todo el libro (huella geométrica ≥ umbral)
+    const twins = twinPairs(book.count);
+    const twinFix = twinTargets(book, twins);
+    const cards = [...reviewGrid.children];
+    cards.forEach(c => { c.classList.remove("twin"); c.querySelector(".twin-note")?.remove(); });
+    for (const { i, j, sim } of twins) for (const [a, b] of [[i, j], [j, i]]) {
+      const c = cards[a]; if (!c) continue;
+      c.classList.add("twin");
+      const meta = c.querySelector(".meta");
+      if (meta && !meta.querySelector(".twin-note")) {
+        const note = document.createElement("div");
+        note.className = "twin-note";
+        note.textContent = `≈ gemela de la pág. ${b + 1} (${Math.round(sim * 100)} %)`;
+        meta.appendChild(note);
+      }
+    }
+    reviewQualityEl.innerHTML += "<br><br>Variedad: " + (twins.length
+      ? `<b style="color:#f57c00">${twins.length} par(es) de páginas gemelas</b> (se ven casi iguales al hojear): ` +
+        twins.slice(0, 8).map(t => `págs. ${t.i + 1} y ${t.j + 1}`).join(" · ") + (twins.length > 8 ? "…" : "") + "."
+      : "sin páginas gemelas ✅.");
+    const todo = new Set([...fixable, ...twinFix]).size;
+    if (reviewFixBtn) { reviewFixBtn.disabled = !todo; reviewFixBtn.textContent = todo ? `Rehacer flojas y gemelas (${todo})` : "Rehacer flojas y gemelas"; }
+  };
+  // De cada par gemelo se rehace la página posterior (si no es de un grupo; si lo es, la otra)
+  const twinTargets = (book, twins) => {
+    const out = new Set();
+    for (const { i, j } of twins) {
+      if (out.has(i) || out.has(j)) continue;
+      const free = (k) => book.plan[k].special?.group == null;
+      if (free(j)) out.add(j); else if (free(i)) out.add(i);
+    }
+    return [...out];
   };
 
   const fillCard = (card, book, i) => {
@@ -2062,6 +2085,7 @@ function bindUI() {
     let sc = null, issues = [];
     if (scorable(opts)) ({ score: sc, issues } = scoreSvg(svg, opts));
     reviewScores.set(i, sc);
+    reviewFps.set(i, fpOf(svg, opts));
     card.classList.toggle("weak", sc != null && sc < WEAK_SCORE);
     const meta = card.querySelector(".meta");
     meta.textContent =
@@ -2085,10 +2109,12 @@ function bindUI() {
     } else meta.title = "Página especial: la puntuación no se aplica.";
   };
 
-  // Prueba hasta `tries` diseños nuevos por página floja y se queda con el mejor
-  const fixWeakPages = async (tries = 4) => {
+  // Prueba hasta `tries` diseños nuevos por página floja o gemela y se queda con el mejor
+  // que no sea gemelo de otra página
+  const fixWeakPages = async (tries = 6) => {
     const book0 = buildBook();
-    const targets = weakPages().filter(i => book0.plan[i].special?.group == null);
+    const weak = weakPages().filter(i => book0.plan[i].special?.group == null);
+    const targets = [...new Set([...weak, ...twinTargets(book0, twinPairs(book0.count))])].sort((a, b) => a - b);
     if (!targets.length) return;
     if (reviewFixBtn) reviewFixBtn.loading = true;
     const cards = [...reviewGrid.children];
@@ -2096,15 +2122,16 @@ function bindUI() {
       for (const i of targets) {
         const key = book0.ovKey(i);
         const start = currentOverrides().get(key) || {};
-        let best = { bump: start.bump || 0, score: reviewScores.get(i) ?? 0 };
-        for (let t = 1; t <= tries && best.score < 80; t++) {
+        // Valor de un diseño: su puntuación, y descartado si es gemelo de otra página
+        const value = (score, fp) => (twinOfAny(fp, i, book0.count) ? -1000 : 0) + (score ?? 70);
+        let best = { bump: start.bump || 0, v: value(reviewScores.get(i), reviewFps.get(i)) };
+        for (let t = 1; t <= tries && best.v < 80; t++) {
           const bump = (start.bump || 0) + t;
           currentOverrides().set(key, { ...start, bump });
           const nb = buildBook();
           const { svg, opts } = pageSvg(nb, i);
-          // Un reemplazo que se parece a una página vecina no sirve, aunque puntúe más
-          const { score } = scoreSvg(svg, opts);
-          if (score > best.score && !twinsNear(nb, i)) best = { bump, score };
+          const v = value(scorable(opts) ? scoreSvg(svg, opts).score : null, fpOf(svg, opts));
+          if (v > best.v) best = { bump, v };
           await new Promise(r => setTimeout(r, 0));
         }
         if (best.bump) currentOverrides().set(key, { ...start, bump: best.bump });
@@ -2126,6 +2153,7 @@ function bindUI() {
     const book = buildBook();
     reviewGrid.innerHTML = "";
     reviewScores.clear();
+    reviewFps.clear();
     if (reviewQualityEl) reviewQualityEl.textContent = "Midiendo la calidad de cada página…";
     if (reviewFixBtn) reviewFixBtn.disabled = true;
     reviewDialog.show();

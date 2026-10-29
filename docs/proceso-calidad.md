@@ -44,18 +44,43 @@ No bajes el trazo de 0,8 mm en un libro para adultos: en papel de KDP una línea
 Pulsa **Revisar páginas antes de crear**. Cada miniatura muestra su puntuación:
 
 - Arriba aparece la **media del libro** y la lista de páginas flojas (< 60).
-- **Rehacer páginas flojas** prueba hasta 4 diseños nuevos para cada página roja y se queda con el mejor.
+- **Rehacer flojas y gemelas** prueba hasta 6 diseños nuevos para cada página roja o gemela y se queda
+  con el mejor que no repita otra página del libro.
 - Después mira las miniaturas con tus ojos. La puntuación mide celdas pequeñas, huecos estrechos y
   trazos finos; **no** mide belleza, equilibrio visual ni si dos páginas se parecen demasiado.
   Usa **Borrar y crear otro** u **Otro encuadre** en lo que no te guste.
 - Las páginas especiales (misteriosos, naturaleza, soluciones) no se puntúan: revísalas a ojo.
 
-Debajo aparece la línea **Variedad**: cuántas formas exteriores distintas tiene el libro y si
-hay pares de páginas cercanas (a menos de 5 de distancia) con el mismo encuadre, estilo y forma
-exterior. Esas páginas se ven gemelas al hojear: usa **Borrar y crear otro** en una de cada par
-(el reemplazo cambia también la forma exterior).
+Debajo aparece la línea **Variedad**: los pares de páginas **gemelas**, que se ven casi iguales
+al hojear, en cualquier lugar del libro. Se marcan con borde naranja punteado y una nota
+(«≈ gemela de la pág. 38 (90 %)»). Rehazlas con el botón o con **Borrar y crear otro**, que cambia
+también la forma exterior y la estructura.
 
-**Criterio para continuar:** ninguna página roja, media ≥ 70 y sin páginas gemelas cercanas.
+**Criterio para continuar:** ninguna página roja, media ≥ 70 y sin páginas gemelas.
+
+### Cómo se mide la repetición
+
+Cada página recibe una **huella geométrica** calculada sobre el dibujo mismo (`js/core/variety.js`),
+no sobre las etiquetas del plan:
+
+| Parte de la huella | Qué capta |
+|---|---|
+| Perfil radial de tinta | dónde caen los anillos: la estructura del mandala |
+| Espectro angular por anillo | cuántas repeticiones tiene cada banda, aunque esté girada |
+| Mapa de tinta 6×8 | cómo se reparte el dibujo en la hoja: encuadre y fondo |
+
+Dos páginas con parecido ≥ 0,90 son gemelas. El umbral se fijó mirando pares reales: los de
+0,90 o más se veían casi iguales; los de 0,81–0,85 ya se distinguían. Para repetir la medición:
+`node scripts/bench-variety.mjs 10` (y `--antiguo` para comparar con el reparto anterior).
+
+| 10 libros de 50 páginas | Antes | Ahora |
+|---|---|---|
+| Pares gemelos (≥ 0,90) por libro | 1,4 | 0,4 (y la revisión los rehace) |
+| Pares parecidos (≥ 0,85) por libro | 5,0 | 2,1 |
+
+Límite: la huella no ve el estilo de los motivos (un pétalo floral y uno geométrico del mismo
+tamaño cuentan igual). Datos insuficientes para afirmar que coincide con la percepción de
+compradores: se calibró con una sola revisión visual, no con lectores.
 
 ### Por qué la forma exterior importa tanto
 
@@ -72,6 +97,17 @@ seguidas:
 | Medallón | rombo, triángulo | disco cerrado por un círculo |
 
 Cada estilo usa sólo las siluetas que le van (un geométrico no lleva corazones).
+
+### Estructura y fondo
+
+Además de la silueta, el plan reparte:
+
+- **Estructura del disco**, sin repetir en páginas seguidas: *corona* (silueta protagonista),
+  *héroe* (una banda media domina), *equilibrio* (anillos parejos) y *núcleo* (flor central grande).
+- **Tema de fondo**, en las páginas con espacio libre. Motivos sueltos: *jardín*, *cielo* (estrellas,
+  soles, lunas), *hojas* (hojas, tulipanes, gotas) y *dulce* (corazones, tréboles). En «fondo
+  decorado» también tramas: *ondas*, *rombos* y *rayos*, cada una con variantes de celda y ángulo.
+  Los fondos decorados recorren los 7 temas antes de repetir uno.
 
 ## Paso 5 · Crear el PDF
 

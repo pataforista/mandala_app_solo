@@ -12,7 +12,7 @@
 // línea, así que sobrestima la estrechez en trazos gruesos. Sirve para comparar cambios.
 
 // --- Geometría: subtrayectos aplanados (M/L/Q/C/Z absolutos, como los emite PathBuilder) ---
-function flattenSubpaths(d) {
+export function flattenSubpaths(d) {
   const tok = d.trim().split(/\s+/);
   const subs = [];
   let cur = null, i = 0, cx = 0, cy = 0, sx = 0, sy = 0;
