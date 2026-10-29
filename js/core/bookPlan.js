@@ -49,8 +49,14 @@ export function strokeScaleFor(complexity, baseComplexity) {
 /** Trazo final de una página: nunca por debajo de 0,35 mm (las líneas finas se pierden al imprimir). */
 export const MIN_PRINT_STROKE_MM = 0.35;
 export const MAX_AUTO_STROKE_MM = 1.2;
+// Grosor mínimo comercial: el mismo umbral que penaliza la puntuación (commercialMetrics.js).
+// El adelgazamiento automático de las páginas difíciles no cruza este umbral si el trazo
+// elegido ya lo cumplía: antes, una página difícil con trazo de 0,8 mm salía a 0,68 mm y
+// perdía 15 puntos por una decisión del propio planificador.
+export const COMMERCIAL_MIN_STROKE_MM = 0.8;
 export function pageStrokeMm(baseMm, scale = 1) {
   let mm = baseMm * scale;
+  if (scale < 1) mm = Math.max(mm, Math.min(baseMm, COMMERCIAL_MIN_STROKE_MM));
   // El aumento automático no pasa de 1,2 mm: más grueso empasta las celdas pequeñas.
   // Si el usuario eligió un trazo mayor, se respeta (nunca se adelgaza por este tope).
   if (scale > 1) mm = Math.min(mm, Math.max(baseMm, MAX_AUTO_STROKE_MM));
@@ -63,10 +69,28 @@ function shuffled(rng, arr) {
   return a;
 }
 
+/**
+ * Pesos → número de copias por ronda. Acepta una lista (mismo orden que options) o un
+ * objeto { opción: peso }. Los pesos fraccionarios se escalan para que el menor peso
+ * positivo valga una copia: { floral: 3, azteca: 0.2 } ⇒ 15 florales por cada azteca
+ * (redondear 0,2 a 0 la haría desaparecer). Un peso no numérico cuenta como 0.
+ */
+export function weightCopies(options, weights) {
+  const raw = options.map((o, i) => {
+    const w = Array.isArray(weights) ? weights[i] : weights[o];
+    return Number.isFinite(w) && w > 0 ? w : 0;
+  });
+  const pos = raw.filter(w => w > 0);
+  if (!pos.length) return options.map(() => 1);
+  const scale = Math.min(1 / Math.min(...pos), 200 / pos.reduce((a, b) => a + b, 0));
+  return raw.map(w => (w > 0 ? Math.max(1, Math.round(w * Math.max(1, scale))) : 0));
+}
+
 /** Bolsa barajada: reparte todas las opciones antes de repetir; evita repetir la anterior. */
 export function shuffleBag(rng, options, weights = null) {
   // Los pesos se traducen en copias: peso 2 ⇒ aparece el doble de veces por ronda
-  const pool = weights ? options.flatMap((o, i) => Array(Math.max(0, Math.round(weights[i]))).fill(o)) : options.slice();
+  const copies = weights ? weightCopies(options, weights) : null;
+  const pool = copies ? options.flatMap((o, i) => Array(copies[i]).fill(o)) : options.slice();
   let bag = [];
   let last;
   return () => {

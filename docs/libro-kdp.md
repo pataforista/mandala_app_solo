@@ -1,5 +1,7 @@
 # Libro para Amazon KDP: variedad, figuras e imágenes de dominio público
 
+> ¿Primera vez? Sigue la guía paso a paso [`proceso-calidad.md`](proceso-calidad.md).
+
 ## 1. Variedad entre páginas
 
 Un libro de 30 discos centrados sobre papel vacío se percibe como la misma página fotocopiada.
@@ -25,6 +27,12 @@ todas las páginas en miniatura; en cada una:
   (mismo encuadre, otra semilla).
 - **Otro encuadre**: pasa a la siguiente composición permitida.
 
+Cada miniatura muestra su **puntuación para colorear** (la de `commercialMetrics.js`, medida sobre
+la página tal como irá al PDF) y arriba aparece la media del libro. Las páginas por debajo de 60 se
+marcan en rojo con su motivo; **Rehacer páginas flojas** prueba hasta 4 diseños nuevos para cada
+una y se queda con el mejor. Las páginas especiales (misteriosos, naturaleza, soluciones) no se
+puntúan, y las de un grupo (mandala que crece, mural) se cambian a mano con «Cambiar todo el grupo».
+
 Los cambios se guardan mientras no cambies la semilla, las composiciones permitidas o la dificultad,
 y se aplican al pulsar «Crear libro».
 
@@ -38,7 +46,7 @@ con simetría alta y sin marcos pesados (`bestSellerProfile` en `js/core/bookPla
 |---|---|---|
 | Composición (peso) | centrado 6 · fondo 2 · gigante 1 · constelación 1 | centrado 5 · fondo 2 · constelación 2 · esquinas 1 · gigante 1 |
 | Medio mandala | nunca | nunca |
-| Estilo (peso) | floral 3 · geométrico, islámico, yantra 2 · resto 1 | igual |
+| Estilo (peso) | floral 3 · geométrico 2 · sashiko 0,5 · islámico, céltico 0,3 · azteca, yantra 0,2 (≈ 45 % floral, 30 % geométrico, el resto ocasional) | igual |
 | Pétalos | 12, 16, 18, 20, 24 | igual |
 | Marco | sin marco 3 · redondeado 1 | igual |
 

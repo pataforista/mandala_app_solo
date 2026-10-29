@@ -597,3 +597,28 @@ test("misteriosos numerados en orden de aparición, con rótulo en su página", 
   const svg = renderDocToSvgString(special(ms[1].special));
   assert.match(svg, />Misterioso 2 de 4 · solución al final</);
 });
+
+test("pesos de estilo fraccionarios (perfil «más vendidos» de la app): no rompen el plan y conservan la variedad", async () => {
+  const { addSpecialPages, weightCopies } = await import("../js/core/bookPlan.js");
+  // Los mismos pesos que buildBook en js/app.js. Antes Math.round(0,2) = 0 y un objeto
+  // como pesos daba Array(NaN): «Invalid array length» al revisar o crear el libro.
+  const w = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
+  const styles = Object.keys(w), styleWeights = Object.values(w);
+  assert.deepEqual(weightCopies(styles, styleWeights), weightCopies(styles, w), "lista y objeto equivalen");
+  assert.ok(weightCopies(styles, styleWeights).every(n => n >= 1), "ningún estilo con peso > 0 desaparece");
+  assert.deepEqual(weightCopies(["a", "b"], [2, 1]), [2, 1], "pesos enteros: sin cambios");
+  const plan = planBook({ count: 50, seed: 1, styles, styleWeights, difficulty: "progresiva", baseComplexity: 110 });
+  const full = addSpecialPages(plan, { seed: 1, growth: 1, mystery: 3, nature: true, mural: { cols: 3, rows: 3 }, styles, styleWeights });
+  assert.ok(full.length > 50);
+  const n = (s) => plan.filter(p => p.styleMode === s).length;
+  assert.ok(n("floral") > n("geometric") && n("geometric") > n("azteca"));
+  assert.ok(new Set(plan.map(p => p.styleMode)).size >= 4, "sigue habiendo variedad");
+});
+
+test("trazo por página: el adelgazamiento automático no baja del mínimo comercial (0,8 mm)", async () => {
+  const { pageStrokeMm, COMMERCIAL_MIN_STROKE_MM } = await import("../js/core/bookPlan.js");
+  assert.equal(pageStrokeMm(0.8, 0.85), COMMERCIAL_MIN_STROKE_MM, "0,8 mm no se afina a 0,68");
+  assert.equal(pageStrokeMm(0.9, 0.85), 0.8);
+  assert.equal(pageStrokeMm(1.1, 0.85), 0.94, "por encima del mínimo sí se afina");
+  assert.equal(pageStrokeMm(0.55, 0.85), 0.55, "un trazo elegido fino no se afina más");
+});

@@ -407,6 +407,10 @@ const COLORING_PRESETS = {
 
 const recentSeeds = [];
 
+// El selector «Nivel de dificultad» arranca en «Adulto»: los valores iniciales deben ser
+// los de ese nivel. Antes se partía de trazo 0,55 mm y celda mínima 3 mm², y el nivel
+// sólo se aplicaba al cambiarlo, así que un libro nuevo salía con línea fina sin avisar.
+Object.assign(DEFAULTS, COLORING_PRESETS[DEFAULTS.coloringPreset]);
 const state = getStateFromURL(DEFAULTS);
 
 if (typeof state.frames === "string") state.frames = state.frames === "true";
@@ -1888,8 +1892,11 @@ function bindUI() {
     // «Lo más vendido»: composiciones, estilos, marcos y pétalos con los pesos del perfil
     const prof = vary && bestSeller() ? bestSellerProfile(state.preset) : null;
     if (prof) {
-      prof.styles = ["floral", "floral", "floral", "geometric", "geometric", "islamico"];
-      prof.styleWeights = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
+      // Floral y geométrico dominan; el resto aparece como variación ocasional.
+      // Lista y pesos en el mismo orden (shuffleBag los empareja por posición)
+      const w = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
+      prof.styles = Object.keys(w);
+      prof.styleWeights = Object.values(w);
     }
     // Plan de todo el libro antes de dibujar: sin rachas de estilos ni encuadres repetidos
     const regularPlan = planBook({
@@ -1992,21 +1999,109 @@ function bindUI() {
     return { svg: renderDocToSvgString(doc).replace(/width="[^"]+mm" height="[^"]+mm"/, ""), opts: o };
   };
 
+  // ---------- Control de calidad por página ----------
+  // La misma puntuación que la vista previa (commercialMetrics.js), medida sobre cada
+  // página tal como irá al PDF. Sólo en páginas de mandala: el misterioso tiene celdas
+  // pequeñas a propósito, la naturaleza lleva texto y las soluciones no se colorean.
+  const WEAK_SCORE = 60;
+  const reviewScores = new Map(); // índice → puntuación (o null si no se mide)
+  const scorable = (o) => !o.special || o.special.type === "grow" || o.special.type === "mural";
+  const scoreSvg = (svg, o) => commercialScore(measureSvg(svg), { strokeWidthMm: o.strokeWidthMm, minCellAreaMm2: o.minCellAreaMm2 });
+  const scoreColor = (n) => (n >= 80 ? "#2e7d32" : n >= WEAK_SCORE ? "#f57c00" : "#c62828");
+  const reviewQualityEl = document.getElementById("reviewQuality");
+  const reviewFixBtn = document.getElementById("reviewFixWeak");
+  const weakPages = () => [...reviewScores].filter(([, sc]) => sc != null && sc < WEAK_SCORE).map(([i]) => i);
+  const updateQualitySummary = (book) => {
+    if (!reviewQualityEl) return;
+    const vals = [...reviewScores.values()].filter(v => v != null);
+    if (!vals.length) { reviewQualityEl.textContent = ""; return; }
+    const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+    // Las páginas de un grupo (etapas, hojas del mural) no se rehacen solas: cambiarían todas
+    const weak = weakPages(), fixable = weak.filter(i => book.plan[i].special?.group == null);
+    reviewQualityEl.innerHTML =
+      `Calidad para colorear: media <b style="color:${scoreColor(avg)}">${avg}</b>/100 en ${vals.length} páginas medidas · ` +
+      (weak.length
+        ? `<b style="color:#c62828">${weak.length} floja(s)</b> (&lt; ${WEAK_SCORE}): págs. ${weak.map(i => i + 1).join(", ")}.` +
+          (weak.length > fixable.length
+            ? ` Las págs. ${weak.filter(i => !fixable.includes(i)).map(i => i + 1).join(", ")} son de un grupo (mandala que crece o mural): cámbialas con «Cambiar todo el grupo».`
+            : "")
+        : "ninguna floja ✅.");
+    if (reviewFixBtn) { reviewFixBtn.disabled = !fixable.length; reviewFixBtn.textContent = fixable.length ? `Rehacer páginas flojas (${fixable.length})` : "Rehacer páginas flojas"; }
+  };
+
   const fillCard = (card, book, i) => {
     const { svg, opts } = pageSvg(book, i);
     const changed = currentOverrides().has(book.ovKey(i));
     card.classList.toggle("changed", changed);
     card.querySelector(".thumb").innerHTML = svg;
-    card.querySelector(".meta").textContent =
+    let sc = null, issues = [];
+    if (scorable(opts)) ({ score: sc, issues } = scoreSvg(svg, opts));
+    reviewScores.set(i, sc);
+    card.classList.toggle("weak", sc != null && sc < WEAK_SCORE);
+    const meta = card.querySelector(".meta");
+    meta.textContent =
       opts.special
         ? `${i + 1} · ✨ ${specialLabel(opts.special)}`
         : `${i + 1} · ${COMP_NAMES[opts.figure ? "figura" : opts.figureRing ? "anillos" : opts.composition] || opts.composition || ""} · ${STYLE_NAMES[opts.styleMode] || opts.styleMode || ""}`;
+    if (sc != null) {
+      const b = document.createElement("b");
+      b.className = "score";
+      b.textContent = ` · ${sc}`;
+      b.style.color = scoreColor(sc);
+      meta.appendChild(b);
+      meta.title = issues.length ? `Puntuación ${sc}/100:\n• ${issues.join("\n• ")}` : `Puntuación ${sc}/100: sin defectos medidos.`;
+      // En el móvil no hay «title» al tocar: el motivo de una página floja va a la vista
+      if (sc < WEAK_SCORE && issues.length) {
+        const why = document.createElement("div");
+        why.className = "why";
+        why.textContent = issues.slice(0, 2).join(" · ");
+        meta.appendChild(why);
+      }
+    } else meta.title = "Página especial: la puntuación no se aplica.";
+  };
+
+  // Prueba hasta `tries` diseños nuevos por página floja y se queda con el mejor
+  const fixWeakPages = async (tries = 4) => {
+    const book0 = buildBook();
+    const targets = weakPages().filter(i => book0.plan[i].special?.group == null);
+    if (!targets.length) return;
+    if (reviewFixBtn) reviewFixBtn.loading = true;
+    const cards = [...reviewGrid.children];
+    try {
+      for (const i of targets) {
+        const key = book0.ovKey(i);
+        const start = currentOverrides().get(key) || {};
+        let best = { bump: start.bump || 0, score: reviewScores.get(i) ?? 0 };
+        for (let t = 1; t <= tries && best.score < 80; t++) {
+          const bump = (start.bump || 0) + t;
+          currentOverrides().set(key, { ...start, bump });
+          const nb = buildBook();
+          const { svg, opts } = pageSvg(nb, i);
+          const { score } = scoreSvg(svg, opts);
+          if (score > best.score) best = { bump, score };
+          await new Promise(r => setTimeout(r, 0));
+        }
+        if (best.bump) currentOverrides().set(key, { ...start, bump: best.bump });
+        else if (Object.keys(start).length) currentOverrides().set(key, start);
+        else currentOverrides().delete(key);
+        const nb = buildBook();
+        fillCard(cards[i], nb, i);
+        cards[i].animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 350 });
+      }
+    } finally {
+      if (reviewFixBtn) reviewFixBtn.loading = false;
+      updateQualitySummary(buildBook());
+      updateReviewInfo();
+    }
   };
 
   const openReview = async () => {
     const token = ++reviewToken;
     const book = buildBook();
     reviewGrid.innerHTML = "";
+    reviewScores.clear();
+    if (reviewQualityEl) reviewQualityEl.textContent = "Midiendo la calidad de cada página…";
+    if (reviewFixBtn) reviewFixBtn.disabled = true;
     reviewDialog.show();
     for (let i = 0; i < book.count; i++) {
       const card = document.createElement("div");
@@ -2037,6 +2132,7 @@ function bindUI() {
           }
         });
         updateReviewInfo();
+        updateQualitySummary(nb);
       });
       reviewGrid.appendChild(card);
     }
@@ -2047,6 +2143,7 @@ function bindUI() {
       await new Promise(r => setTimeout(r, 0));
       try { fillCard(cards[i], book, i); } catch (err) { console.error("Miniatura", i, err); }
     }
+    updateQualitySummary(book);
   };
 
   const reviewBtn = document.getElementById("reviewBook");
@@ -2059,6 +2156,7 @@ function bindUI() {
       openReview();
     });
     document.getElementById("reviewCreate")?.addEventListener("click", () => { reviewDialog.hide(); downloadBook(); });
+    reviewFixBtn?.addEventListener("click", () => fixWeakPages());
     reviewDialog.addEventListener("sl-after-hide", (e) => { if (e.target === reviewDialog) reviewToken++; });
   }
   // Cambiar el número de páginas o las composiciones permitidas rehace el plan
