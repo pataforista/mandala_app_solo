@@ -622,3 +622,40 @@ test("trazo por página: el adelgazamiento automático no baja del mínimo comer
   assert.equal(pageStrokeMm(1.1, 0.85), 0.94, "por encima del mínimo sí se afina");
   assert.equal(pageStrokeMm(0.55, 0.85), 0.55, "un trazo elegido fino no se afina más");
 });
+
+test("siluetas: repartidas por familia visual, sin repetir familia en páginas seguidas y acordes al estilo", async () => {
+  const { SILHOUETTE_FAMILY, BOOK_SILHOUETTES } = await import("../js/core/bookPlan.js");
+  for (const seed of [1, 2, 3]) {
+    const plan = planBook({ count: 50, seed, ...bestSellerProfile("KDP_8_5x11") });
+    const fam = plan.map(p => SILHOUETTE_FAMILY[p.silhouette]);
+    assert.ok(plan.every(p => BOOK_SILHOUETTES.includes(p.silhouette)));
+    for (let i = 1; i < fam.length; i++) assert.notEqual(fam[i], fam[i - 1], `semilla ${seed}, págs. ${i}-${i + 1}`);
+    const counts = Object.values(fam.reduce((c, f) => ({ ...c, [f]: (c[f] || 0) + 1 }), {}));
+    // Antes, loto y ojiva (la misma corona de puntas) sumaban 34 de 50 páginas
+    assert.ok(Math.max(...counts) <= 15, `semilla ${seed}: una familia domina (${Math.max(...counts)} de 50)`);
+    assert.ok(counts.length >= 4);
+    // Un estilo geométrico no lleva corazones
+    assert.ok(plan.filter(p => p.styleMode === "geometric").every(p => p.silhouette !== "heart"));
+  }
+});
+
+test("motor clásico: respeta la silueta pedida y la cambia sin alterar el interior", () => {
+  const draw = (silhouette) => {
+    const doc = createDoc({ preset: "KDP_8_5x8_5", seed: 7, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 7, petals: 16, composition: "centro", silhouette });
+    return doc.meta.discs[0].motifs;
+  };
+  const a = draw("heart"), b = draw("diamond");
+  assert.equal(a.at(-1), "heart");
+  assert.equal(b.at(-1), "diamond");
+  assert.deepEqual(a.slice(0, -1), b.slice(0, -1), "las bandas interiores no cambian");
+});
+
+test("silueta de reemplazo: acorde al estilo y de otra familia visual", async () => {
+  const { alternateSilhouette, SILHOUETTE_FAMILY } = await import("../js/core/bookPlan.js");
+  for (let k = 1; k <= 8; k++) {
+    const s = alternateSilhouette("geometric", "lotus", k);
+    assert.notEqual(SILHOUETTE_FAMILY[s], SILHOUETTE_FAMILY.lotus);
+    assert.notEqual(s, "heart");
+  }
+});

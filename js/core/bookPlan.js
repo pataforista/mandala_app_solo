@@ -11,6 +11,74 @@ export const BOOK_COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas",
 export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno"];
 export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 
+// Silueta: la banda exterior del mandala, lo primero que se reconoce al hojear. Antes la
+// sorteaba el motor entre 3 formas (loto, festón, ojiva) y la mitad del libro salía con
+// loto: páginas distintas por dentro parecían el mismo dibujo. Ahora la reparte el plan.
+// Dos familias: flor abierta y medallón cerrado (rombo, triángulo: contorno circular).
+// El zigzag (chevron) queda fuera: como silueta deja una corona casi vacía.
+export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle"];
+const SILHOUETTES_BY_STYLE = {
+  floral:    ["lotus", "petal", "round", "heart", "leaf", "scallop", "ogee"],
+  geometric: ["diamond", "triangle", "petal", "lotus", "ogee", "scallop"],
+  azteca:    ["triangle", "diamond", "petal", "lotus", "scallop"],
+  islamico:  ["ogee", "scallop", "diamond", "lotus", "petal", "round"],
+  yantra:    ["lotus", "petal", "triangle", "diamond", "ogee"],
+  sashiko:   ["scallop", "round", "diamond", "lotus", "ogee", "petal"],
+  celtico:   ["round", "heart", "leaf", "scallop", "ogee", "lotus"],
+};
+
+// Familias visuales: lo que el ojo distingue al hojear. Loto, pétalo y ojiva tienen
+// nombres distintos pero se ven como la misma corona de puntas.
+export const SILHOUETTE_FAMILY = {
+  lotus: "puntas", petal: "puntas", ogee: "puntas",
+  scallop: "lobulos", round: "lobulos",
+  heart: "corazones", leaf: "rayos",
+  diamond: "medallon", triangle: "medallon",
+};
+
+/**
+ * Silueta de reemplazo n.º k (k ≥ 1) para una página rehecha: acorde a su estilo y de otra
+ * familia visual que la original, para que el reemplazo no se parezca al dibujo descartado.
+ */
+export function alternateSilhouette(style, current, k) {
+  const allowed = SILHOUETTES_BY_STYLE[style] || BOOK_SILHOUETTES;
+  const other = allowed.filter(s => SILHOUETTE_FAMILY[s] !== SILHOUETTE_FAMILY[current]);
+  const list = other.length ? other : allowed;
+  return list[(Math.max(1, k) - 1) % list.length];
+}
+
+/**
+ * Elige siluetas compatibles con cada estilo, equilibradas en el libro: evita la familia
+ * visual de las 2 páginas anteriores y, entre las que quedan, toma la familia y la silueta
+ * menos usadas hasta ahora. Con `composition`, además evita repetir familia con una de las
+ * 4 páginas anteriores que tenga el mismo encuadre y estilo (se verían gemelas al hojear).
+ */
+export function silhouettePicker(rng) {
+  const used = new Map(BOOK_SILHOUETTES.map(s => [s, 0]));
+  const famUsed = new Map();
+  const recent = [];
+  const window = []; // { key: encuadre|estilo, fam } de las 4 páginas anteriores
+  return (style, composition = null) => {
+    const allowed = SILHOUETTES_BY_STYLE[style] || BOOK_SILHOUETTES;
+    const key = `${composition}|${style}`;
+    const twinFams = composition ? window.filter(w => w.key === key).map(w => w.fam) : [];
+    let pool = allowed.filter(s => !recent.includes(SILHOUETTE_FAMILY[s]) && !twinFams.includes(SILHOUETTE_FAMILY[s]));
+    if (!pool.length) pool = allowed.filter(s => !recent.includes(SILHOUETTE_FAMILY[s]));
+    if (!pool.length) pool = allowed.filter(s => SILHOUETTE_FAMILY[s] !== recent.at(-1));
+    if (!pool.length) pool = allowed;
+    const cost = (s) => (famUsed.get(SILHOUETTE_FAMILY[s]) || 0) * 10 + used.get(s);
+    const min = Math.min(...pool.map(cost));
+    const least = pool.filter(s => cost(s) === min);
+    const pick = least[Math.floor(rng() * least.length)];
+    used.set(pick, used.get(pick) + 1);
+    const fam = SILHOUETTE_FAMILY[pick];
+    famUsed.set(fam, (famUsed.get(fam) || 0) + 1);
+    recent.push(fam); if (recent.length > 2) recent.shift();
+    window.push({ key, fam }); if (window.length > 4) window.shift();
+    return pick;
+  };
+}
+
 /**
  * Perfil «lo que más se vende» para un formato. NO sale de datos de ventas (no los
  * tenemos): resume las convenciones de los libros de mandalas mejor posicionados en
@@ -133,6 +201,8 @@ export function planBook(opts) {
   const nextComp = shuffleBag(rng, compositions, compositionWeights);
   const nextFrame = shuffleBag(rng, frames, frameWeights);
   const nextPetals = shuffleBag(rng, petals);
+  // Generador propio: añadir la silueta no cambia los sorteos de las demás dimensiones
+  const nextSilhouette = silhouettePicker(mulberry32(((seed >>> 0) ^ 0x51A0E77E) >>> 0));
 
   // Páginas con imagen: espaciadas de forma uniforme (k + ½) · count / images
   const imageAt = new Map();
@@ -154,10 +224,12 @@ export function planBook(opts) {
     let composition = nextComp();
     // Un medio mandala cortaría al personaje por la mitad
     if (centerArt && composition === "medio") composition = "fondo";
+    const styleMode = nextStyle();
     pages.push({
       seed: ((seed >>> 0) + i) >>> 0,
       strokeScale: difficulty === "fija" ? 1 : strokeScaleFor(complexity, baseComplexity),
-      styleMode: nextStyle(),
+      styleMode,
+      silhouette: nextSilhouette(styleMode, composition),
       composition,
       frameStyle: nextFrame(),
       petals: nextPetals(),

@@ -50,7 +50,28 @@ Pulsa **Revisar páginas antes de crear**. Cada miniatura muestra su puntuación
   Usa **Borrar y crear otro** u **Otro encuadre** en lo que no te guste.
 - Las páginas especiales (misteriosos, naturaleza, soluciones) no se puntúan: revísalas a ojo.
 
-**Criterio para continuar:** ninguna página roja y media ≥ 70.
+Debajo aparece la línea **Variedad**: cuántas formas exteriores distintas tiene el libro y si
+hay pares de páginas cercanas (a menos de 5 de distancia) con el mismo encuadre, estilo y forma
+exterior. Esas páginas se ven gemelas al hojear: usa **Borrar y crear otro** en una de cada par
+(el reemplazo cambia también la forma exterior).
+
+**Criterio para continuar:** ninguna página roja, media ≥ 70 y sin páginas gemelas cercanas.
+
+### Por qué la forma exterior importa tanto
+
+Al hojear, el ojo reconoce primero la silueta del mandala (su banda exterior), no el interior.
+El plan reparte 9 siluetas en 5 familias visuales y nunca pone la misma familia en dos páginas
+seguidas:
+
+| Familia | Siluetas | Se ve como |
+|---|---|---|
+| Puntas | loto, pétalo, ojiva | flor de pétalos puntiagudos |
+| Lóbulos | festón, redondo | flor de pétalos redondos |
+| Corazones | corazón | corona de corazones |
+| Rayos | hoja | sol de rayos finos |
+| Medallón | rombo, triángulo | disco cerrado por un círculo |
+
+Cada estilo usa sólo las siluetas que le van (un geométrico no lleva corazones).
 
 ## Paso 5 · Crear el PDF
 

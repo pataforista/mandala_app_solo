@@ -11,7 +11,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, SILHOUETTE_FAMILY, alternateSilhouette } from "./core/bookPlan.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
 import { escapeXml } from "./core/svgText.js";
@@ -1965,6 +1965,9 @@ function bindUI() {
       if (isClassic) {
         o.composition = ov?.composition || pg.composition;
         o.frameStyle = pg.frameStyle;
+        // «Borrar y crear otro» también cambia la silueta: con la misma, el reemplazo
+        // se parecería demasiado al dibujo descartado
+        if (pg.silhouette) o.silhouette = ov?.bump ? alternateSilhouette(o.styleMode || pg.styleMode, pg.silhouette, ov.bump) : pg.silhouette;
         // Cada imagen elegida aparece una vez, con el uso que se le asignó a mano;
         // el resto de páginas son mandalas sin imagen
         const entry = pg.centerArt ? chosen[pg.centerArt.imageIndex] : null;
@@ -2010,6 +2013,18 @@ function bindUI() {
   const scoreColor = (n) => (n >= 80 ? "#2e7d32" : n >= WEAK_SCORE ? "#f57c00" : "#c62828");
   const reviewQualityEl = document.getElementById("reviewQuality");
   const reviewFixBtn = document.getElementById("reviewFixWeak");
+  // Firma visual de una página: encuadre + estilo + familia de la silueta (null si no aplica)
+  const pageSignature = (book, i) => {
+    if (book.plan[i].special) return null;
+    const o = book.makeOpts(i);
+    return o.figure || o.figureRing || !o.silhouette ? null : `${o.composition}|${o.styleMode}|${SILHOUETTE_FAMILY[o.silhouette]}`;
+  };
+  const twinsNear = (book, i) => {
+    const a = pageSignature(book, i);
+    if (!a) return false;
+    for (let j = Math.max(0, i - 4); j < Math.min(book.plan.length, i + 5); j++) if (j !== i && pageSignature(book, j) === a) return true;
+    return false;
+  };
   const weakPages = () => [...reviewScores].filter(([, sc]) => sc != null && sc < WEAK_SCORE).map(([i]) => i);
   const updateQualitySummary = (book) => {
     if (!reviewQualityEl) return;
@@ -2023,9 +2038,19 @@ function bindUI() {
       (weak.length
         ? `<b style="color:#c62828">${weak.length} floja(s)</b> (&lt; ${WEAK_SCORE}): págs. ${weak.map(i => i + 1).join(", ")}.` +
           (weak.length > fixable.length
-            ? ` Las págs. ${weak.filter(i => !fixable.includes(i)).map(i => i + 1).join(", ")} son de un grupo (mandala que crece o mural): cámbialas con «Cambiar todo el grupo».`
+            ? ((g) => g.length === 1
+                ? ` La pág. ${g[0]} es de un grupo (mandala que crece o mural): cámbiala con «Cambiar todo el grupo».`
+                : ` Las págs. ${g.join(", ")} son de un grupo (mandala que crece o mural): cámbialas con «Cambiar todo el grupo».`)(weak.filter(i => !fixable.includes(i)).map(i => i + 1))
             : "")
         : "ninguna floja ✅.");
+    // Variedad: páginas a menos de 5 de distancia con el mismo encuadre, estilo y familia
+    // de silueta se perciben como el mismo dibujo al hojear
+    const sig = book.plan.map((_, i) => pageSignature(book, i));
+    const twins = [];
+    sig.forEach((a, i) => { if (a) for (let j = i + 1; j < Math.min(sig.length, i + 5); j++) if (sig[j] === a) twins.push(`${i + 1}–${j + 1}`); });
+    const fams = new Set(sig.filter(Boolean).map(x => x.split("|")[2]));
+    reviewQualityEl.innerHTML += `<br><br>Variedad: ${fams.size} formas exteriores distintas · ` +
+      (twins.length ? `<b style="color:#f57c00">${twins.length} par(es) muy parecidos y cercanos</b>: págs. ${twins.join(", ")} (usa «Borrar y crear otro» en una de cada par).` : "sin páginas gemelas cercanas ✅.");
     if (reviewFixBtn) { reviewFixBtn.disabled = !fixable.length; reviewFixBtn.textContent = fixable.length ? `Rehacer páginas flojas (${fixable.length})` : "Rehacer páginas flojas"; }
   };
 
@@ -2077,8 +2102,9 @@ function bindUI() {
           currentOverrides().set(key, { ...start, bump });
           const nb = buildBook();
           const { svg, opts } = pageSvg(nb, i);
+          // Un reemplazo que se parece a una página vecina no sirve, aunque puntúe más
           const { score } = scoreSvg(svg, opts);
-          if (score > best.score) best = { bump, score };
+          if (score > best.score && !twinsNear(nb, i)) best = { bump, score };
           await new Promise(r => setTimeout(r, 0));
         }
         if (best.bump) currentOverrides().set(key, { ...start, bump: best.bump });

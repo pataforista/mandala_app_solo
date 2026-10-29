@@ -29,6 +29,8 @@ const ASPECT = { petal: 0.75, round: 0.85, lotus: 0.8, leaf: 0.6, scallop: 1.5, 
 // La silueta es lo que se reconoce al hojear: más peso en lotus, la forma más reconocible
 const SILHOUETTE = ["lotus", "lotus", "lotus", "scallop", "scallop", "ogee", "ogee"];
 
+const MOTIFS_OK = (m) => Object.prototype.hasOwnProperty.call(ASPECT, m);
+
 export function generateMandalaClassic(doc, opts) {
   // Encuadres de página (fondo, constelación, esquinas…): dibujan el disco con esta misma función
   if (wantsComposition(opts)) return composePage(doc, opts, generateMandalaClassic);
@@ -127,7 +129,11 @@ export function generateMandalaClassic(doc, opts) {
   let prev = null;
   for (const b of bands) {
     const h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
-    if (b.k === B - 1) b.motif = SILHOUETTE[Math.floor(rng() * SILHOUETTE.length)];
+    if (b.k === B - 1) {
+      // El sorteo se consume siempre (misma secuencia aleatoria con o sin silueta elegida)
+      const drawn = SILHOUETTE[Math.floor(rng() * SILHOUETTE.length)];
+      b.motif = opts.silhouette && MOTIFS_OK(opts.silhouette) ? opts.silhouette : drawn;
+    }
     else if (beadSlots.has(b.k) && h >= 3) b.motif = "beads"; // cuentas de <1 mm = puntos negros
     else b.motif = pickMotif(prev);
     prev = b.motif;
@@ -391,7 +397,11 @@ export function generateMandalaClassic(doc, opts) {
       const inner = mainPB(); circle(inner, cx, cy, b.r0 - Math.max(2.4, (b.r1 - b.r0) * 0.16)); emit(inner, detailW);
     }
   }
-  if (doc?.meta) doc.meta.bands = { total: B, drawn: kDraw };
+  if (doc?.meta) {
+    doc.meta.bands = { total: B, drawn: kDraw };
+    // Firma de cada disco dibujado (para medir repetición entre páginas)
+    (doc.meta.discs ??= []).push({ R, N, motifs: bands.map(b => b.motif), counts: bands.map(b => b.n) });
+  }
 
   // ---------- Núcleo: medallón con la imagen ----------
   if (art) {
