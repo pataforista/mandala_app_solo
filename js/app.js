@@ -11,7 +11,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, alternateSilhouette, BOOK_STRUCTURES } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, alternateSilhouette, BOOK_STRUCTURES, BOOK_STYLES, chapterLayout, insertChapterDividers } from "./core/bookPlan.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
 import { escapeXml } from "./core/svgText.js";
@@ -1794,8 +1794,18 @@ function bindUI() {
       mural: mural ? { cols: mural[0], rows: mural[1] } : null,
     };
   };
+  // Capítulos temáticos: estilos y pesos del libro (los mismos que usa el plan)
+  const BESTSELLER_STYLE_W = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
+  const bookChaptersEl = document.getElementById("bookChapters");
+  const chaptersFor = (regular) => {
+    if (!bookChaptersEl?.checked || !bookVaryEl.checked || state.generatorType !== "classic") return [];
+    return bestSeller()
+      ? chapterLayout(regular, Object.keys(BESTSELLER_STYLE_W), Object.values(BESTSELLER_STYLE_W))
+      : chapterLayout(regular, BOOK_STYLES);
+  };
   const layoutFor = (regular) => {
-    const total = regular + specialPageCount(specialOpts());
+    // Cada capítulo suma su portadilla
+    const total = regular + specialPageCount(specialOpts()) + chaptersFor(regular).length;
     const off = bookColorTestEl?.checked ? 1 : 0;
     const doubleSided = backMode() === "ninguno";
     return {
@@ -1849,6 +1859,8 @@ function bindUI() {
     if (sp.nature) extra.push("capítulo de simetrías naturales (4 págs.)");
     if (sp.mural) extra.push(`mural de ${sp.mural.cols}×${sp.mural.rows} hojas + guía`);
     if (extra.length) bookSummaryEl.innerHTML += `<br>✨ ${bookCount()} mandalas + ${extra.join(", ")}.`;
+    const chs = chaptersFor(regularCount());
+    if (chs.length) bookSummaryEl.innerHTML += `<br>📚 ${chs.length} capítulos con portadilla: ` + chs.map(c => `${escapeXml(c.title)} (${c.size})`).join(" · ") + ".";
     if (tips.length) bookSummaryEl.innerHTML += "<br>" + tips.join("<br>");
     const chosen = chosenFigures();
     const info = document.getElementById("bookImagesInfo");
@@ -1895,9 +1907,8 @@ function bindUI() {
     if (prof) {
       // Floral y geométrico dominan; el resto aparece como variación ocasional.
       // Lista y pesos en el mismo orden (shuffleBag los empareja por posición)
-      const w = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
-      prof.styles = Object.keys(w);
-      prof.styleWeights = Object.values(w);
+      prof.styles = Object.keys(BESTSELLER_STYLE_W);
+      prof.styleWeights = Object.values(BESTSELLER_STYLE_W);
     }
     // Plan de todo el libro antes de dibujar: sin rachas de estilos ni encuadres repetidos
     const regularPlan = planBook({
@@ -1912,14 +1923,17 @@ function bindUI() {
       difficulty: bookDifficultyEl?.value || "mixta",
       baseComplexity: base.complexity,
       images: chosen.length,
+      // Hoja vertical: el mandala centrado completa las franjas vacías con un fondo
+      fillCentro: vary && isClassic && (({ wMm, hMm }) => hMm > wMm * 1.15 || wMm > hMm * 1.15)(getCurrentDoc().page),
+      chapters: chaptersFor(regular),
     });
     // Páginas sorprendentes y, en modo progresivo, dificultad creciente en TODO el libro
-    const plan = addSpecialPages(regularPlan, {
+    const plan = insertChapterDividers(addSpecialPages(regularPlan, {
       seed: baseSeed, ...specialOpts(),
       difficulty: bookDifficultyEl?.value || "progresiva",
       baseComplexity: base.complexity,
       styles: vary ? prof?.styles : [state.styleMode], styleWeights: prof?.styleWeights ?? null,
-    });
+    }), baseSeed);
     const count = plan.length;
     const overrides = currentOverrides();
     // Las páginas de un grupo (secuencia que crece, mural) cambian juntas
@@ -1949,7 +1963,8 @@ function bindUI() {
         const special = { ...pg.special };
         if (special.type === "solutions") special.entries = solutionEntries();
         const o = { ...base, seed, complexity: pg.complexity, petals: pg.petals, styleMode: pg.styleMode,
-          strokeWidthMm: pageStrokeMm(base.strokeWidthMm, pg.strokeScale ?? 1), special };
+          strokeWidthMm: pageStrokeMm(base.strokeWidthMm, pg.strokeScale ?? 1), special,
+          ...(pg.silhouette ? { silhouette: pg.silhouette } : {}) };
         sourceLog[i] = { mandala: i + 1, composition: specialLabel(special), style: o.styleMode, image: "", source: "" };
         return o;
       }
@@ -2230,6 +2245,7 @@ function bindUI() {
   syncProfileUI();
   document.querySelectorAll(".bookComp").forEach(b => b.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); }));
   bookVaryEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateGeneratorUI(); });
+  bookChaptersEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateBookSummary(); });
   bookDifficultyEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); });
   [bookGrowthEl, bookMysteryEl, bookNatureEl, bookMuralEl].forEach(el => el?.addEventListener("sl-change", () => {
     bookOverrides = new Map(); updateReviewInfo(); updateBookSummary();

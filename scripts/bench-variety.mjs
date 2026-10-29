@@ -1,13 +1,13 @@
 // Banco de pruebas de repetición: genera libros completos y mide cuántos pares de páginas
 // son gemelas según la huella geométrica (js/core/variety.js), la misma que usa la revisión.
 //   node scripts/bench-variety.mjs [libros=10] [--antiguo]
-// --antiguo: sin silueta, estructura ni tema de fondo planificados (como antes), para comparar.
+// --antiguo: sin silueta, estructura, tema de fondo ni capítulos (como antes), para comparar.
 // Calibración del umbral (0,90), revisada a ojo sobre los pares de un libro de 50 páginas:
 // pares ≥ 0,90 se veían casi iguales; pares de 0,81–0,85 ya se distinguían al hojear.
 import { createDoc } from "../js/core/svgDoc.js";
 import { renderDocToSvgString } from "../js/core/svgRender.js";
 import { generateMandalaClassic } from "../js/generators/mandalaClassic.js";
-import { planBook, bestSellerProfile, pageStrokeMm } from "../js/core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, chapterLayout } from "../js/core/bookPlan.js";
 import { pageFingerprint, fingerprintSimilarity, TWIN_THRESHOLD } from "../js/core/variety.js";
 
 const BOOKS = Number(process.argv[2]) || 10;
@@ -20,7 +20,8 @@ const W = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, 
 const rows = [];
 for (let b = 1; b <= BOOKS; b++) {
   const plan = planBook({ count: PAGES, seed: b, ...bestSellerProfile(PRESET), styles: Object.keys(W), styleWeights: Object.values(W),
-    difficulty: "progresiva", baseComplexity: 102 });
+    difficulty: "progresiva", baseComplexity: 102,
+    ...(OLD ? { fillCentro: false } : { chapters: chapterLayout(PAGES, Object.keys(W), Object.values(W)) }) });
   const fps = plan.map(p => {
     const o = { ...BASE, seed: p.seed, complexity: p.complexity, petals: p.petals, styleMode: p.styleMode,
       composition: p.composition, frameStyle: p.frameStyle, strokeWidthMm: pageStrokeMm(0.8, p.strokeScale) };

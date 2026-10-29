@@ -32,7 +32,7 @@ No bajes el trazo de 0,8 mm en un libro para adultos: en papel de KDP una línea
 
 1. **Número de mandalas:** 40–100 (los libros mejor valorados están en ese rango).
 2. **Dificultad:** «Creciente» (recomendado).
-3. **Patrones:** «Los más vendidos para este formato».
+3. **Patrones:** «Los más vendidos para este formato», con **capítulos temáticos** activados.
 4. **Páginas sorprendentes:** opcionales. Los mandalas misteriosos tienen celdas pequeñas por diseño:
    ponlos sólo en libros para adultos con paciencia; quítalos en libros «large print» o infantiles.
 5. **Textos y páginas extra:** título, autor, **reverso en blanco** (recomendado para marcadores).
@@ -105,9 +105,33 @@ Además de la silueta, el plan reparte:
 - **Estructura del disco**, sin repetir en páginas seguidas: *corona* (silueta protagonista),
   *héroe* (una banda media domina), *equilibrio* (anillos parejos) y *núcleo* (flor central grande).
 - **Tema de fondo**, en las páginas con espacio libre. Motivos sueltos: *jardín*, *cielo* (estrellas,
-  soles, lunas), *hojas* (hojas, tulipanes, gotas) y *dulce* (corazones, tréboles). En «fondo
-  decorado» también tramas: *ondas*, *rombos* y *rayos*, cada una con variantes de celda y ángulo.
-  Los fondos decorados recorren los 7 temas antes de repetir uno.
+  soles, lunas), *hojas* (hojas, tulipanes, gotas) y *dulce* (corazones, tréboles); corazones y
+  hojas sólo acompañan estilos florales u orgánicos. En «fondo decorado» y en el centrado de hoja
+  vertical también tramas ornamentales: *escamas* (anillos de pétalos), *flor de la vida* (círculos
+  entrelazados) y *sol* (rayos en forma de pétalo). Dos páginas vecinas nunca comparten fondo.
+
+### Hoja llena en formatos verticales
+
+En 8.5×11, A4 o Carta, un mandala redondo deja franjas vacías arriba y abajo: la página quedaba
+cubierta al 61 %. Los libros líderes venden diseños de hoja completa («sin el espacio en blanco
+típico de los libros de mandalas», ficha de *100 Amazing Patterns*). Ahora el mandala centrado
+completa las franjas con su tema de fondo y ganan peso los encuadres que cubren la hoja:
+
+| 8.5×11, 200 páginas medidas | Antes | Ahora |
+|---|---|---|
+| Hoja cubierta (media) | 78 % | 93 % |
+| Páginas con menos del 70 % cubierto | 52 % | 10 % |
+
+En formato cuadrado (8.5×8.5) el centrado sigue limpio: el disco ya llena la hoja.
+
+### Capítulos temáticos
+
+Con «Organizar en capítulos temáticos» (activado por defecto) el libro se agrupa por familias de
+estilo, como hacen los libros líderes (*125 Mandalas*: vitral, étnico, gemas…): *Jardín de
+mandalas* (floral, céltico), *Arabescos y vitrales* (islámico, sashiko), *Geometría sagrada*
+(geométrico, yantra) y *Soles y piedras* (azteca). Cada capítulo abre con una portadilla para
+colorear. Un capítulo de menos de 4 páginas se une al más afín. Con dificultad creciente, cada
+capítulo empieza algo más fácil que donde terminó el anterior y vuelve a subir.
 
 ## Paso 5 · Crear el PDF
 

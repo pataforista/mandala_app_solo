@@ -36,6 +36,21 @@ export function generateSpecialPage(doc, opts) {
       return generateMuralPage(doc, { ...opts, ...NO_IMAGE, mural: sp });
     case "solutions":
       return generateMysterySolutions(doc, { entries: sp.entries || [] });
+    case "chapter": {
+      // Portadilla: número y título del capítulo, y un mandala sencillo de su estilo
+      // (también para colorear: una página relajada antes de las difíciles)
+      const { wMm: W, hMm: H } = doc.page;
+      const m = Number.isFinite(doc.page.marginMm) ? doc.page.marginMm : 10;
+      const top = m + 26;
+      doc.body.push(svgText(W / 2, top, `Capítulo ${sp.n}`, { size: 8, fill: "#333", italic: true }));
+      // Título grande: ocupa el ancho útil sin pasarse (ancho medio de letra ≈ 0,5 em)
+      const tSize = Math.min(16, (W - 2 * m - 10) / Math.max(8, sp.title.length * 0.55));
+      doc.body.push(svgText(W / 2, top + 6 + tSize, sp.title, { size: tSize, weight: "bold" }));
+      const y0 = top + tSize + 20;
+      const R = Math.max(20, Math.min((W - 2 * m) / 2 - 6, (H - m - 8 - y0) / 2));
+      generateMandalaClassic(doc, { ...opts, ...NO_IMAGE, special: undefined, center: { x: W / 2, y: y0 + R }, radius: R, structure: "corona", silhouette: opts.silhouette ?? sp.silhouette });
+      return doc;
+    }
     default:
       return generateMandalaClassic(doc, { ...opts, special: undefined });
   }
@@ -55,6 +70,7 @@ export function specialLabel(sp) {
     case "nature": return NATURE_TEXT[sp.kind]?.title.split(" · ")[0] || sp.kind;
     case "mural": return sp.guide ? "Guía del mural" : `Mural ${tileName(sp.col, sp.row)}`;
     case "solutions": return "Soluciones";
+    case "chapter": return `Capítulo ${sp.n}: ${sp.title}`;
     default: return sp.type;
   }
 }

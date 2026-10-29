@@ -15,7 +15,8 @@ El modo libro planifica ahora cada página antes de dibujarla (`js/core/bookPlan
 | Pétalos | 8–24 | bolsa barajada |
 | Silueta (banda exterior) | 9 formas en 5 familias visuales (puntas, lóbulos, corazones, rayos, medallón) | acorde al estilo; nunca la misma familia en páginas seguidas ni con el mismo encuadre y estilo a menos de 5 páginas (`silhouettePicker`) |
 | Estructura del disco | corona, héroe, equilibrio, núcleo | bolsa barajada, sin repetir seguidas (`STRUCTURES` en `mandalaClassic.js`) |
-| Tema de fondo | jardín, cielo, hojas, dulce; tramas ondas, rombos, rayos (sólo «fondo decorado») | el menos usado para ese encuadre, distinto del anterior (`backgroundPicker`) |
+| Tema de fondo | jardín, cielo, hojas, dulce; tramas escamas, flor de la vida, sol («fondo decorado» y centrado en hoja vertical) | el menos usado para ese encuadre, acorde al estilo y distinto del anterior (`backgroundPicker`) |
+| Capítulo | Jardín de mandalas, Arabescos y vitrales, Geometría sagrada, Soles y piedras | páginas agrupadas por estilo con portadilla (`chapterLayout`, `insertChapterDividers`) |
 | Dificultad | mixta, progresiva (fácil → difícil), fija | |
 | Mis imágenes | uso elegido **a mano** por imagen: figura rellena, anillos o medallón | cada imagen elegida aparece una vez, repartida de forma uniforme |
 

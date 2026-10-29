@@ -383,7 +383,13 @@ test("perfil «más vendidos»: centrado domina, sin medios mandalas, simetría 
     const plan = planBook({ count: 60, seed: 42, ...prof });
     const n = (c) => plan.filter(p => p.composition === c).length;
     assert.equal(n("medio"), 0, preset);
-    assert.ok(n("centro") >= 0.45 * plan.length, `${preset}: centrado ${n("centro")}/60`);
+    // Cuadrado: el centrado domina. Vertical: sigue siendo el encuadre más frecuente, pero
+    // completa la hoja con un fondo y comparte peso con los que cubren la hoja
+    if (/8_5x8_5/.test(preset)) assert.ok(n("centro") >= 0.45 * plan.length, `${preset}: centrado ${n("centro")}/60`);
+    else {
+      assert.ok(["fondo", "constelacion", "esquinas", "gigante"].every(c => n("centro") >= n(c)), preset);
+      assert.ok(plan.filter(p => p.composition === "centro").every(p => p.background), "centrado vertical con fondo");
+    }
     assert.ok(plan.every(p => p.petals >= 12), preset);
     assert.ok(plan.filter(p => p.styleMode === "floral").length > plan.filter(p => p.styleMode === "azteca").length, preset);
   }

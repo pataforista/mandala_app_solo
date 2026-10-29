@@ -22,7 +22,7 @@ test("huella: una página es idéntica a sí misma y la gemela se parece más qu
   const a = page({ seed: 1, composition: "centro", silhouette: "lotus", structure: "corona" });
   const twin = page({ seed: 2, composition: "centro", silhouette: "lotus", structure: "corona" });
   const other = page({ seed: 2, composition: "centro", silhouette: "diamond", structure: "heroe" });
-  const bg = page({ seed: 2, composition: "fondo", background: "ondas", silhouette: "heart", structure: "nucleo" });
+  const bg = page({ seed: 2, composition: "fondo", background: "escamas", silhouette: "heart", structure: "nucleo" });
   assert.ok(Math.abs(fingerprintSimilarity(a.fp, a.fp) - 1) < 1e-9);
   const sT = fingerprintSimilarity(a.fp, twin.fp), sO = fingerprintSimilarity(a.fp, other.fp), sB = fingerprintSimilarity(a.fp, bg.fp);
   assert.ok(sT > sO, `gemela ${sT.toFixed(3)} > distinta ${sO.toFixed(3)}`);
@@ -40,14 +40,19 @@ test("plan: estructura y fondo repartidos sin repetir en páginas seguidas", () 
     assert.ok(new Set(plan.map(p => p.structure)).size === BOOK_STRUCTURES.length);
     // Fondo sólo donde hay espacio que decorar; tramas sólo en «fondo decorado»
     for (const p of plan) {
-      if (p.composition === "centro" || p.composition === "gigante") assert.equal(p.background, null);
+      if (p.composition === "gigante") assert.equal(p.background, null);
+      else if (p.composition === "centro") assert.ok(p.background, "hoja vertical: el centrado completa la hoja");
       else assert.ok(BACKGROUNDS.includes(p.background));
-      if (PATTERN_BACKGROUNDS.includes(p.background)) assert.equal(p.composition, "fondo");
+      if (PATTERN_BACKGROUNDS.includes(p.background)) assert.ok(["fondo", "centro"].includes(p.composition));
     }
-    // Los fondos decorados recorren todos los temas antes de repetir
+    if (seed === 1) {
+      const sq = planBook({ count: 50, seed, ...bestSellerProfile("KDP_8_5x8_5") });
+      assert.ok(sq.filter(p => p.composition === "centro").every(p => p.background === null), "cuadrado: centrado limpio");
+    }
+    // Páginas vecinas nunca comparten fondo; los fondos decorados usan casi todos los temas
+    for (let i = 1; i < plan.length; i++) if (plan[i].background) assert.notEqual(plan[i].background, plan[i - 1].background, `fondo, págs. ${i}-${i + 1}`);
     const fondos = plan.filter(p => p.composition === "fondo").map(p => p.background);
-    const first = fondos.slice(0, BACKGROUNDS.length);
-    assert.equal(new Set(first).size, first.length, `semilla ${seed}: ${fondos.join(",")}`);
+    assert.ok(new Set(fondos.slice(0, BACKGROUNDS.length)).size >= 5, `semilla ${seed}: ${fondos.join(",")}`);
   }
 });
 
