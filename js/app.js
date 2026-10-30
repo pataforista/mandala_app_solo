@@ -11,7 +11,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, alternateSilhouette, BOOK_STRUCTURES, BOOK_STYLES, chapterLayout, insertChapterDividers } from "./core/bookPlan.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
 import { escapeXml } from "./core/svgText.js";
@@ -20,6 +20,7 @@ import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.j
 import { packFigures, unpackFigures } from "./core/figurePack.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
+import { pageFingerprint, fingerprintSimilarity, similarPairs, TWIN_THRESHOLD } from "./core/variety.js";
 
 const historyMan = new StateHistory();
 const imgProc = new ImageProcessor();
@@ -407,6 +408,10 @@ const COLORING_PRESETS = {
 
 const recentSeeds = [];
 
+// El selector «Nivel de dificultad» arranca en «Adulto»: los valores iniciales deben ser
+// los de ese nivel. Antes se partía de trazo 0,55 mm y celda mínima 3 mm², y el nivel
+// sólo se aplicaba al cambiarlo, así que un libro nuevo salía con línea fina sin avisar.
+Object.assign(DEFAULTS, COLORING_PRESETS[DEFAULTS.coloringPreset]);
 const state = getStateFromURL(DEFAULTS);
 
 if (typeof state.frames === "string") state.frames = state.frames === "true";
@@ -1789,8 +1794,18 @@ function bindUI() {
       mural: mural ? { cols: mural[0], rows: mural[1] } : null,
     };
   };
+  // Capítulos temáticos: estilos y pesos del libro (los mismos que usa el plan)
+  const BESTSELLER_STYLE_W = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
+  const bookChaptersEl = document.getElementById("bookChapters");
+  const chaptersFor = (regular) => {
+    if (!bookChaptersEl?.checked || !bookVaryEl.checked || state.generatorType !== "classic") return [];
+    return bestSeller()
+      ? chapterLayout(regular, Object.keys(BESTSELLER_STYLE_W), Object.values(BESTSELLER_STYLE_W))
+      : chapterLayout(regular, BOOK_STYLES);
+  };
   const layoutFor = (regular) => {
-    const total = regular + specialPageCount(specialOpts());
+    // Cada capítulo suma su portadilla
+    const total = regular + specialPageCount(specialOpts()) + chaptersFor(regular).length;
     const off = bookColorTestEl?.checked ? 1 : 0;
     const doubleSided = backMode() === "ninguno";
     return {
@@ -1844,6 +1859,8 @@ function bindUI() {
     if (sp.nature) extra.push("capítulo de simetrías naturales (4 págs.)");
     if (sp.mural) extra.push(`mural de ${sp.mural.cols}×${sp.mural.rows} hojas + guía`);
     if (extra.length) bookSummaryEl.innerHTML += `<br>✨ ${bookCount()} mandalas + ${extra.join(", ")}.`;
+    const chs = chaptersFor(regularCount());
+    if (chs.length) bookSummaryEl.innerHTML += `<br>📚 ${chs.length} capítulos con portadilla: ` + chs.map(c => `${escapeXml(c.title)} (${c.size})`).join(" · ") + ".";
     if (tips.length) bookSummaryEl.innerHTML += "<br>" + tips.join("<br>");
     const chosen = chosenFigures();
     const info = document.getElementById("bookImagesInfo");
@@ -1888,8 +1905,10 @@ function bindUI() {
     // «Lo más vendido»: composiciones, estilos, marcos y pétalos con los pesos del perfil
     const prof = vary && bestSeller() ? bestSellerProfile(state.preset) : null;
     if (prof) {
-      prof.styles = ["floral", "floral", "floral", "geometric", "geometric", "islamico"];
-      prof.styleWeights = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
+      // Floral y geométrico dominan; el resto aparece como variación ocasional.
+      // Lista y pesos en el mismo orden (shuffleBag los empareja por posición)
+      prof.styles = Object.keys(BESTSELLER_STYLE_W);
+      prof.styleWeights = Object.values(BESTSELLER_STYLE_W);
     }
     // Plan de todo el libro antes de dibujar: sin rachas de estilos ni encuadres repetidos
     const regularPlan = planBook({
@@ -1904,14 +1923,17 @@ function bindUI() {
       difficulty: bookDifficultyEl?.value || "mixta",
       baseComplexity: base.complexity,
       images: chosen.length,
+      // Hoja vertical: el mandala centrado completa las franjas vacías con un fondo
+      fillCentro: vary && isClassic && (({ wMm, hMm }) => hMm > wMm * 1.15 || wMm > hMm * 1.15)(getCurrentDoc().page),
+      chapters: chaptersFor(regular),
     });
     // Páginas sorprendentes y, en modo progresivo, dificultad creciente en TODO el libro
-    const plan = addSpecialPages(regularPlan, {
+    const plan = insertChapterDividers(addSpecialPages(regularPlan, {
       seed: baseSeed, ...specialOpts(),
       difficulty: bookDifficultyEl?.value || "progresiva",
       baseComplexity: base.complexity,
       styles: vary ? prof?.styles : [state.styleMode], styleWeights: prof?.styleWeights ?? null,
-    });
+    }), baseSeed);
     const count = plan.length;
     const overrides = currentOverrides();
     // Las páginas de un grupo (secuencia que crece, mural) cambian juntas
@@ -1941,7 +1963,8 @@ function bindUI() {
         const special = { ...pg.special };
         if (special.type === "solutions") special.entries = solutionEntries();
         const o = { ...base, seed, complexity: pg.complexity, petals: pg.petals, styleMode: pg.styleMode,
-          strokeWidthMm: pageStrokeMm(base.strokeWidthMm, pg.strokeScale ?? 1), special };
+          strokeWidthMm: pageStrokeMm(base.strokeWidthMm, pg.strokeScale ?? 1), special,
+          ...(pg.silhouette ? { silhouette: pg.silhouette } : {}) };
         sourceLog[i] = { mandala: i + 1, composition: specialLabel(special), style: o.styleMode, image: "", source: "" };
         return o;
       }
@@ -1958,6 +1981,11 @@ function bindUI() {
       if (isClassic) {
         o.composition = ov?.composition || pg.composition;
         o.frameStyle = pg.frameStyle;
+        // «Borrar y crear otro» también cambia la silueta: con la misma, el reemplazo
+        // se parecería demasiado al dibujo descartado
+        if (pg.structure) o.structure = ov?.bump ? BOOK_STRUCTURES[(BOOK_STRUCTURES.indexOf(pg.structure) + ov.bump) % BOOK_STRUCTURES.length] : pg.structure;
+        if (pg.background) o.background = pg.background;
+        if (pg.silhouette) o.silhouette = ov?.bump ? alternateSilhouette(o.styleMode || pg.styleMode, pg.silhouette, ov.bump) : pg.silhouette;
         // Cada imagen elegida aparece una vez, con el uso que se le asignó a mano;
         // el resto de páginas son mandalas sin imagen
         const entry = pg.centerArt ? chosen[pg.centerArt.imageIndex] : null;
@@ -1992,21 +2020,157 @@ function bindUI() {
     return { svg: renderDocToSvgString(doc).replace(/width="[^"]+mm" height="[^"]+mm"/, ""), opts: o };
   };
 
+  // ---------- Control de calidad por página ----------
+  // La misma puntuación que la vista previa (commercialMetrics.js), medida sobre cada
+  // página tal como irá al PDF. Sólo en páginas de mandala: el misterioso tiene celdas
+  // pequeñas a propósito, la naturaleza lleva texto y las soluciones no se colorean.
+  const WEAK_SCORE = 60;
+  const reviewScores = new Map(); // índice → puntuación (o null si no se mide)
+  const scorable = (o) => !o.special || o.special.type === "grow" || o.special.type === "mural";
+  const scoreSvg = (svg, o) => commercialScore(measureSvg(svg), { strokeWidthMm: o.strokeWidthMm, minCellAreaMm2: o.minCellAreaMm2 });
+  const scoreColor = (n) => (n >= 80 ? "#2e7d32" : n >= WEAK_SCORE ? "#f57c00" : "#c62828");
+  const reviewQualityEl = document.getElementById("reviewQuality");
+  const reviewFixBtn = document.getElementById("reviewFixWeak");
+  // Repetición: huella geométrica de cada página (variety.js), medida sobre el dibujo.
+  // Las páginas especiales no se comparan (las etapas de un mandala que crece se parecen
+  // a propósito).
+  const reviewFps = new Map(); // índice → huella (o null)
+  const fpOf = (svg, o) => (o.special ? null : pageFingerprint(svg, getCurrentDoc().page));
+  const fpList = (n) => Array.from({ length: n }, (_, k) => reviewFps.get(k) || null);
+  const twinPairs = (n) => similarPairs(fpList(n));
+  // ¿Esta huella sería gemela de alguna otra página del libro?
+  const twinOfAny = (fp, i, n) => fp && fpList(n).some((g, k) => k !== i && g && fingerprintSimilarity(fp, g) >= TWIN_THRESHOLD);
+  const weakPages = () => [...reviewScores].filter(([, sc]) => sc != null && sc < WEAK_SCORE).map(([i]) => i);
+  const updateQualitySummary = (book) => {
+    if (!reviewQualityEl) return;
+    const vals = [...reviewScores.values()].filter(v => v != null);
+    if (!vals.length) { reviewQualityEl.textContent = ""; return; }
+    const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+    // Las páginas de un grupo (etapas, hojas del mural) no se rehacen solas: cambiarían todas
+    const weak = weakPages(), fixable = weak.filter(i => book.plan[i].special?.group == null);
+    reviewQualityEl.innerHTML =
+      `Calidad para colorear: media <b style="color:${scoreColor(avg)}">${avg}</b>/100 en ${vals.length} páginas medidas · ` +
+      (weak.length
+        ? `<b style="color:#c62828">${weak.length} floja(s)</b> (&lt; ${WEAK_SCORE}): págs. ${weak.map(i => i + 1).join(", ")}.` +
+          (weak.length > fixable.length
+            ? ((g) => g.length === 1
+                ? ` La pág. ${g[0]} es de un grupo (mandala que crece o mural): cámbiala con «Cambiar todo el grupo».`
+                : ` Las págs. ${g.join(", ")} son de un grupo (mandala que crece o mural): cámbialas con «Cambiar todo el grupo».`)(weak.filter(i => !fixable.includes(i)).map(i => i + 1))
+            : "")
+        : "ninguna floja ✅.");
+    // Variedad: pares de páginas gemelas en todo el libro (huella geométrica ≥ umbral)
+    const twins = twinPairs(book.count);
+    const twinFix = twinTargets(book, twins);
+    const cards = [...reviewGrid.children];
+    cards.forEach(c => { c.classList.remove("twin"); c.querySelector(".twin-note")?.remove(); });
+    for (const { i, j, sim } of twins) for (const [a, b] of [[i, j], [j, i]]) {
+      const c = cards[a]; if (!c) continue;
+      c.classList.add("twin");
+      const meta = c.querySelector(".meta");
+      if (meta && !meta.querySelector(".twin-note")) {
+        const note = document.createElement("div");
+        note.className = "twin-note";
+        note.textContent = `≈ gemela de la pág. ${b + 1} (${Math.round(sim * 100)} %)`;
+        meta.appendChild(note);
+      }
+    }
+    reviewQualityEl.innerHTML += "<br><br>Variedad: " + (twins.length
+      ? `<b style="color:#f57c00">${twins.length} par(es) de páginas gemelas</b> (se ven casi iguales al hojear): ` +
+        twins.slice(0, 8).map(t => `págs. ${t.i + 1} y ${t.j + 1}`).join(" · ") + (twins.length > 8 ? "…" : "") + "."
+      : "sin páginas gemelas ✅.");
+    const todo = new Set([...fixable, ...twinFix]).size;
+    if (reviewFixBtn) { reviewFixBtn.disabled = !todo; reviewFixBtn.textContent = todo ? `Rehacer flojas y gemelas (${todo})` : "Rehacer flojas y gemelas"; }
+  };
+  // De cada par gemelo se rehace la página posterior (si no es de un grupo; si lo es, la otra)
+  const twinTargets = (book, twins) => {
+    const out = new Set();
+    for (const { i, j } of twins) {
+      if (out.has(i) || out.has(j)) continue;
+      const free = (k) => book.plan[k].special?.group == null;
+      if (free(j)) out.add(j); else if (free(i)) out.add(i);
+    }
+    return [...out];
+  };
+
   const fillCard = (card, book, i) => {
     const { svg, opts } = pageSvg(book, i);
     const changed = currentOverrides().has(book.ovKey(i));
     card.classList.toggle("changed", changed);
     card.querySelector(".thumb").innerHTML = svg;
-    card.querySelector(".meta").textContent =
+    let sc = null, issues = [];
+    if (scorable(opts)) ({ score: sc, issues } = scoreSvg(svg, opts));
+    reviewScores.set(i, sc);
+    reviewFps.set(i, fpOf(svg, opts));
+    card.classList.toggle("weak", sc != null && sc < WEAK_SCORE);
+    const meta = card.querySelector(".meta");
+    meta.textContent =
       opts.special
         ? `${i + 1} · ✨ ${specialLabel(opts.special)}`
         : `${i + 1} · ${COMP_NAMES[opts.figure ? "figura" : opts.figureRing ? "anillos" : opts.composition] || opts.composition || ""} · ${STYLE_NAMES[opts.styleMode] || opts.styleMode || ""}`;
+    if (sc != null) {
+      const b = document.createElement("b");
+      b.className = "score";
+      b.textContent = ` · ${sc}`;
+      b.style.color = scoreColor(sc);
+      meta.appendChild(b);
+      meta.title = issues.length ? `Puntuación ${sc}/100:\n• ${issues.join("\n• ")}` : `Puntuación ${sc}/100: sin defectos medidos.`;
+      // En el móvil no hay «title» al tocar: el motivo de una página floja va a la vista
+      if (sc < WEAK_SCORE && issues.length) {
+        const why = document.createElement("div");
+        why.className = "why";
+        why.textContent = issues.slice(0, 2).join(" · ");
+        meta.appendChild(why);
+      }
+    } else meta.title = "Página especial: la puntuación no se aplica.";
+  };
+
+  // Prueba hasta `tries` diseños nuevos por página floja o gemela y se queda con el mejor
+  // que no sea gemelo de otra página
+  const fixWeakPages = async (tries = 6) => {
+    const book0 = buildBook();
+    const weak = weakPages().filter(i => book0.plan[i].special?.group == null);
+    const targets = [...new Set([...weak, ...twinTargets(book0, twinPairs(book0.count))])].sort((a, b) => a - b);
+    if (!targets.length) return;
+    if (reviewFixBtn) reviewFixBtn.loading = true;
+    const cards = [...reviewGrid.children];
+    try {
+      for (const i of targets) {
+        const key = book0.ovKey(i);
+        const start = currentOverrides().get(key) || {};
+        // Valor de un diseño: su puntuación, y descartado si es gemelo de otra página
+        const value = (score, fp) => (twinOfAny(fp, i, book0.count) ? -1000 : 0) + (score ?? 70);
+        let best = { bump: start.bump || 0, v: value(reviewScores.get(i), reviewFps.get(i)) };
+        for (let t = 1; t <= tries && best.v < 80; t++) {
+          const bump = (start.bump || 0) + t;
+          currentOverrides().set(key, { ...start, bump });
+          const nb = buildBook();
+          const { svg, opts } = pageSvg(nb, i);
+          const v = value(scorable(opts) ? scoreSvg(svg, opts).score : null, fpOf(svg, opts));
+          if (v > best.v) best = { bump, v };
+          await new Promise(r => setTimeout(r, 0));
+        }
+        if (best.bump) currentOverrides().set(key, { ...start, bump: best.bump });
+        else if (Object.keys(start).length) currentOverrides().set(key, start);
+        else currentOverrides().delete(key);
+        const nb = buildBook();
+        fillCard(cards[i], nb, i);
+        cards[i].animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 350 });
+      }
+    } finally {
+      if (reviewFixBtn) reviewFixBtn.loading = false;
+      updateQualitySummary(buildBook());
+      updateReviewInfo();
+    }
   };
 
   const openReview = async () => {
     const token = ++reviewToken;
     const book = buildBook();
     reviewGrid.innerHTML = "";
+    reviewScores.clear();
+    reviewFps.clear();
+    if (reviewQualityEl) reviewQualityEl.textContent = "Midiendo la calidad de cada página…";
+    if (reviewFixBtn) reviewFixBtn.disabled = true;
     reviewDialog.show();
     for (let i = 0; i < book.count; i++) {
       const card = document.createElement("div");
@@ -2037,6 +2201,7 @@ function bindUI() {
           }
         });
         updateReviewInfo();
+        updateQualitySummary(nb);
       });
       reviewGrid.appendChild(card);
     }
@@ -2047,6 +2212,7 @@ function bindUI() {
       await new Promise(r => setTimeout(r, 0));
       try { fillCard(cards[i], book, i); } catch (err) { console.error("Miniatura", i, err); }
     }
+    updateQualitySummary(book);
   };
 
   const reviewBtn = document.getElementById("reviewBook");
@@ -2059,6 +2225,7 @@ function bindUI() {
       openReview();
     });
     document.getElementById("reviewCreate")?.addEventListener("click", () => { reviewDialog.hide(); downloadBook(); });
+    reviewFixBtn?.addEventListener("click", () => fixWeakPages());
     reviewDialog.addEventListener("sl-after-hide", (e) => { if (e.target === reviewDialog) reviewToken++; });
   }
   // Cambiar el número de páginas o las composiciones permitidas rehace el plan
@@ -2078,6 +2245,7 @@ function bindUI() {
   syncProfileUI();
   document.querySelectorAll(".bookComp").forEach(b => b.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); }));
   bookVaryEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateGeneratorUI(); });
+  bookChaptersEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateBookSummary(); });
   bookDifficultyEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); });
   [bookGrowthEl, bookMysteryEl, bookNatureEl, bookMuralEl].forEach(el => el?.addEventListener("sl-change", () => {
     bookOverrides = new Map(); updateReviewInfo(); updateBookSummary();

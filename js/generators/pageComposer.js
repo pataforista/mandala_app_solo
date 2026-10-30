@@ -29,6 +29,18 @@ export const FILLERS = {
   celtico:   { daisy: 2, heart: 2, leaf: 3, star: 0.5, sun: 1 },
 };
 
+// Temas de fondo. Antes todos los fondos esparcían las mismas 5 figuras y las páginas
+// decoradas se veían iguales. Temas sueltos: qué figuras se esparcen. Temas de patrón
+// (sólo «fondo decorado»): una trama que cubre la hoja y da otra textura a la página.
+export const SCATTER_THEMES = {
+  jardin: null, // las figuras del estilo (FILLERS): el fondo de siempre
+  cielo:  { star: 3, sun: 2, crescent: 2.5 },
+  hojas:  { leaf: 3, tulip: 2, drop: 1.5 },
+  dulce:  { heart: 3, clover: 2, drop: 1.5, daisy: 1 },
+};
+export const PATTERN_THEMES = ["escamas", "flor_vida", "sol"];
+export const BACKGROUNDS = [...Object.keys(SCATTER_THEMES), ...PATTERN_THEMES];
+
 /**
  * ¿Necesita esta llamada al generador el compositor de página?
  * El collage (centro/radio explícitos) y las llamadas internas dibujan sólo el disco.
@@ -36,6 +48,7 @@ export const FILLERS = {
 export function wantsComposition(opts) {
   if (opts._inner || opts.center || opts.centerMm || opts.radius || opts.radiusMm) return false;
   if (opts.figure || opts.figureRing) return true;
+  if (opts.background) return true; // centrado que completa la hoja con un fondo
   const c = opts.composition ?? "centro";
   const f = opts.frameStyle ?? "redondeado";
   return c !== "centro" || f !== "redondeado";
@@ -125,6 +138,7 @@ export function composePage(doc, opts, drawMandala) {
     detailSimplification: 0.7,
     strokeWidthMm: Math.max(0.3, strokeWidthMm * 0.75),
     centerArt: null,
+    structure: undefined, // los mandalas pequeños usan la estructura clásica
   });
 
   // ---------- Mandala(s) estructurales ----------
@@ -132,6 +146,7 @@ export function composePage(doc, opts, drawMandala) {
   const content = [];
   let clip = false;
   let fill = null;       // { minis: bool } si la composición rellena el espacio libre
+  let fillPattern = null; // { kind, cx, cy, halo } trama de fondo («fondo decorado»)
 
   switch (opts.figure ? "figura" : opts.figureRing ? "anillos" : composition) {
     case "anillos": {
@@ -204,7 +219,20 @@ export function composePage(doc, opts, drawMandala) {
       break;
     }
     case "fondo": {
-      const R = maxR * (0.88 + rng() * 0.05);
+      const rR = 0.88 + rng() * 0.05;
+      if (PATTERN_THEMES.includes(opts.background)) {
+        // Trama de fondo: el mandala algo menor deja ver más trama; un halo blanco con
+        // contorno lo separa y cierra las celdas de la trama que lo rodean
+        const R = maxR * (rR - 0.08);
+        const halo = R + gap * 1.5;
+        // Variante de la trama (tamaño de celda y ángulo): dos páginas con la misma
+        // trama no salen idénticas
+        fillPattern = { kind: opts.background, cx: acx, cy: acy, halo, variant: rng() };
+        content.push(...sub(acx, acy, R));
+        clip = true;
+        break;
+      }
+      const R = maxR * rR;
       content.push(...sub(acx, acy, R));
       obstacles.push({ x: acx, y: acy, r: R });
       fill = { minis: false };
@@ -266,14 +294,25 @@ export function composePage(doc, opts, drawMandala) {
     }
     default: {
       const R = maxR * 0.98; // el disco ocupa casi todo el espacio disponible
+      // Hoja vertical (8.5×11, A4…): un disco deja franjas vacías arriba y abajo y la página
+      // queda a medio llenar (~60 %). Con un tema de fondo, las franjas se completan
+      const tall = ah > aw * 1.15 || aw > ah * 1.15;
+      if (opts.background && tall) {
+        if (PATTERN_THEMES.includes(opts.background)) {
+          fillPattern = { kind: opts.background, cx: acx, cy: acy, halo: R + gap * 1.5, variant: rng() };
+          clip = true;
+        } else fill = { minis: false };
+      }
       content.push(...sub(acx, acy, R));
       obstacles.push({ x: acx, y: acy, r: R });
     }
   }
 
   // ---------- Relleno del espacio libre ----------
-  const fillItems = fill ? packFill({ A, obstacles, rng, gap, minis: fill.minis, style: styleMode,
+  const theme = SCATTER_THEMES[opts.background] || null;
+  const fillItems = fill ? packFill({ A, obstacles, rng, gap, minis: fill.minis, style: styleMode, theme,
     outlineMode, stroke, mainW, detailW, sub, miniOpts }) : [];
+  if (fillPattern) fillItems.push(...drawPattern({ ...fillPattern, A, gap, stroke, mainW, detailW, outlineMode }));
 
   // ---------- Ensamblado ----------
   // El relleno va detrás: si un motivo roza el mandala, el blanco del mandala lo tapa.
@@ -301,7 +340,7 @@ function emitTo(arr, pb, w, fill = "none", stroke = "#000") {
 }
 
 // ---------- Empaquetado voraz de círculos ----------
-function packFill({ A, obstacles, rng, gap, minis, style, outlineMode, stroke, mainW, detailW, sub, miniOpts }) {
+function packFill({ A, obstacles, rng, gap, minis, style, theme = null, outlineMode, stroke, mainW, detailW, sub, miniOpts }) {
   const step = 2;
   const pts = [];
   for (let y = A.y0 + step / 2; y < A.y1; y += step) {
@@ -313,7 +352,7 @@ function packFill({ A, obstacles, rng, gap, minis, style, outlineMode, stroke, m
       pts.push({ x: jx, y: jy, a });
     }
   }
-  const W = FILLERS[style] || FILLERS.floral;
+  const W = theme || FILLERS[style] || FILLERS.floral;
   const kinds = Object.keys(W);
   const pickKind = () => { let t = rng() * kinds.reduce((s, k) => s + W[k], 0); for (const k of kinds) { t -= W[k]; if (t <= 0) return k; } return kinds[0]; };
 
@@ -337,9 +376,13 @@ function packFill({ A, obstacles, rng, gap, minis, style, outlineMode, stroke, m
     if (minis && r >= 13 && miniCount < 14) {
       out.push(...sub(best.x, best.y, r, miniOpts(miniCount++, r)));
     } else if (r >= 5.0) {
-      drawFiller(pickKind(), main, detail, best.x, best.y, r, rot, rng, !outlineMode);
+      const kind = pickKind();
+      // Tulipanes y gotas casi derechos: cabeza abajo se leen como un error
+      drawFiller(kind, main, detail, best.x, best.y, r, kind === "tulip" || kind === "drop" ? (rot - Math.PI) * 0.12 : rot, rng, !outlineMode);
     } else if (r >= 3.0) {
-      drawFiller(rng() < 0.5 ? "ring" : (rng() < 0.5 ? "heart" : "star"), main, detail, best.x, best.y, r, rot, rng, false);
+      // El sorteo es el mismo con o sin tema: el tema sólo cambia la figura pequeña
+      const small = rng() < 0.5 ? "ring" : (rng() < 0.5 ? "heart" : "star");
+      drawFiller(theme && small !== "ring" ? (theme.star ? "star" : theme.heart ? "heart" : "drop") : small, main, detail, best.x, best.y, r, rot, rng, false);
     } else {
       circle(dots, best.x, best.y, Math.max(0.55, r * 0.5));
     }
@@ -436,9 +479,116 @@ export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
       M(detail, 0, 0.8); L(detail, 0, -0.72);
       for (const t of [0.35, -0.05, -0.4]) for (const sd of [-1, 1]) { M(detail, 0, t); L(detail, sd * 0.32, t - 0.28); }
     }
+  } else if (kind === "crescent") {
+    // Luna creciente: arco exterior y arco interior desplazado
+    M(main, 0.15, -0.95);
+    C(main, -1.15, -0.95, -1.15, 0.95, 0.15, 0.95);
+    C(main, -0.55, 0.62, -0.55, -0.62, 0.15, -0.95);
+    main.close();
+    if (big && r > 13) { const [sx, sy] = T(0.45, -0.35); circle(detail, sx, sy, r * 0.13); } // si no, celda < 6 mm²
+  } else if (kind === "drop") {
+    // Gota con punta arriba y gota interior
+    const drop = (pb, k, dy) => {
+      M(pb, 0, -0.98 * k + dy);
+      C(pb, 0.35 * k, -0.5 * k + dy, 0.8 * k, 0.0 + dy, 0.62 * k, 0.48 * k + dy);
+      C(pb, 0.45 * k, 0.98 * k + dy, -0.45 * k, 0.98 * k + dy, -0.62 * k, 0.48 * k + dy);
+      C(pb, -0.8 * k, 0.0 + dy, -0.35 * k, -0.5 * k + dy, 0, -0.98 * k + dy);
+      pb.close();
+    };
+    drop(main, 1, 0);
+    if (big) drop(detail, 0.45, 0.25);
+  } else if (kind === "tulip") {
+    // Tulipán: copa con tres puntas
+    M(main, -0.6, -0.15);
+    C(main, -0.65, 0.5, -0.32, 0.9, 0, 0.9);
+    C(main, 0.32, 0.9, 0.65, 0.5, 0.6, -0.15);
+    L(main, 0.36, -0.85); L(main, 0.15, -0.3); L(main, 0, -0.95); L(main, -0.15, -0.3); L(main, -0.36, -0.85);
+    main.close();
+    if (big) { M(detail, 0, 0.7); C(detail, -0.25, 0.4, -0.2, 0.05, 0, -0.3); C(detail, 0.2, 0.05, 0.25, 0.4, 0, 0.7); detail.close(); }
+  } else if (kind === "clover") {
+    // Trébol de cuatro hojas en corazón, sin cruces de línea
+    for (let i = 0; i < 4; i++) {
+      const a = (i * TAU) / 4, p = (u, v) => [u * Math.cos(a) - v * Math.sin(a), u * Math.sin(a) + v * Math.cos(a)];
+      M(main, ...p(0.12, 0));
+      C(main, ...p(0.35, -0.55), ...p(1.0, -0.55), ...p(0.92, -0.08));
+      C(main, ...p(0.9, 0.02), ...p(0.86, 0.02), ...p(0.88, 0.08));
+      C(main, ...p(1.0, 0.55), ...p(0.35, 0.55), ...p(0.12, 0));
+      main.close();
+    }
   } else {
     // ring: circulito con punto
     circle(main, x, y, r * 0.85);
     if (r > 3.2) circle(detail, x, y, r * 0.35);
   }
+}
+
+// ---------- Tramas de fondo («fondo decorado» y centrado en hoja vertical) ----------
+// Ornamentales, no rejillas: continúan el lenguaje del mandala hacia el borde de la hoja.
+//  escamas:   anillos de pétalos encadenados que se abren desde el mandala
+//  flor_vida: círculos entrelazados en red hexagonal (pétalos y triángulos curvos)
+//  sol:       rayos en forma de pétalo, largos y cortos alternados, con nervio interior
+// (antes: ondas de ladrillo, malla de rombos y una rueda; se veían genéricas)
+// El recorte de la página (marco o línea de borde) cierra las celdas del borde y el halo
+// blanco con contorno cierra las que rodean al mandala.
+function drawPattern({ kind, cx, cy, halo, variant = 0.5, A, gap, stroke, mainW, detailW, outlineMode }) {
+  const pb = new PathBuilder();
+  const span = Math.hypot(Math.max(cx - A.x0, A.x1 - cx) + gap, Math.max(cy - A.y0, A.y1 - cy) + gap);
+  const cell = (outlineMode ? 16 : 12) * (0.9 + variant * 0.4); // tamaño típico de una celda (mm)
+  const P = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  const X0 = A.x0 - gap - 2, X1 = A.x1 + gap + 2, Y0 = A.y0 - gap - 2, Y1 = A.y1 + gap + 2;
+  if (kind === "escamas") {
+    // Cada anillo: arcos que salen de la base r y suben h; el siguiente anillo apoya sus
+    // uniones en las puntas del anterior (desfasado medio paso): celdas en forma de escama
+    const h = cell * 0.8;
+    let n = Math.max(16, Math.round((TAU * halo) / (cell * 1.25) / 4) * 4);
+    let off = -Math.PI / 2, r = halo;
+    while (r < span) {
+      const step = TAU / n;
+      for (let i = 0; i < n; i++) {
+        const a0 = off + i * step, a1 = a0 + step;
+        pb.moveTo(...P(r, a0));
+        pb.cubicTo(...P(r + h * 1.33, a0 + step * 0.04), ...P(r + h * 1.33, a1 - step * 0.04), ...P(r, a1));
+      }
+      // Escamas demasiado anchas: el anillo siguiente duplica su número
+      off += step / 2;
+      r += h;
+      if ((r * TAU) / n > cell * 2.1) { n *= 2; }
+    }
+  } else if (kind === "flor_vida") {
+    const rr = cell * 1.75, dy = rr * Math.sqrt(3) / 2; // grande: se lee como pétalos, no como malla
+    const jMax = Math.ceil((Math.max(cy - Y0, Y1 - cy) + rr) / dy);
+    const iMax = Math.ceil((Math.max(cx - X0, X1 - cx) + rr) / rr) + 1;
+    for (let j = -jMax; j <= jMax; j++) {
+      for (let i = -iMax; i <= iMax; i++) {
+        const x = cx + (i + (Math.abs(j) % 2) / 2) * rr, y = cy + j * dy;
+        if (x + rr < X0 || x - rr > X1 || y + rr < Y0 || y - rr > Y1) continue;
+        if (Math.hypot(x - cx, y - cy) + rr < halo) continue; // tapado por el halo
+        circle(pb, x, y, rr);
+      }
+    }
+  } else {
+    // Sol: n rayos largos (pétalos que llegan al borde) y n cortos entre ellos
+    const n = [16, 20, 24, 28][Math.floor(variant * 4)];
+    const step = TAU / n, L = span * 1.02 - halo;
+    const lens = (r0, r1, a, w) => {
+      pb.moveTo(...P(r0, a));
+      pb.cubicTo(...P(r0 + (r1 - r0) * 0.25, a - w), ...P(r0 + (r1 - r0) * 0.75, a - w * 0.9), ...P(r1, a));
+      pb.cubicTo(...P(r0 + (r1 - r0) * 0.75, a + w * 0.9), ...P(r0 + (r1 - r0) * 0.25, a + w), ...P(r0, a));
+      pb.close();
+    };
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + i * step;
+      lens(halo, halo + L, a, step * 0.42);                       // rayo largo
+      lens(halo + L * 0.08, halo + L * 0.55, a, step * 0.2);       // nervio interior
+      lens(halo, halo + L * 0.38, a + step / 2, step * 0.3);       // rayo corto
+    }
+  }
+  const out = [];
+  const p = pb.toPath({ stroke, strokeWidthMm: detailW, fill: "none" });
+  if (p) out.push(p);
+  // Halo: tapa la trama alrededor del mandala y cierra sus celdas
+  const hc = new PathBuilder(); circle(hc, cx, cy, halo);
+  const hp = hc.toPath({ stroke, strokeWidthMm: mainW, fill: "#fff" });
+  if (hp) out.push(hp);
+  return out;
 }

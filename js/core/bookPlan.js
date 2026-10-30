@@ -11,6 +11,118 @@ export const BOOK_COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas",
 export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno"];
 export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 
+// Silueta: la banda exterior del mandala, lo primero que se reconoce al hojear. Antes la
+// sorteaba el motor entre 3 formas (loto, festón, ojiva) y la mitad del libro salía con
+// loto: páginas distintas por dentro parecían el mismo dibujo. Ahora la reparte el plan.
+// Dos familias: flor abierta y medallón cerrado (rombo, triángulo: contorno circular).
+// El zigzag (chevron) queda fuera: como silueta deja una corona casi vacía.
+export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle"];
+const SILHOUETTES_BY_STYLE = {
+  floral:    ["lotus", "petal", "round", "heart", "leaf", "scallop", "ogee"],
+  geometric: ["diamond", "triangle", "petal", "lotus", "ogee", "scallop"],
+  azteca:    ["triangle", "diamond", "petal", "lotus", "scallop"],
+  islamico:  ["ogee", "scallop", "diamond", "lotus", "petal", "round"],
+  yantra:    ["lotus", "petal", "triangle", "diamond", "ogee"],
+  sashiko:   ["scallop", "round", "diamond", "lotus", "ogee", "petal"],
+  celtico:   ["round", "heart", "leaf", "scallop", "ogee", "lotus"],
+};
+
+// Estructura del disco (ver STRUCTURES en mandalaClassic.js) y tema de fondo (ver
+// BACKGROUNDS en pageComposer.js). Se reparten igual que la silueta: sin repetir en
+// páginas seguidas y equilibrados en el libro.
+export const BOOK_STRUCTURES = ["corona", "heroe", "equilibrio", "nucleo"];
+const STRUCTURE_WEIGHTS = [3, 2, 2, 1]; // «núcleo» puntúa algo menos: sale menos
+export const SCATTER_BACKGROUNDS = ["jardin", "cielo", "hojas", "dulce"];
+export const PATTERN_BACKGROUNDS = ["escamas", "flor_vida", "sol"];
+// Temas sueltos que no combinan con todos los estilos (corazones alrededor de un mandala
+// geométrico se ven fuera de lugar). Cielo, jardín (figuras del propio estilo) y las
+// tramas van con todos.
+const BACKGROUND_STYLES = {
+  dulce: ["floral", "celtico", "sashiko"],
+  hojas: ["floral", "celtico", "sashiko", "yantra", "islamico"],
+};
+// Composiciones con espacio libre que se decora (el resto no usa tema de fondo)
+const FILLED = new Set(["fondo", "constelacion", "esquinas", "medio"]);
+
+/** Tema de fondo equilibrado: el menos usado entre los posibles, distinto del anterior. */
+export function backgroundPicker(rng, { fillCentro = false } = {}) {
+  const used = new Map();
+  let last = null;
+  return (composition, style = null) => {
+    const centro = composition === "centro" && fillCentro;
+    if (!FILLED.has(composition) && !centro) return null;
+    const allowed = (composition === "fondo" || centro ? [...SCATTER_BACKGROUNDS, ...PATTERN_BACKGROUNDS] : SCATTER_BACKGROUNDS)
+      .filter(b => !style || !BACKGROUND_STYLES[b] || BACKGROUND_STYLES[b].includes(style));
+    // Cuenta por encuadre: si no, los temas sueltos (que también usan constelación y
+    // esquinas) parecían «muy usados» y el fondo decorado repetía siempre las tramas.
+    // Primero el menos usado; entre empatados, distinto del de la página anterior
+    const n = (b) => used.get(`${composition}|${b}`) || 0;
+    const min = Math.min(...allowed.map(n));
+    let least = allowed.filter(b => n(b) === min && b !== last);
+    if (!least.length) {
+      const pool = allowed.filter(b => b !== last);
+      const m2 = Math.min(...pool.map(n));
+      least = pool.length ? pool.filter(b => n(b) === m2) : allowed;
+    }
+    const pick = least[Math.floor(rng() * least.length)];
+    used.set(`${composition}|${pick}`, n(pick) + 1);
+    last = pick;
+    return pick;
+  };
+}
+
+// Familias visuales: lo que el ojo distingue al hojear. Loto, pétalo y ojiva tienen
+// nombres distintos pero se ven como la misma corona de puntas.
+export const SILHOUETTE_FAMILY = {
+  lotus: "puntas", petal: "puntas", ogee: "puntas",
+  scallop: "lobulos", round: "lobulos",
+  heart: "corazones", leaf: "rayos",
+  diamond: "medallon", triangle: "medallon",
+};
+
+/**
+ * Silueta de reemplazo n.º k (k ≥ 1) para una página rehecha: acorde a su estilo y de otra
+ * familia visual que la original, para que el reemplazo no se parezca al dibujo descartado.
+ */
+export function alternateSilhouette(style, current, k) {
+  const allowed = SILHOUETTES_BY_STYLE[style] || BOOK_SILHOUETTES;
+  const other = allowed.filter(s => SILHOUETTE_FAMILY[s] !== SILHOUETTE_FAMILY[current]);
+  const list = other.length ? other : allowed;
+  return list[(Math.max(1, k) - 1) % list.length];
+}
+
+/**
+ * Elige siluetas compatibles con cada estilo, equilibradas en el libro: evita la familia
+ * visual de las 2 páginas anteriores y, entre las que quedan, toma la familia y la silueta
+ * menos usadas hasta ahora. Con `composition`, además evita repetir familia con una de las
+ * 4 páginas anteriores que tenga el mismo encuadre y estilo (se verían gemelas al hojear).
+ */
+export function silhouettePicker(rng) {
+  const used = new Map(BOOK_SILHOUETTES.map(s => [s, 0]));
+  const famUsed = new Map();
+  const recent = [];
+  const window = []; // { key: encuadre|estilo, fam } de las 4 páginas anteriores
+  return (style, composition = null) => {
+    const allowed = SILHOUETTES_BY_STYLE[style] || BOOK_SILHOUETTES;
+    const key = `${composition}|${style}`;
+    const twinFams = composition ? window.filter(w => w.key === key).map(w => w.fam) : [];
+    let pool = allowed.filter(s => !recent.includes(SILHOUETTE_FAMILY[s]) && !twinFams.includes(SILHOUETTE_FAMILY[s]));
+    if (!pool.length) pool = allowed.filter(s => !recent.includes(SILHOUETTE_FAMILY[s]));
+    if (!pool.length) pool = allowed.filter(s => SILHOUETTE_FAMILY[s] !== recent.at(-1));
+    if (!pool.length) pool = allowed;
+    const cost = (s) => (famUsed.get(SILHOUETTE_FAMILY[s]) || 0) * 10 + used.get(s);
+    const min = Math.min(...pool.map(cost));
+    const least = pool.filter(s => cost(s) === min);
+    const pick = least[Math.floor(rng() * least.length)];
+    used.set(pick, used.get(pick) + 1);
+    const fam = SILHOUETTE_FAMILY[pick];
+    famUsed.set(fam, (famUsed.get(fam) || 0) + 1);
+    recent.push(fam); if (recent.length > 2) recent.shift();
+    window.push({ key, fam }); if (window.length > 4) window.shift();
+    return pick;
+  };
+}
+
 /**
  * Perfil «lo que más se vende» para un formato. NO sale de datos de ventas (no los
  * tenemos): resume las convenciones de los libros de mandalas mejor posicionados en
@@ -22,15 +134,19 @@ export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 export function bestSellerProfile(preset = "KDP_8_5x8_5") {
   const square = /8_5x8_5/.test(preset);
   // Hoja cuadrada: el disco ocupa toda la página y el centrado domina aún más
+  // Hoja vertical: el centrado completa la hoja con un fondo (fillCentro) y ganan peso los
+  // encuadres que cubren la hoja. Los líderes de la categoría venden diseños «sin el espacio
+  // en blanco típico de los libros de mandalas» (ficha de 100 Amazing Patterns)
   const comps = square
     ? { centro: 6, fondo: 2, gigante: 1, constelacion: 1 }
-    : { centro: 5, fondo: 2, constelacion: 2, esquinas: 1, gigante: 1 };
+    : { centro: 4, fondo: 2, constelacion: 2, esquinas: 2, gigante: 1 };
   const styles = { floral: 3, geometric: 2, islamico: 2, yantra: 2, sashiko: 1, celtico: 1, azteca: 1 };
   return {
     compositions: Object.keys(comps), compositionWeights: Object.values(comps),
     styles: Object.keys(styles), styleWeights: Object.values(styles),
     frames: ["ninguno", "redondeado"], frameWeights: [3, 1],
     petals: [12, 16, 18, 20, 24],
+    fillCentro: !square,
   };
 }
 
@@ -49,8 +165,14 @@ export function strokeScaleFor(complexity, baseComplexity) {
 /** Trazo final de una página: nunca por debajo de 0,35 mm (las líneas finas se pierden al imprimir). */
 export const MIN_PRINT_STROKE_MM = 0.35;
 export const MAX_AUTO_STROKE_MM = 1.2;
+// Grosor mínimo comercial: el mismo umbral que penaliza la puntuación (commercialMetrics.js).
+// El adelgazamiento automático de las páginas difíciles no cruza este umbral si el trazo
+// elegido ya lo cumplía: antes, una página difícil con trazo de 0,8 mm salía a 0,68 mm y
+// perdía 15 puntos por una decisión del propio planificador.
+export const COMMERCIAL_MIN_STROKE_MM = 0.8;
 export function pageStrokeMm(baseMm, scale = 1) {
   let mm = baseMm * scale;
+  if (scale < 1) mm = Math.max(mm, Math.min(baseMm, COMMERCIAL_MIN_STROKE_MM));
   // El aumento automático no pasa de 1,2 mm: más grueso empasta las celdas pequeñas.
   // Si el usuario eligió un trazo mayor, se respeta (nunca se adelgaza por este tope).
   if (scale > 1) mm = Math.min(mm, Math.max(baseMm, MAX_AUTO_STROKE_MM));
@@ -63,10 +185,28 @@ function shuffled(rng, arr) {
   return a;
 }
 
+/**
+ * Pesos → número de copias por ronda. Acepta una lista (mismo orden que options) o un
+ * objeto { opción: peso }. Los pesos fraccionarios se escalan para que el menor peso
+ * positivo valga una copia: { floral: 3, azteca: 0.2 } ⇒ 15 florales por cada azteca
+ * (redondear 0,2 a 0 la haría desaparecer). Un peso no numérico cuenta como 0.
+ */
+export function weightCopies(options, weights) {
+  const raw = options.map((o, i) => {
+    const w = Array.isArray(weights) ? weights[i] : weights[o];
+    return Number.isFinite(w) && w > 0 ? w : 0;
+  });
+  const pos = raw.filter(w => w > 0);
+  if (!pos.length) return options.map(() => 1);
+  const scale = Math.min(1 / Math.min(...pos), 200 / pos.reduce((a, b) => a + b, 0));
+  return raw.map(w => (w > 0 ? Math.max(1, Math.round(w * Math.max(1, scale))) : 0));
+}
+
 /** Bolsa barajada: reparte todas las opciones antes de repetir; evita repetir la anterior. */
 export function shuffleBag(rng, options, weights = null) {
   // Los pesos se traducen en copias: peso 2 ⇒ aparece el doble de veces por ronda
-  const pool = weights ? options.flatMap((o, i) => Array(Math.max(0, Math.round(weights[i]))).fill(o)) : options.slice();
+  const copies = weights ? weightCopies(options, weights) : null;
+  const pool = copies ? options.flatMap((o, i) => Array(copies[i]).fill(o)) : options.slice();
   let bag = [];
   let last;
   return () => {
@@ -83,6 +223,75 @@ export function shuffleBag(rng, options, weights = null) {
     last = v;
     return v;
   };
+}
+
+// ---------- Capítulos temáticos ----------
+// Los libros más vendidos agrupan los diseños por tema (p. ej. 125 Mandalas: vitral,
+// étnico, gemas). Cada capítulo reúne estilos afines y abre con una portadilla.
+export const CHAPTERS = [
+  { key: "floral", title: "Jardín de mandalas", styles: ["floral", "celtico"], near: "arabesco" },
+  { key: "arabesco", title: "Arabescos y vitrales", styles: ["islamico", "sashiko"], near: "geometrico" },
+  { key: "geometrico", title: "Geometría sagrada", styles: ["geometric", "yantra"], near: "solar" },
+  { key: "solar", title: "Soles y piedras", styles: ["azteca"], near: "geometrico" },
+];
+
+/**
+ * Capítulos de un libro de `count` páginas: tamaño proporcional al peso de sus estilos.
+ * Un capítulo de menos de `minSize` páginas se une al más afín (con sus estilos).
+ * Devuelve [{ key, title, styles, weights, size }] (vacío si queda un solo capítulo).
+ */
+export function chapterLayout(count, styles = BOOK_STYLES, weights = null, minSize = 4) {
+  const wOf = (st) => {
+    const i = styles.indexOf(st);
+    if (i < 0) return 0;
+    if (!weights) return 1;
+    const w = Array.isArray(weights) ? weights[i] : weights[st];
+    return Number.isFinite(w) && w > 0 ? w : 0;
+  };
+  let chs = CHAPTERS.map(c => {
+    const st = c.styles.filter(x => wOf(x) > 0);
+    return { key: c.key, title: c.title, near: c.near, styles: st, w: st.reduce((a, x) => a + wOf(x), 0) };
+  }).filter(c => c.styles.length);
+  for (;;) {
+    if (chs.length < 2) return [];
+    const total = chs.reduce((a, c) => a + c.w, 0);
+    const small = chs.filter(c => (count * c.w) / total < minSize).sort((a, b) => a.w - b.w)[0];
+    if (!small) break;
+    const rest = chs.filter(c => c !== small);
+    // Se une al capítulo más afín (soles → geometría); si no está, al mayor
+    const big = rest.find(c => c.key === small.near) || rest.reduce((a, b) => (b.w > a.w ? b : a));
+    big.styles = [...big.styles, ...small.styles];
+    big.w += small.w;
+    chs = rest;
+  }
+  if (chs.length < 2) return [];
+  // Reparto por mayor resto: los tamaños suman exactamente count
+  const total = chs.reduce((a, c) => a + c.w, 0);
+  const raw = chs.map(c => (count * c.w) / total);
+  const size = raw.map(Math.floor);
+  let left = count - size.reduce((a, b) => a + b, 0);
+  raw.map((r, i) => [r - Math.floor(r), i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (left > 0) { size[i]++; left--; } });
+  return chs.map((c, i) => ({ key: c.key, title: c.title, styles: c.styles, weights: c.styles.map(wOf), size: size[i] }));
+}
+
+/** Inserta una portadilla antes del primer mandala de cada capítulo. */
+export function insertChapterDividers(pages, seed = 1) {
+  const n = new Set(pages.filter(p => p.chapter).map(p => p.chapter.key)).size;
+  if (n < 2) return pages;
+  const out = [];
+  for (const p of pages) {
+    if (p.chapter?.first) {
+      out.push({
+        seed: ((seed >>> 0) * 17 + 0xC4A9 * p.chapter.n) >>> 0, styleMode: p.styleMode, petals: 12,
+        composition: "centro", frameStyle: "ninguno", centerArt: null, strokeScale: 1.3, complexity: 60,
+        // Cada portadilla con otra silueta: si no, las tres se veían iguales
+        silhouette: ["round", "diamond", "heart", "triangle"][(p.chapter.n - 1) % 4],
+        special: { type: "chapter", n: p.chapter.n, of: n, title: p.chapter.title, size: p.chapter.size },
+      });
+    }
+    out.push(p);
+  }
+  return out;
 }
 
 /**
@@ -109,16 +318,33 @@ export function planBook(opts) {
   const nextComp = shuffleBag(rng, compositions, compositionWeights);
   const nextFrame = shuffleBag(rng, frames, frameWeights);
   const nextPetals = shuffleBag(rng, petals);
+  // Generador propio: añadir la silueta no cambia los sorteos de las demás dimensiones
+  const nextSilhouette = silhouettePicker(mulberry32(((seed >>> 0) ^ 0x51A0E77E) >>> 0));
+  const nextStructure = shuffleBag(mulberry32(((seed >>> 0) ^ 0x57A0C7E5) >>> 0), BOOK_STRUCTURES, STRUCTURE_WEIGHTS);
+  const nextBackground = backgroundPicker(mulberry32(((seed >>> 0) ^ 0xBAC6A0D5) >>> 0), { fillCentro: opts.fillCentro });
 
   // Páginas con imagen: espaciadas de forma uniforme (k + ½) · count / images
   const imageAt = new Map();
   for (let k = 0; k < Math.min(images, count); k++) imageAt.set(Math.floor(((k + 0.5) * count) / Math.min(images, count)), k);
+  // Capítulos: los estilos se deciden primero, capítulo por capítulo (cada uno con su bolsa)
+  const chapters = Array.isArray(opts.chapters) && opts.chapters.length > 1 ? opts.chapters : null;
+  const chapterAt = [];
+  if (chapters) {
+    chapters.forEach((ch, k) => {
+      const bag = shuffleBag(rng, ch.styles, ch.weights);
+      for (let j = 0; j < ch.size; j++) chapterAt.push({ ch, k, j, style: bag() });
+    });
+  }
   const pages = [];
   for (let i = 0; i < count; i++) {
     let complexity;
+    const cp = chapters ? chapterAt[i] : null;
     if (difficulty === "progresiva") {
-      // De relajado a desafiante: el lector siente que avanza
-      const t = count > 1 ? i / (count - 1) : 0;
+      // De relajado a desafiante: el lector siente que avanza. Con capítulos, cada uno
+      // empieza más fácil que donde terminó el anterior y vuelve a subir (diente de sierra
+      // que en conjunto sigue creciendo)
+      const tg = count > 1 ? i / (count - 1) : 0;
+      const t = cp ? 0.35 * tg + 0.65 * (cp.ch.size > 1 ? cp.j / (cp.ch.size - 1) : 0) : tg;
       complexity = Math.round(40 + t * (Math.max(baseComplexity, 200) - 40));
     } else if (difficulty === "fija") {
       complexity = baseComplexity;
@@ -130,15 +356,20 @@ export function planBook(opts) {
     let composition = nextComp();
     // Un medio mandala cortaría al personaje por la mitad
     if (centerArt && composition === "medio") composition = "fondo";
+    const styleMode = cp ? cp.style : nextStyle();
     pages.push({
       seed: ((seed >>> 0) + i) >>> 0,
       strokeScale: difficulty === "fija" ? 1 : strokeScaleFor(complexity, baseComplexity),
-      styleMode: nextStyle(),
+      styleMode,
+      silhouette: nextSilhouette(styleMode, composition),
+      structure: nextStructure(),
+      background: nextBackground(composition, styleMode),
       composition,
       frameStyle: nextFrame(),
       petals: nextPetals(),
       complexity,
       centerArt,
+      ...(cp ? { chapter: { key: cp.ch.key, title: cp.ch.title, n: cp.k + 1, size: cp.ch.size, first: cp.j === 0 } } : {}),
     });
   }
   return pages;
@@ -232,7 +463,21 @@ export function addSpecialPages(plan, opts = {}) {
 
   // Dificultad creciente sobre el libro completo. Los grupos toman la complejidad de su
   // primera página; las soluciones no cuentan (no se colorean).
-  if (difficulty === "progresiva") {
+  if (difficulty === "progresiva" && pages.some(p => p.chapter)) {
+    // Con capítulos, las páginas normales ya traen su dificultad; las especiales toman la
+    // de la página normal anterior (un grupo, la de su primera página)
+    let last = baseComplexity;
+    const groupCx = new Map();
+    for (const p of pages) {
+      if (!p.special) { last = p.complexity; continue; }
+      if (p.special.type === "solutions") continue;
+      const g = p.special.group;
+      let cx = last;
+      if (g != null) { if (!groupCx.has(g)) groupCx.set(g, cx); cx = groupCx.get(g); }
+      p.complexity = cx;
+      p.strokeScale = strokeScaleFor(cx, baseComplexity);
+    }
+  } else if (difficulty === "progresiva") {
     const top = Math.max(baseComplexity, 200);
     const N = pages.length;
     const groupCx = new Map();

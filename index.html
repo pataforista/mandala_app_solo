@@ -193,6 +193,11 @@
       gap: 4px;
     }
 
+    .review-card.weak { border-color: #c62828; }
+    .review-card .meta .score { font-weight: 700; }
+    .review-card .meta .why { color: #c62828; font-size: 0.65rem; margin-top: 2px; }
+    .review-card.twin { border-color: #f57c00; border-style: dashed; }
+    .review-card .meta .twin-note { color: #e65100; font-size: 0.65rem; margin-top: 2px; }
     .review-card.changed { border-color: var(--m3-primary); box-shadow: 0 0 0 2px var(--m3-primary-container); }
     .review-card .thumb { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
     .review-card .thumb svg { width: 100%; height: 100%; }
@@ -544,6 +549,7 @@
               <sl-option value="fija">Fija (la complejidad actual)</sl-option>
             </sl-select>
             <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco</sl-checkbox>
+            <sl-checkbox id="bookChapters" checked>Organizar en capítulos temáticos, cada uno con su portadilla</sl-checkbox>
             <sl-select id="bookProfile" label="Patrones del libro" size="small" value="rentable">
               <sl-option value="rentable">Los más vendidos para este formato (recomendado)</sl-option>
               <sl-option value="personalizada">Elegir yo las composiciones</sl-option>
@@ -701,12 +707,18 @@
   <!-- Revisión del libro: cambiar las páginas que no sirven antes de crear el PDF -->
   <sl-dialog id="reviewDialog" label="Revisar páginas del libro" style="--width: min(1100px, 96vw);">
     <p class="hint" style="margin-bottom:12px;">
+      Cada página muestra su <b>puntuación para colorear</b> (0–100; las rojas dicen por qué):
+      verde ≥ 80, naranja 60–79, <span style="color:#c62828">rojo &lt; 60 = floja</span>.
+      Las páginas <span style="color:#e65100">gemelas</span> (casi iguales a otra del libro) llevan borde naranja punteado.
+      <b>Rehacer flojas y gemelas</b> prueba varios diseños nuevos para cada una y se queda con el mejor que no repita otra página.
       ¿Una página se ve mal? Pulsa <b>Borrar y crear otro</b>: se descarta y aparece al instante un mandala nuevo en su lugar.
       <b>Otro encuadre</b> cambia la composición de esa página.
       Los cambios se aplican al crear el libro y se mantienen mientras no cambies la semilla.
     </p>
+    <p id="reviewQuality" class="hint" style="margin-bottom:12px;"></p>
     <div id="reviewGrid"></div>
     <sl-button slot="footer" id="reviewReset" variant="text">Deshacer todos los cambios</sl-button>
+    <sl-button slot="footer" id="reviewFixWeak" variant="warning" outline disabled>Rehacer flojas y gemelas</sl-button>
     <sl-button slot="footer" id="reviewCreate" variant="success">Crear libro (PDF)</sl-button>
     <sl-button slot="footer" id="reviewClose" variant="primary">Listo</sl-button>
   </sl-dialog>
