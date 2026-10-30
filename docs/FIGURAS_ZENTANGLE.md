@@ -7,8 +7,10 @@ para construir mandalas, igual que una imagen subida por el usuario. No hace fal
 el motor de tangles.
 
 Por defecto cada figura entra con uso **«Anillos alrededor de un mandala»**: `pageComposer.js`
-la repite 6–12 veces en corona (rotada, con espejo alterno) y pone una copia en el medallón
-central. También puede usarse como medallón o, con `--use figura`, como figura rellena.
+la repite 6–12 veces en corona (rotada, con espejo alterno). El centro es un núcleo propio del mandala,
+sin la figura: una figura sola en un círculo se lee como una ilustración pegada. Para ponerla también en el
+centro, `figureCenter: true` en las opciones de la página. También puede usarse con uso «Medallón central»
+o, con `--use figura`, como figura rellena.
 
 ## Usar el paquete ya generado
 
@@ -53,7 +55,7 @@ mariposas, estrellas…). Usa la silueta real de cada copia (`cls`, que `app.js`
 caja, así que los motivos entran entre patas y colas sin tocar el dibujo. Los huecos pequeños llevan un
 punto sólido. Si la figura no trae `cls`, la corona queda como antes.
 
-## Figura en el medallón
+## Figura en el medallón (uso «Medallón central» o `figureCenter`)
 
 El medallón es un círculo con la figura recortada por dentro. Antes la imagen se ajustaba a un cuadrado del
 tamaño del círculo, así que una figura ancha (dinosaurios, ballena) llegaba al borde del cuadrado y el círculo

@@ -217,9 +217,10 @@ export function composePage(doc, opts, drawMandala) {
         content.push(...drawRingGaps({ cx: acx, cy: acy, rLo: d - Math.max(1.5, R * 0.02), rHi: rExt, n, rm, sw, sh, mirror,
           cls: ring.cls, fw: ring.w, fh: ring.h, seed, styleMode, outlineMode, stroke, mainW, detailW }));
       }
-      // Mandala interior con la figura completa en el medallón
+      // Mandala interior: núcleo propio del mandala. La figura sólo va al centro con opts.figureCenter
+      // (una figura sola en un círculo se lee como una ilustración pegada, no como parte del mandala)
       const ri = rIn - Math.max(1.5, R * 0.02);
-      content.push(...sub(acx, acy, ri, { maxBands: 2, centerArt: ring.centerHref ? { type: "image", href: ring.centerHref, scale: 0.62, ...fitOf(ring) } : null }));
+      content.push(...sub(acx, acy, ri, { maxBands: 2, centerArt: ring.centerHref && opts.figureCenter ? { type: "image", href: ring.centerHref, scale: 0.62, ...fitOf(ring) } : null }));
       obstacles.push({ x: acx, y: acy, r: R });
       fill = { minis: false };
       break;

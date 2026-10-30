@@ -6,7 +6,7 @@ import { inflateSync } from "node:zlib";
 import { createDoc } from "../js/core/svgDoc.js";
 import { renderDocToSvgString } from "../js/core/svgRender.js";
 import { generateMandalaClassic } from "../js/generators/mandalaClassic.js";
-import { COMPOSITIONS, FRAME_STYLES } from "../js/generators/pageComposer.js";
+import { COMPOSITIONS, FRAME_STYLES, fitOf } from "../js/generators/pageComposer.js";
 import { planBook, shuffleBag, BOOK_STYLES, bestSellerProfile } from "../js/core/bookPlan.js";
 import { kdpGutterMm, kdpSafeMarginMm, bookLayout, kdpChecklist } from "../js/core/kdp.js";
 import { encodeGrayPng, rgbaToGray } from "../js/core/grayPng.js";
@@ -233,7 +233,7 @@ test("figura: clics sobre el fondo y 'sólo figura principal' quitan fondo oscur
   assert.ok(withClick.w / withClick.h < 0.85, `relación ${withClick.w}/${withClick.h}`);
 });
 
-test("anillos de figuras: copias que no se pisan, sello de trazo grueso y medallón", () => {
+test("anillos de figuras: copias que no se pisan, sello de trazo grueso y centro sin figura", () => {
   const w = 120, h = 150;
   const cls = new Uint8Array(w * h).fill(2);
   for (let y = 20; y < 130; y++) for (let x = 20; x < 100; x++) cls[y * w + x] = (x === 20 || x === 99 || y === 20 || y === 129) ? 0 : 1;
@@ -265,7 +265,7 @@ test("anillos de figuras: copias que no se pisan, sello de trazo grueso y medall
       .map(m => +m[2] - cx).filter(r => r > rm + sh / 2);
     const rOutLine = Math.min(...ring);
     assert.ok(Math.hypot(d + sh, sw / 2) <= rOutLine, `${preset}: la esquina sale del anillo`);
-    assert.match(svg, /<image href="data:,C"/, "falta la figura en el medallón");
+    assert.doesNotMatch(svg, /<image href="data:,C"/, "el centro es un núcleo de mandala, sin la figura");
   }
 });
 
@@ -695,7 +695,7 @@ test("medallón: una figura ancha cabe entera en el círculo (antes el clip le c
     if (e <= 1) cls[y * w + x] = e > 0.9 ? 0 : 1;
   }
   const doc = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 10 });
-  generateMandalaClassic(doc, { ...BASE, seed: 2, figureRing: { href: "data:,S", centerHref: "data:,C", w, h, cls } });
+  generateMandalaClassic(doc, { ...BASE, seed: 2, centerArt: { type: "image", href: "data:,C", scale: 0.62, ...fitOf({ w, h, cls }) } });
   const svg = renderDocToSvgString(doc);
   const clip = svg.match(/<clipPath id="art-[^"]+"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/);
   const img = svg.match(/<image href="data:,C" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/);
@@ -727,4 +727,16 @@ test("medallón: la figura central lleva una trama polar a su alrededor", () => 
   const fit = { fit: { x: 100, y: 50, r: 99 }, imgW: w, imgH: h };
   assert.ok(paths(gen({ ...fit, cls })) > paths(gen({})), "hay trama extra en el medallón");
   assert.equal(gen({ ...fit, cls }), gen({ ...fit, cls }), "determinista");
+});
+
+test("anillos: por defecto el centro es un núcleo de mandala, sin la figura; figureCenter la pone en el medallón", () => {
+  const ring = { href: "data:,S", centerHref: "data:,C", w: 100, h: 120 };
+  const gen = (extra) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 2, figureRing: ring, ...extra });
+    return renderDocToSvgString(doc);
+  };
+  assert.ok(!gen({}).includes('href="data:,C"'), "sin figura en el centro");
+  assert.ok(gen({ figureCenter: true }).includes('href="data:,C"'), "con figureCenter, la figura va al centro");
+  assert.ok((gen({}).match(/<image href="data:,S"/g) || []).length >= 6, "las copias de la corona siguen");
 });
