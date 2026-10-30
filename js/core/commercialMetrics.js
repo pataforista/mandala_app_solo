@@ -152,27 +152,38 @@ export function measureSvg(svg, { petals = null, center = null } = {}) {
   // FASE 8: Métricas nuevas
   // Cobertura de tinta: % del área total que tiene tinta (trazos)
   if (center) {
-    const totalArea = Math.PI * Math.pow(Math.max(...cells.map(c => Math.sqrt(c.area / Math.PI))) * 2, 2);
+    // Calcular radio máximo real desde los vértices
+    let maxR = 0;
+    for (const el of els) for (const s of el.subs) for (const [x, y] of s.pts) {
+      const r = Math.hypot(x - center.x, y - center.y);
+      if (r > maxR) maxR = r;
+    }
+    const totalArea = Math.PI * maxR * maxR;
     const inkArea = cells.reduce((sum, c) => sum + c.area, 0);
-    out.cobertura = Math.min(100, (inkArea / totalArea) * 100);
-    
+    out.cobertura = totalArea > 0 ? Math.min(100, (inkArea / totalArea) * 100) : 0;
+
     // Balance radial: distribución de tinta por anillos concéntricos
     const rings = 5;
-    const maxR = Math.max(...cells.map(c => Math.sqrt(c.area / Math.PI))) * 2;
     const ringAreas = Array(rings).fill(0);
     for (const el of els) for (const s of el.subs) if (s.closed && s.pts.length >= 3) {
       const cx = s.pts.reduce((sum, p) => sum + p[0], 0) / s.pts.length;
       const cy = s.pts.reduce((sum, p) => sum + p[1], 0) / s.pts.length;
       const r = Math.hypot(cx - center.x, cy - center.y);
-      const ringIdx = Math.min(rings - 1, Math.floor((r / maxR) * rings));
+      const ringIdx = maxR > 0 ? Math.min(rings - 1, Math.floor((r / maxR) * rings)) : 0;
       ringAreas[ringIdx] += shoelace(s.pts);
     }
-    const avgPerRing = ringAreas.reduce((a, b) => a + b, 0) / rings;
-    out.balanceRadial = 100 - (ringAreas.reduce((sum, a) => sum + Math.abs(a - avgPerRing), 0) / (rings * avgPerRing)) * 100;
-    
+    const totalInk = ringAreas.reduce((a, b) => a + b, 0);
+    if (totalInk > 0) {
+      const avgPerRing = totalInk / rings;
+      const deviation = ringAreas.reduce((sum, a) => sum + Math.abs(a - avgPerRing), 0) / (rings * avgPerRing);
+      out.balanceRadial = Math.max(0, Math.min(100, (1 - deviation) * 100));
+    } else {
+      out.balanceRadial = 0;
+    }
+
     // Riqueza de detalle: número de subtrayectos por mm²
     const totalSubpaths = els.reduce((sum, el) => sum + el.subs.length, 0);
-    out.riquezaDetalle = totalSubpaths / Math.max(1, totalArea / 100);
+    out.riquezaDetalle = totalArea > 0 ? totalSubpaths / (totalArea / 100) : 0;
   }
   
   return out;
