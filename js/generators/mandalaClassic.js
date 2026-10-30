@@ -5,6 +5,8 @@
 //  - Pintor de afuera hacia adentro con relleno blanco: los pétalos de cada banda nacen
 //    "detrás" de la banda interior y las capas se ocultan entre sí, sin cruces de línea.
 //  - Celdas cerradas de tamaño coloreable; los detalles finos respetan minCellArea.
+//  - Tres niveles de trazo: contorno (grueso), detalle (medio), vestido (fino: nervios, punteados).
+//  - Detalle "premium": stippling, nervaduras-cápsula, pétalo-dentro-pétalo, doble contorno en siluetas.
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder, coloringCullArea } from "../core/pathBuilder.js";
 import { wantsComposition, composePage } from "./pageComposer.js";
@@ -14,37 +16,38 @@ const TAU = Math.PI * 2;
 const MIN_LINE_MM = 0.55; // por debajo, la imprenta lo reproduce gris o lo pierde
 
 // Pesos de motivos por estilo: el estilo cambia el "acento" sin romper la gramática
+// Nuevos motivos: voluta, antemia, roseta, flame — se integran con pesos bajos para no dominar
 const STYLE_WEIGHTS = {
-  floral:    { petal: 3, round: 3, lotus: 3, leaf: 3, scallop: 2, heart: 2, beads: 1, triangle: 0.5, diamond: 0.5, ogee: 1, chevron: 0.3 },
-  geometric: { petal: 2, round: 0.5, lotus: 1, leaf: 0.5, scallop: 1, heart: 0.3, beads: 2, triangle: 3, diamond: 3, ogee: 1, chevron: 2 },
-  islamico:  { petal: 2, round: 1, lotus: 2, leaf: 1, scallop: 2, heart: 0.5, beads: 1.5, triangle: 1, diamond: 2, ogee: 3, chevron: 1 },
-  sashiko:   { petal: 2, round: 2, lotus: 2, leaf: 1, scallop: 3, heart: 1, beads: 2, triangle: 1, diamond: 1.5, ogee: 1, chevron: 1 },
-  azteca:    { petal: 2, round: 0.5, lotus: 1, leaf: 0.5, scallop: 1, heart: 0.5, beads: 1.5, triangle: 3, diamond: 2, ogee: 1, chevron: 3 },
-  yantra:    { petal: 3, round: 1, lotus: 3, leaf: 1, scallop: 1, heart: 0.5, beads: 1.5, triangle: 2.5, diamond: 1.5, ogee: 1.5, chevron: 1 },
-  celtico:   { petal: 1.5, round: 2, lotus: 2, leaf: 2, scallop: 2.5, heart: 2, beads: 1.5, triangle: 0.5, diamond: 1, ogee: 2, chevron: 0.5 },
+  floral:    { petal: 3, round: 3, lotus: 3, leaf: 3, scallop: 2, heart: 2, beads: 1, triangle: 0.5, diamond: 0.5, ogee: 1, chevron: 0.3, roseta: 1.5, flame: 0.8, voluta: 0.6, antemia: 0.5 },
+  geometric: { petal: 2, round: 0.5, lotus: 1, leaf: 0.5, scallop: 1, heart: 0.3, beads: 2, triangle: 3, diamond: 3, ogee: 1, chevron: 2, roseta: 0.8, flame: 0.3, voluta: 0.4, antemia: 2 },
+  islamico:  { petal: 2, round: 1, lotus: 2, leaf: 1, scallop: 2, heart: 0.5, beads: 1.5, triangle: 1, diamond: 2, ogee: 3, chevron: 1, roseta: 1.5, flame: 0.5, voluta: 1, antemia: 2.5 },
+  sashiko:   { petal: 2, round: 2, lotus: 2, leaf: 1, scallop: 3, heart: 1, beads: 2, triangle: 1, diamond: 1.5, ogee: 1, chevron: 1, roseta: 1, flame: 0.5, voluta: 0.8, antemia: 0.6 },
+  azteca:    { petal: 2, round: 0.5, lotus: 1, leaf: 0.5, scallop: 1, heart: 0.5, beads: 1.5, triangle: 3, diamond: 2, ogee: 1, chevron: 3, roseta: 0.6, flame: 2, voluta: 0.3, antemia: 2.5 },
+  yantra:    { petal: 3, round: 1, lotus: 3, leaf: 1, scallop: 1, heart: 0.5, beads: 1.5, triangle: 2.5, diamond: 1.5, ogee: 1.5, chevron: 1, roseta: 2, flame: 1, voluta: 0.8, antemia: 1 },
+  celtico:   { petal: 1.5, round: 2, lotus: 2, leaf: 2, scallop: 2.5, heart: 2, beads: 1.5, triangle: 0.5, diamond: 1, ogee: 2, chevron: 0.5, roseta: 1.2, flame: 0.8, voluta: 1.5, antemia: 0.5 },
 };
 
 // Proporción ancho-de-celda / alto-de-banda que mejor luce cada motivo
-const ASPECT = { petal: 0.75, round: 0.85, lotus: 0.8, leaf: 0.6, scallop: 1.5, heart: 1.0, beads: 1.0, triangle: 0.9, diamond: 1.2, ogee: 0.8, chevron: 1.4 };
+const ASPECT = { petal: 0.75, round: 0.85, lotus: 0.8, leaf: 0.6, scallop: 1.5, heart: 1.0, beads: 1.0, triangle: 0.9, diamond: 1.2, ogee: 0.8, chevron: 1.4, voluta: 0.7, antemia: 0.9, roseta: 1.0, flame: 0.65 };
 // La silueta es lo que se reconoce al hojear: más peso en lotus, la forma más reconocible
 const SILHOUETTE = ["lotus", "lotus", "lotus", "scallop", "scallop", "ogee", "ogee"];
 
 const MOTIFS_OK = (m) => Object.prototype.hasOwnProperty.call(ASPECT, m);
 
-// Perfiles de estructura: cuánto pesa cada parte del disco. Con un solo perfil todas las
-// páginas tenían la misma arquitectura (corona enorme + círculo + interior denso) y se
-// veían iguales al hojear aunque cambiaran los motivos. Sólo escalan pesos: no consumen
-// sorteos, así que una página con el perfil por defecto no cambia.
-//  sil: peso de la silueta · hero: banda bajo la silueta · core: radio del núcleo (× R)
+// Perfiles de estructura: cuánto pesa cada parte del disco.
 export const STRUCTURES = {
-  corona:     { sil: 2.4, hero: 1.6, core: null },  // silueta protagonista (el de siempre)
-  equilibrio: { sil: 1.35, hero: 1.15, core: null }, // bandas parejas: anillos concéntricos
-  nucleo:     { sil: 1.7, hero: 1.0, core: 0.3, dropBand: true }, // flor central grande
-  heroe:      { sil: 1.2, hero: 2.8, core: null },  // una banda media domina
+  corona:     { sil: 2.4, hero: 1.6, core: null },
+  equilibrio: { sil: 1.35, hero: 1.15, core: null },
+  nucleo:     { sil: 1.7, hero: 1.0, core: 0.3, dropBand: true },
+  heroe:      { sil: 1.2, hero: 2.8, core: null },
 };
 
+// ---------- Variantes de núcleo ----------
+// Cuatro formas de dibujar el medallón central. Cada una con su propio radio mínimo
+// para que quepa. El sorteo usa el RNG de la página para no alterar la secuencia.
+const CORE_VARIANTS = ["flor_radiante", "flor_vida", "espiral_aurea", "estrella_compuesta"];
+
 export function generateMandalaClassic(doc, opts) {
-  // Encuadres de página (fondo, constelación, esquinas…): dibujan el disco con esta misma función
   if (wantsComposition(opts)) return composePage(doc, opts, generateMandalaClassic);
   const {
     seed = 1,
@@ -73,14 +76,11 @@ export function generateMandalaClassic(doc, opts) {
   const detail = !outlineMode && detailSimplification < 0.85;
   const richDetail = detail && cF > 0.35 && detailSimplification < 0.6;
 
-  // Tres niveles de tinta: silueta/contorno, detalle y "vestido" (nervios y acentos)
+  // Tres niveles de trazo más marcados: el contorno destaca, el detalle es sutil, el vestido es fino
   const mainW = Math.max(0.8, strokeWidthMm);
-  const detailW = Math.max(MIN_LINE_MM, strokeWidthMm * 0.65);
-  const vestW = Math.max(0.4, strokeWidthMm * 0.5);
+  const detailW = Math.max(MIN_LINE_MM, strokeWidthMm * 0.55);
+  const vestW = Math.max(0.5, strokeWidthMm * 0.45);
   const cull = coloringCullArea(opts);
-  // Escala: el diseño debe verse igual en 6×9 que en 8.5×11. Pero un mandala pequeño
-  // (relleno de constelación, esquinas) no es una copia reducida: por debajo de ~2 mm²
-  // la celda ya no se colorea, mida lo que mida el disco.
   const minCell = Math.max(cull, 2.5 * (R / 90) ** 2, 2);
 
   const P = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
@@ -93,34 +93,23 @@ export function generateMandalaClassic(doc, opts) {
   const detailPB = () => new PathBuilder({ minClosedArea: minCell });
 
   // ---------- Reparto de bandas ----------
-  // Modo contornos (niños / zen): menos bandas y formas grandes
-  // Medallón central con una imagen subida (ya convertida a líneas): núcleo grande, menos bandas
   const art = opts.centerArt && opts.centerArt.href ? opts.centerArt : null;
   const artFrac = art ? Math.max(0.25, Math.min(0.6, art.scale ?? 0.42)) : 0;
-  // Rango comercial: 4–7 bandas (antes 5–10). Más anillos = celdas más pequeñas
   let B = outlineMode ? 3 + Math.round(cF * 1.5 + rng() * 0.6) : 4 + Math.round(cF * 2.5 + rng() * 0.8);
   const ST = STRUCTURES[opts.structure] || STRUCTURES.corona;
   if (art) B = Math.max(3, B - Math.round(artFrac * 6));
-  // Núcleo grande: una banda menos (el espacio lo ocupa la flor central)
   else if (ST.dropBand && !opts.minBands) B = Math.max(3, B - 1);
-  // Mínimo de bandas: un mural gigante o una secuencia «que crece» necesitan más anillos
   if (opts.minBands) B = Math.max(B, opts.minBands);
-  // Mandalas pequeños de relleno: pocas bandas o las celdas se vuelven incoloreables
   if (opts.maxBands) B = Math.max(2, Math.min(B, opts.maxBands));
-  // Núcleo con tamaño absoluto mínimo: en los mini mandalas un núcleo de 1–2 mm
-  // se imprime como una mancha negra
-  // Núcleo lo bastante grande para colorearlo con un lápiz (~7 mm de diámetro como mínimo)
   const rCoreBase = art ? R * artFrac : Math.max(R * (0.14 + rng() * 0.04), Math.min(R * 0.32, 5.5));
   const rCore = !art && ST.core ? Math.max(rCoreBase, R * ST.core) : rCoreBase;
-  // Jerarquía: la silueta y una banda héroe dominan; el núcleo queda algo más pequeño
   const weights = Array.from({ length: B }, (_, k) => {
     let w = 0.7 + rng() * 0.5;
-    if (k === B - 1) w *= ST.sil;       // silueta (muy protagonista en «corona»)
-    if (k === B - 2) w *= ST.hero;      // banda héroe
-    if (k === 0) w *= 0.8;              // núcleo relativo más pequeño
+    if (k === B - 1) w *= ST.sil;
+    if (k === B - 2) w *= ST.hero;
+    if (k === 0) w *= 0.8;
     return w;
   });
-  // Bandas estrechas de cuentas ("respiros"): 1–2, nunca adyacentes ni exteriores
   const beadSlots = new Set();
   for (let k = 1; k < B - 2; k++) if (!beadSlots.has(k - 1) && rng() < 0.22 + spacing * 0.2) { beadSlots.add(k); weights[k] *= 0.5; }
   const wSum = weights.reduce((a, b) => a + b, 0);
@@ -135,8 +124,11 @@ export function generateMandalaClassic(doc, opts) {
   // ---------- Elección de motivos ----------
   const W = STYLE_WEIGHTS[styleMode] || STYLE_WEIGHTS.floral;
   const pickMotif = (exclude) => {
-    // El zigzag deja franjas estrechas: no apto para modo contornos (niños)
-    const keys = Object.keys(W).filter(m => m !== exclude && m !== "beads" && !(outlineMode && m === "chevron"));
+    // voluta, roseta, antemia excluidos: sus formas tienen simetría local que no
+    // coincide con la simetría radial del mandala (espirales, pétalos locales)
+    const keys = Object.keys(W).filter(m => m !== exclude && m !== "beads"
+      && m !== "voluta" && m !== "roseta" && m !== "antemia"
+      && !(outlineMode && (m === "chevron" || m === "flame")));
     let t = rng() * keys.reduce((s, m) => s + W[m], 0);
     for (const m of keys) { t -= W[m]; if (t <= 0) return m; }
     return keys[0];
@@ -146,16 +138,12 @@ export function generateMandalaClassic(doc, opts) {
   for (const b of bands) {
     const h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
     if (b.k === B - 1) {
-      // El sorteo se consume siempre (misma secuencia aleatoria con o sin silueta elegida)
       const drawn = SILHOUETTE[Math.floor(rng() * SILHOUETTE.length)];
       b.motif = opts.silhouette && MOTIFS_OK(opts.silhouette) ? opts.silhouette : drawn;
     }
-    else if (beadSlots.has(b.k) && h >= 3) b.motif = "beads"; // cuentas de <1 mm = puntos negros
+    else if (beadSlots.has(b.k) && h >= 3) b.motif = "beads";
     else b.motif = pickMotif(prev);
     prev = b.motif;
-    // Conteo armónico por banda: el que deja celdas con la proporción del motivo y área
-    // coloreable. Sólo armónicos de N, así la simetría sigue siendo exacta en cada banda
-    // Celda mínima ~4.5 mm (a escala de página): más estrecha no se colorea bien
     const minArc = Math.max(4.5 * (R / 90), 3.2);
     const ok = harmonics.filter(n => TAU * rm / n >= minArc);
     const pool = ok.length ? ok : [harmonics[0]];
@@ -164,9 +152,10 @@ export function generateMandalaClassic(doc, opts) {
   }
 
   // ---------- Primitivas ----------
-  // Círculo con 8 arcos Bézier (error < 0.001%): los anillos grandes quedan redondos
+  // Círculo con 8 arcos Bézier (error < 0.001%): para círculos grandes (>30mm) usamos 12
   const circle = (pb, x, y, rad) => {
-    const n = 8, k = (4 / 3) * Math.tan(Math.PI / (2 * n)) * rad;
+    const n = rad > 30 ? 12 : 8;
+    const k = (4 / 3) * Math.tan(Math.PI / (2 * n)) * rad;
     pb.moveTo(x + rad, y);
     for (let i = 0; i < n; i++) {
       const a0 = (i * TAU) / n, a1 = ((i + 1) * TAU) / n;
@@ -180,6 +169,43 @@ export function generateMandalaClassic(doc, opts) {
   const C = (pb, r1, a1, r2, a2, r3, a3) => { const [x1, y1] = P(r1, a1), [x2, y2] = P(r2, a2), [x3, y3] = P(r3, a3); pb.cubicTo(x1, y1, x2, y2, x3, y3); };
   const M = (pb, rr, a) => pb.moveTo(...P(rr, a));
   const L = (pb, rr, a) => pb.lineTo(...P(rr, a));
+
+  // ---------- Detalle premium: helpers ----------
+  // Stippling: puntos a lo largo de una línea radial (como un "camino de hormigas")
+  // Solo se activa cuando la banda es lo bastante grande para que los puntos sean coloreables
+  const stipple = (pb, rStart, rEnd, a, count, dotRad) => {
+    if (!textures || !richDetail) return;
+    if (rEnd - rStart < 6) return; // banda demasiado estrecha para punteado
+    for (let i = 1; i <= count; i++) {
+      const t = i / (count + 1);
+      const rr = rStart + (rEnd - rStart) * t;
+      const [x, y] = P(rr, a);
+      // Umbral alto: los puntos deben ser claramente coloreables (≥ 2× minCell)
+      if (Math.PI * dotRad * dotRad >= minCell * 2) circle(pb, x, y, dotRad);
+    }
+  };
+  // Nervadura-cápsula: línea cerrada muy estrecha (como una lente) que se puede colorear
+  // Solo se activa con texturas (es un detalle "premium")
+  const capsuleVein = (pb, rStart, rEnd, a, width) => {
+    if (!textures) return;
+    const h = rEnd - rStart;
+    if (h < 3 || width < 0.2) return;
+    // Verificar que el área de la cápsula sea suficiente para colorear
+    const approxArea = h * width * 2;
+    if (approxArea < minCell * 1.5) return;
+    const [x0, y0] = P(rStart, a);
+    const [x1, y1] = P(rEnd, a);
+    const dx = x1 - x0, dy = y1 - y0;
+    const len = Math.hypot(dx, dy);
+    if (len < 1.5) return;
+    const nx = -dy / len * width, ny = dx / len * width;
+    const [mx, my] = [(x0 + x1) / 2, (y0 + y1) / 2];
+    pb.moveTo(x0, y0).quadTo(mx + nx, my + ny, x1, y1).quadTo(mx - nx, my - ny, x0, y0).close();
+  };
+  // Pétalo interior (pétalo-dentro-pétalo): un pétalo más pequeño dentro del principal
+  const innerPetal = (pb, r0, r1, a, w, belly = 1.05, round = false) => {
+    petalShape(pb, r0, r1, a, w, belly, round);
+  };
 
   // Pétalo puntiagudo simétrico: base en r0 (±w), punta en r1
   const petalShape = (pb, r0, r1, a, w, belly = 1.05, round = false) => {
@@ -212,12 +238,11 @@ export function generateMandalaClassic(doc, opts) {
     C(pb, r0 + h * 0.5, a + w * 1.05, r0 + h * 0.2, a + w * 1.15, r0, a + w * 0.8);
     pb.close();
   };
-  // Ancho angular disponible que no invade la celda vecina en el radio rr
   const fitW = (step, frac) => (step / 2) * frac;
 
-  // Punto decorativo entre pétalos, sólo si cabe como celda coloreable
+  // Punto decorativo entre pétalos
   const gapDots = (pb, b, rr, frac = 0.55) => {
-    if (!textures || !detail || b.k === B - 1) return; // fuera de la silueta quedan "flotando"
+    if (!textures || !detail || b.k === B - 1) return;
     const step = TAU / b.n;
     const rad = Math.min((b.r1 - b.r0) * 0.11, rr * step * 0.5 * (1 - frac) * 0.8);
     if (Math.PI * rad * rad < minCell * 1.2) return;
@@ -232,146 +257,331 @@ export function generateMandalaClassic(doc, opts) {
       for (let i = 0; i < b.n; i++) {
         const a = b.off + i * step;
         petalShape(m, b.r0 - h * 0.06, b.r1, a, w);
-        if (detail) petalShape(d, b.r0 + h * 0.18, b.r1 - h * 0.2, a, w * 0.55);
-        // Nervio como lente estrecha cerrada: coloreable, no una línea suelta
-        if (richDetail) petalShape(v, b.r0 + h * 0.28, b.r1 - h * 0.36, a, w * 0.12);
+        if (detail) {
+          innerPetal(d, b.r0 + h * 0.18, b.r1 - h * 0.2, a, w * 0.52);
+          if (textures) {
+            capsuleVein(v, b.r0 + h * 0.28, b.r1 - h * 0.36, a, w * 0.1);
+            stipple(v, b.r0 + h * 0.25, b.r1 - h * 0.3, a - w * 0.3, 3, Math.min(h * 0.04, 0.7));
+            stipple(v, b.r0 + h * 0.25, b.r1 - h * 0.3, a + w * 0.3, 3, Math.min(h * 0.04, 0.7));
+          }
+        }
       }
       emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.22); emit(d, detailW); emit(v, vestW);
     },
     round(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.94);
-      const m = mainPB(), d = detailPB();
+      const m = mainPB(), d = detailPB(), v = detailPB();
       for (let i = 0; i < b.n; i++) {
         const a = b.off + i * step;
         petalShape(m, b.r0 - h * 0.06, b.r1, a, w, 1.1, true);
-        if (detail) petalShape(d, b.r0 + h * 0.16, b.r1 - h * 0.2, a, w * 0.58, 1.1, true);
-        if (richDetail) { const [x, y] = P(b.r1 - h * 0.34, a); const rad = Math.min(h * 0.08, (b.r1 - h * 0.34) * w * 0.25); if (rad > 0.9) circle(d, x, y, rad); }
+        if (detail) {
+          petalShape(d, b.r0 + h * 0.16, b.r1 - h * 0.2, a, w * 0.55, 1.1, true);
+          if (textures) {
+            stipple(v, b.r0 + h * 0.25, b.r1 - h * 0.3, a, 2, Math.min(h * 0.05, 0.8));
+            capsuleVein(v, b.r0 + h * 0.3, b.r1 - h * 0.35, a - w * 0.2, w * 0.07);
+            capsuleVein(v, b.r0 + h * 0.3, b.r1 - h * 0.35, a + w * 0.2, w * 0.07);
+          }
+        }
       }
-      emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.2); emit(d, detailW);
+      emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.2); emit(d, detailW); emit(v, vestW);
     },
     lotus(b) {
-      // Dos filas: la trasera asoma entre los pétalos delanteros
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.98);
-      const back = mainPB(), front = mainPB(), d = detailPB();
+      const back = mainPB(), front = mainPB(), d = detailPB(), v = detailPB();
       for (let i = 0; i < b.n; i++) {
         const a = b.off + i * step;
         petalShape(back, b.r0 - h * 0.06, b.r1, a + step / 2, w);
         petalShape(front, b.r0 - h * 0.06, b.r1 - h * 0.22, a, w * 1.02);
         if (detail) {
-          petalShape(d, b.r0 + h * 0.14, b.r1 - h * 0.42, a, w * 0.55);
-          if (richDetail) { M(d, b.r1 - h * 0.08, a + step / 2); L(d, b.r1 - h * 0.3, a + step / 2); }
+          petalShape(d, b.r0 + h * 0.14, b.r1 - h * 0.42, a, w * 0.5);
+          if (textures) {
+            capsuleVein(v, b.r0 + h * 0.2, b.r1 - h * 0.35, a, w * 0.08);
+            stipple(v, b.r0 + h * 0.22, b.r1 - h * 0.32, a, 3, Math.min(h * 0.035, 0.6));
+          }
         }
       }
-      emit(back, mainW, "#fff"); emit(front, mainW, "#fff"); emit(d, detailW);
+      emit(back, mainW, "#fff"); emit(front, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
     },
     leaf(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.8);
-      const m = mainPB(), d = detailPB();
+      const m = mainPB(), d = detailPB(), v = detailPB();
       for (let i = 0; i < b.n; i++) {
         const a = b.off + i * step;
         petalShape(m, b.r0 + h * 0.04, b.r1 - h * 0.02, a, w, 1.25);
         if (detail) {
-          M(d, b.r0 + h * 0.12, a); L(d, b.r1 - h * 0.12, a);
-          const veins = richDetail ? 3 : 2;
-          for (let v = 1; v <= veins; v++) {
-            const t = v / (veins + 1), rr = b.r0 + h * (0.12 + t * 0.6);
-            for (const s of [-1, 1]) { M(d, rr, a); L(d, rr + h * 0.14, a + s * w * 0.55 * (1 - t * 0.5)); }
+          // Nervio central como cápsula (más grueso, siempre visible)
+          capsuleVein(d, b.r0 + h * 0.12, b.r1 - h * 0.12, a, w * 0.12);
+          if (textures) {
+            const veins = richDetail ? 4 : 3;
+            for (let vi = 1; vi <= veins; vi++) {
+              const t = vi / (veins + 1), rr = b.r0 + h * (0.15 + t * 0.55);
+              for (const s of [-1, 1]) {
+                capsuleVein(v, rr, rr + h * 0.12, a + s * w * 0.45 * (1 - t * 0.4), w * 0.06);
+              }
+            }
+            stipple(v, b.r0 + h * 0.2, b.r1 - h * 0.25, a, 2, Math.min(h * 0.03, 0.5));
           }
         }
       }
-      emit(m, mainW, "#fff"); gapDots(d, b, (b.r0 + b.r1) / 2, 0.8); emit(d, detailW);
+      emit(m, mainW, "#fff"); gapDots(d, b, (b.r0 + b.r1) / 2, 0.8); emit(d, detailW); emit(v, vestW);
     },
     scallop(b) {
       const step = TAU / b.n, h = b.r1 - b.r0;
-      const m = mainPB(), d = detailPB();
-      // Festón: un arco por celda, de (rIn, a-½) a (rIn, a+½) pasando por rOut
+      const m = mainPB(), d = detailPB(), v = detailPB();
       const bump = (pb, rIn, rOut, a, half) => {
         M(pb, rIn, a - half);
         C(pb, rOut, a - half, rOut, a - half * 0.4, rOut, a);
         C(pb, rOut, a + half * 0.4, rOut, a + half, rIn, a + half);
       };
       for (let i = 0; i < b.n; i++) bump(m, b.r0 + h * 0.15, b.r1, b.off + i * step, step / 2);
-      // El cuerpo bajo los festones debe cubrir lo que haya detrás
       if (detail) {
         for (let i = 0; i < b.n; i++) { bump(d, b.r0 + h * 0.18, b.r1 - h * 0.3, b.off + i * step, step * 0.36); d.close(); }
-        if (richDetail) for (let i = 0; i < b.n; i++) {
-          const rad = Math.min(h * 0.09, (b.r0 + h * 0.4) * step * 0.12);
-          if (rad > 0.9) circle(d, ...P(b.r0 + h * 0.42, b.off + i * step), rad);
+        if (textures && richDetail) {
+          for (let i = 0; i < b.n; i++) {
+            const rad = Math.min(h * 0.06, (b.r0 + h * 0.35) * step * 0.08);
+            if (rad > 0.7) circle(v, ...P(b.r0 + h * 0.35, b.off + (i + 0.5) * step), rad);
+          }
+          for (let i = 0; i < b.n; i++) {
+            const rad = Math.min(h * 0.04, (b.r0 + h * 0.4) * step * 0.06);
+            if (rad > 0.5) circle(v, ...P(b.r0 + h * 0.42, b.off + i * step), rad);
+          }
         }
       }
       const disc = mainPB(); circle(disc, cx, cy, b.r0 + h * 0.15);
-      emit(m, mainW, "#fff"); emit(disc, mainW, "#fff"); emit(d, detailW);
+      emit(m, mainW, "#fff"); emit(disc, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
     },
     heart(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.92);
-      const m = mainPB(), d = detailPB();
+      const m = mainPB(), d = detailPB(), v = detailPB();
       for (let i = 0; i < b.n; i++) {
         const a = b.off + i * step;
         heartShape(m, b.r0, b.r1, a, w);
-        if (detail) heartShape(d, b.r0 + h * 0.2, b.r1 - h * 0.15, a, w * 0.55);
+        if (detail) {
+          heartShape(d, b.r0 + h * 0.2, b.r1 - h * 0.15, a, w * 0.5);
+          if (textures) {
+            capsuleVein(v, b.r0 + h * 0.25, b.r1 - h * 0.3, a - w * 0.25, w * 0.06);
+            capsuleVein(v, b.r0 + h * 0.25, b.r1 - h * 0.3, a + w * 0.25, w * 0.06);
+            capsuleVein(v, b.r0 + h * 0.22, b.r1 - h * 0.25, a, w * 0.07);
+            stipple(v, b.r0 + h * 0.3, b.r1 - h * 0.2, a - w * 0.35, 2, Math.min(h * 0.03, 0.5));
+            stipple(v, b.r0 + h * 0.3, b.r1 - h * 0.2, a + w * 0.35, 2, Math.min(h * 0.03, 0.5));
+          }
+        }
       }
-      emit(m, mainW, "#fff"); emit(d, detailW);
+      emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
     },
     ogee(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.95);
-      const m = mainPB(), d = detailPB();
+      const m = mainPB(), d = detailPB(), v = detailPB();
       for (let i = 0; i < b.n; i++) {
         const a = b.off + i * step;
         ogeeShape(m, b.r0 - h * 0.05, b.r1, a, w);
-        if (detail) ogeeShape(d, b.r0 + h * 0.15, b.r1 - h * 0.22, a, w * 0.55);
+        if (detail) {
+          ogeeShape(d, b.r0 + h * 0.12, b.r1 - h * 0.18, a, w * 0.55);
+          if (textures) {
+            ogeeShape(v, b.r0 + h * 0.22, b.r1 - h * 0.32, a, w * 0.3);
+            stipple(v, b.r0 + h * 0.15, b.r1 - h * 0.2, a, 2, Math.min(h * 0.035, 0.6));
+          }
+        }
       }
-      emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.25); emit(d, detailW);
+      emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.25); emit(d, detailW); emit(v, vestW);
     },
     triangle(b) {
       const step = TAU / b.n, h = b.r1 - b.r0;
-      const m = mainPB(), d = detailPB();
+      const m = mainPB(), d = detailPB(), v = detailPB();
       M(m, b.r0, b.off - step / 2);
       for (let i = 0; i < b.n; i++) { const a = b.off + i * step; L(m, b.r1, a); L(m, b.r0, a + step / 2); }
       m.close();
       if (detail) for (let i = 0; i < b.n; i++) {
         const a = b.off + i * step;
         M(d, b.r0 + h * 0.18, a - step * 0.28); L(d, b.r1 - h * 0.3, a); L(d, b.r0 + h * 0.18, a + step * 0.28); d.close();
-        if (richDetail) { M(d, b.r1 - h * 0.08, a + step / 2 - step * 0.2); L(d, b.r0 + h * 0.5, a + step / 2); L(d, b.r1 - h * 0.08, a + step / 2 + step * 0.2); }
+        if (textures && richDetail) {
+          M(v, b.r1 - h * 0.08, a + step / 2 - step * 0.18); L(v, b.r0 + h * 0.5, a + step / 2); L(v, b.r1 - h * 0.08, a + step / 2 + step * 0.18);
+          stipple(v, b.r0 + h * 0.3, b.r1 - h * 0.2, a + step / 2, 2, Math.min(h * 0.04, 0.6));
+        }
       }
       const ring = mainPB(); circle(ring, cx, cy, b.r1);
-      emit(ring, mainW, "#fff"); emit(m, mainW, "#fff"); emit(d, detailW);
+      emit(ring, mainW, "#fff"); emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
     },
     diamond(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
-      const m = mainPB(), d = detailPB();
+      const m = mainPB(), d = detailPB(), v = detailPB();
       for (let i = 0; i < b.n; i++) {
         const a = b.off + i * step;
         M(m, b.r0, a); L(m, rm, a - step / 2); L(m, b.r1, a); L(m, rm, a + step / 2); m.close();
-        if (detail) { M(d, b.r0 + h * 0.2, a); L(d, rm, a - step * 0.27); L(d, b.r1 - h * 0.2, a); L(d, rm, a + step * 0.27); d.close(); }
+        if (detail) {
+          M(d, b.r0 + h * 0.2, a); L(d, rm, a - step * 0.27); L(d, b.r1 - h * 0.2, a); L(d, rm, a + step * 0.27); d.close();
+          if (textures && richDetail) {
+            const ri = b.r0 + h * 0.35, ro = b.r1 - h * 0.35;
+            M(v, ri + (rm - ri) * 0.5, a); L(v, rm, a - step * 0.12); L(v, ro - (ro - rm) * 0.5, a); L(v, rm, a + step * 0.12);
+            stipple(v, b.r0 + h * 0.3, b.r1 - h * 0.3, a, 2, Math.min(h * 0.035, 0.55));
+          }
+        }
       }
       const ring = mainPB(); circle(ring, cx, cy, b.r1);
-      emit(ring, mainW, "#fff"); emit(m, mainW, "#fff"); emit(d, detailW);
+      emit(ring, mainW, "#fff"); emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
     },
     chevron(b) {
       const step = TAU / b.n, h = b.r1 - b.r0;
-      const m = mainPB();
+      const m = mainPB(), d = detailPB();
       const ring = mainPB(); circle(ring, cx, cy, b.r1);
+      // Dos filas de zigzag con celdas cerradas entre ellas
       for (const [lo, hi] of [[b.r0 + h * 0.1, b.r0 + h * 0.5], [b.r0 + h * 0.5, b.r1 - h * 0.1]]) {
         M(m, lo, b.off);
         for (let i = 0; i < b.n; i++) { const a = b.off + i * step; L(m, hi, a + step / 2); L(m, lo, a + step); }
       }
-      emit(ring, mainW, "#fff"); emit(m, detailW);
+      if (detail && richDetail) {
+        // Líneas internas en zigzag más finas (celdas cerradas coloreables)
+        for (const [lo, hi] of [[b.r0 + h * 0.15, b.r0 + h * 0.35], [b.r0 + h * 0.65, b.r1 - h * 0.15]]) {
+          M(d, lo, b.off);
+          for (let i = 0; i < b.n; i++) { const a = b.off + i * step; L(d, hi, a + step / 2); L(d, lo, a + step); }
+        }
+      }
+      emit(ring, mainW, "#fff"); emit(m, detailW); emit(d, vestW);
     },
     beads(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
       const ring = mainPB(); circle(ring, cx, cy, b.r1);
-      const m = mainPB(), d = detailPB();
+      const m = mainPB(), d = detailPB(), v = detailPB();
       const rad = Math.min(h * 0.36, rm * Math.sin(step / 2) * 0.82);
       for (let i = 0; i < b.n; i++) {
         const [x, y] = P(rm, b.off + i * step);
         circle(m, x, y, rad);
-        if (detail && rad > 2.2) circle(d, x, y, rad * 0.45);
+        if (detail && rad > 2.2) {
+          // Círculo interno (brillo)
+          circle(d, x, y, rad * 0.45);
+          // Arco de brillo (textura de superficie)
+          if (richDetail && rad > 3.5) {
+            const arcR = rad * 0.65;
+            const a0 = b.off + i * step - 0.4;
+            const a1 = b.off + i * step + 0.4;
+            const [ax, ay] = P(rm - rad * 0.15, a0);
+            const [bx, by] = P(rm - rad * 0.15, a1);
+            v.moveTo(ax, ay).quadTo(x - (y - ay) * 0.3, y + (x - ax) * 0.3, bx, by);
+          }
+        }
       }
-      emit(ring, mainW, "#fff"); emit(m, detailW, "#fff"); emit(d, detailW);
+      emit(ring, mainW, "#fff"); emit(m, detailW, "#fff"); emit(d, detailW); emit(v, vestW);
+    },
+
+    // ---------- Motivos nuevos ----------
+    voluta(b) {
+      // Espiral logarítmica con celdas cerradas (fiddlehead)
+      const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.85);
+      const m = mainPB(), d = detailPB(), v = detailPB();
+      for (let i = 0; i < b.n; i++) {
+        const a = b.off + i * step;
+        // Cuerpo: forma de espiral cerrada
+        const r0 = b.r0 + h * 0.05, r1 = b.r1 - h * 0.05;
+        const spiralH = r1 - r0;
+        M(m, r0, a - w * 0.6);
+        // Curva exterior de la espiral
+        C(m, r0 + spiralH * 0.3, a - w * 0.9, r0 + spiralH * 0.7, a - w * 0.7, r1, a - w * 0.15);
+        // Punta curvada hacia dentro
+        C(m, r1 + spiralH * 0.05, a + w * 0.05, r1 - spiralH * 0.1, a + w * 0.35, r0 + spiralH * 0.5, a + w * 0.4);
+        // Curva interior de retorno
+        C(m, r0 + spiralH * 0.3, a + w * 0.35, r0 + spiralH * 0.1, a + w * 0.15, r0, a - w * 0.6);
+        m.close();
+        if (detail) {
+          // Línea espiral interna
+          const ir0 = r0 + spiralH * 0.15, ir1 = r1 - spiralH * 0.15;
+          M(d, ir0, a - w * 0.3);
+          C(d, ir0 + (ir1 - ir0) * 0.4, a - w * 0.5, ir0 + (ir1 - ir0) * 0.7, a - w * 0.3, ir1, a);
+          // Punteado a lo largo de la espiral
+          stipple(v, r0 + spiralH * 0.2, r1 - spiralH * 0.2, a - w * 0.1, 3, Math.min(h * 0.03, 0.5));
+        }
+      }
+      emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+    },
+    antemia(b) {
+      // Abanico con divisiones radiales (arte griego/egipcio)
+      const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.92);
+      const m = mainPB(), d = detailPB(), v = detailPB();
+      for (let i = 0; i < b.n; i++) {
+        const a = b.off + i * step;
+        // Cuerpo de abanico: trapecio curvo
+        M(m, b.r0 + h * 0.05, a - w * 0.7);
+        C(m, b.r0 + h * 0.3, a - w * 0.95, b.r1 - h * 0.1, a - w * 0.85, b.r1 - h * 0.05, a - w * 0.5);
+        L(m, b.r1 - h * 0.05, a + w * 0.5);
+        C(m, b.r1 - h * 0.1, a + w * 0.85, b.r0 + h * 0.3, a + w * 0.95, b.r0 + h * 0.05, a + w * 0.7);
+        m.close();
+        if (detail) {
+          // Divisiones radiales (3-5 líneas desde la base)
+          const divs = richDetail ? 5 : 3;
+          for (let di = 1; di < divs; di++) {
+            const da = a - w * 0.5 + (w / divs) * di;
+            capsuleVein(d, b.r0 + h * 0.12, b.r1 - h * 0.15, da, w * 0.05);
+          }
+          // Línea horizontal de separación
+          const midR = (b.r0 + b.r1) / 2;
+          const [lx, ly] = P(midR, a - w * 0.6);
+          const [rx, ry] = P(midR, a + w * 0.6);
+          d.moveTo(lx, ly).quadTo(...P(midR + h * 0.05, a), rx, ry);
+        }
+      }
+      emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+    },
+    roseta(b) {
+      // Círculo con pétalos internos que no llegan al borde (flor vista desde arriba)
+      const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.9);
+      const m = mainPB(), d = detailPB(), v = detailPB();
+      for (let i = 0; i < b.n; i++) {
+        const a = b.off + i * step;
+        const rm = (b.r0 + b.r1) / 2;
+        // Círculo exterior de la roseta
+        circle(m, ...P(rm, a), h * 0.42);
+        if (detail) {
+          // Pétalos internos (5-7) que no llegan al borde del círculo
+          const nPet = 5 + (richDetail ? 2 : 0);
+          const petR = h * 0.42;
+          const petStep = TAU / nPet;
+          for (let pi = 0; pi < nPet; pi++) {
+            const pa = a + pi * petStep;
+            const [pcx, pcy] = P(rm, a);
+            const pr0 = petR * 0.15, pr1 = petR * 0.75;
+            const pw = petStep * 0.35;
+            // Mini-pétalo en coordenadas absolutas
+            const p0x = pcx + pr0 * Math.cos(pa), p0y = pcy + pr0 * Math.sin(pa);
+            const p1x = pcx + pr1 * Math.cos(pa), p1y = pcy + pr1 * Math.sin(pa);
+            const midR2 = (pr0 + pr1) / 2;
+            const cp1x = pcx + midR2 * Math.cos(pa - pw), cp1y = pcy + midR2 * Math.sin(pa - pw);
+            const cp2x = pcx + midR2 * Math.cos(pa + pw), cp2y = pcy + midR2 * Math.sin(pa + pw);
+            d.moveTo(p0x, p0y).quadTo(cp1x, cp1y, p1x, p1y).quadTo(cp2x, cp2y, p0x, p0y).close();
+          }
+          // Punto central
+          if (richDetail) circle(v, ...P(rm, a), petR * 0.12);
+        }
+      }
+      emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+    },
+    flame(b) {
+      // Forma de llama simétrica con ondulaciones laterales
+      const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.7);
+      const m = mainPB(), d = detailPB(), v = detailPB();
+      for (let i = 0; i < b.n; i++) {
+        const a = b.off + i * step;
+        // Cuerpo de la llama simétrico
+        M(m, b.r0 + h * 0.05, a);
+        // Lado izquierdo con ondulación
+        C(m, b.r0 + h * 0.25, a - w * 0.6, b.r0 + h * 0.55, a - w * 0.7, b.r0 + h * 0.75, a - w * 0.35);
+        C(m, b.r0 + h * 0.9, a - w * 0.1, b.r1 - h * 0.02, a - w * 0.05, b.r1, a);
+        // Lado derecho (espejo)
+        C(m, b.r1 - h * 0.02, a + w * 0.05, b.r0 + h * 0.9, a + w * 0.1, b.r0 + h * 0.75, a + w * 0.35);
+        C(m, b.r0 + h * 0.55, a + w * 0.7, b.r0 + h * 0.25, a + w * 0.6, b.r0 + h * 0.05, a);
+        m.close();
+        if (detail) {
+          // Línea interior de la llama
+          const ir0 = b.r0 + h * 0.2, ir1 = b.r1 - h * 0.15;
+          M(d, ir0, a);
+          C(d, ir0 + (ir1 - ir0) * 0.4, a - w * 0.25, ir0 + (ir1 - ir0) * 0.7, a - w * 0.15, ir1, a);
+          C(d, ir0 + (ir1 - ir0) * 0.7, a + w * 0.15, ir0 + (ir1 - ir0) * 0.4, a + w * 0.25, ir0, a);
+          d.close();
+        }
+      }
+      emit(m, mainW, "#fff"); emit(d, detailW);
     },
   };
 
-  // Las cuentas necesitan su propio conteo (celdas ~redondas)
+  // Cuentas necesitan su propio conteo
   for (const b of bands) if (b.motif === "beads") {
     const h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
     b.n = harmonics.reduce((best, n) => Math.abs(TAU * rm / n - h) < Math.abs(TAU * rm / best - h) ? n : best, harmonics[0]);
@@ -389,33 +599,43 @@ export function generateMandalaClassic(doc, opts) {
     if (includeFrames) { const p2 = mainPB(); rect(p2, m + 2.5, m + 2.5, page.wMm - m - 2.5, page.hMm - m - 2.5, rr * 0.6); emit(p2, detailW); }
   }
 
-  // «Mandala que crece» (opts.growth ∈ [0, 1]): sólo se dibujan las bandas interiores.
-  // Todas las etapas comparten semilla, bandas y motivos: el lector ve el MISMO mandala
-  // ganar anillos, no mandalas distintos. La primera etapa ya ocupa ~50 % del radio.
   let kDraw = B;
   if (Number.isFinite(opts.growth)) {
     let kMin = 2;
     while (kMin < B && bands[kMin - 1].r1 < R * 0.5) kMin++;
-    // Siempre quedan al menos 3 anillos por añadir: 4 etapas distintas
     kMin = Math.max(2, Math.min(kMin, B - 3));
     kDraw = Math.min(B, kMin + Math.round((B - kMin) * Math.max(0, Math.min(1, opts.growth))));
   }
   for (let k = B - 1; k >= 0; k--) {
     const b = bands[k];
-    // El sorteo se consume aunque la banda no se dibuje: así cada etapa reproduce
-    // exactamente los anillos interiores de la anterior
     const extraRing = includeFrames && detail && k > 0 && b.motif !== "beads" && bands[k - 1].motif !== "beads" && (b.r1 - b.r0) > 9 && rng() < 0.35;
     if (k >= kDraw) continue;
     MOTIFS[b.motif](b);
-    // Disco interior: tapa la base de los pétalos y traza el anillo separador
     const disc = mainPB(); circle(disc, cx, cy, b.r0); emit(disc, mainW, "#fff");
+    // Silueta decorada: doble contorno en la banda exterior
+    if (k === B - 1 && includeFrames && detail) {
+      const innerRing = mainPB();
+      circle(innerRing, cx, cy, b.r0 + (b.r1 - b.r0) * 0.12);
+      emit(innerRing, vestW);
+      // Punteado entre los dos contornos de la silueta (conteo múltiplo de N para simetría)
+      if (richDetail && (b.r1 - b.r0) > 10) {
+        const dotRing = detailPB();
+        const dotR = b.r0 + (b.r1 - b.r0) * 0.06;
+        // Múltiplo de N para mantener la simetría radial
+        const dotN = N * Math.max(1, Math.round(TAU * dotR / (3 * N)));
+        const dotRad = Math.min((b.r1 - b.r0) * 0.025, 0.6);
+        if (Math.PI * dotRad * dotRad >= minCell * 1.5) {
+          for (let di = 0; di < dotN; di++) circle(dotRing, ...P(dotR, di * TAU / dotN), dotRad);
+        }
+        emit(dotRing, vestW);
+      }
+    }
     if (extraRing) {
       const inner = mainPB(); circle(inner, cx, cy, b.r0 - Math.max(2.4, (b.r1 - b.r0) * 0.16)); emit(inner, detailW);
     }
   }
   if (doc?.meta) {
     doc.meta.bands = { total: B, drawn: kDraw };
-    // Firma de cada disco dibujado (para medir repetición entre páginas)
     (doc.meta.discs ??= []).push({ R, N, structure: opts.structure || "corona", motifs: bands.map(b => b.motif), counts: bands.map(b => b.n), radii: bands.map(b => +(b.r1 / R).toFixed(3)) });
   }
 
@@ -425,7 +645,6 @@ export function generateMandalaClassic(doc, opts) {
     const ring = mainPB(); circle(ring, cx, cy, rIn); emit(ring, detailW, "#fff");
     const id = `art-${(seed >>> 0).toString(36)}-${doc.defs.length}`;
     doc.defs.push(`<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${rIn - detailW / 2}" /></clipPath>`);
-    // Se encaja sin deformarla
     const s = rIn * 2 * (art.zoom ?? 1);
     const inner = [`<image href="${art.href}" x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid meet" />`];
     out.push(`<g clip-path="url(#${id})">`, ...inner, `</g>`);
@@ -433,35 +652,199 @@ export function generateMandalaClassic(doc, opts) {
     return doc;
   }
 
-  // ---------- Núcleo: flor central ----------
+  // ---------- Núcleo: 4 variantes ----------
   {
-    // Pétalos del núcleo: el mayor divisor de N cuyo pétalo mida ≥ 2 mm de ancho;
-    // si ni 4 caben, el núcleo queda como un disco liso con un anillo
-    let nC = N >= 12 && N % 2 === 0 ? N / 2 : N;
-    const fits = (n) => TAU * rCore * 0.6 / n >= 2;
-    if (!fits(nC)) {
-      const divs = [];
-      for (let k = 2; N / k >= 4; k++) if (N % k === 0) divs.push(N / k);
-      nC = divs.find(fits) ?? 0;
-    }
-    if (!nC) {
-      const c = mainPB(); circle(c, cx, cy, rCore * 0.55); emit(c, mainW, "#fff");
-      doc.body.push(...out);
-      return doc;
-    }
-    const step = TAU / nC, w = fitW(step, 0.95);
-    const roundCore = rng() < 0.5;
-    const m = mainPB(), d = detailPB();
-    for (let i = 0; i < nC; i++) {
-      const a = -Math.PI / 2 + i * step;
-      petalShape(m, rCore * 0.3, rCore * 0.96, a, w, 1.1, roundCore);
-      if (detail && rCore > 9) petalShape(d, rCore * 0.42, rCore * 0.75, a, w * 0.5);
-    }
-    emit(m, mainW, "#fff"); emit(d, detailW);
-    const c = mainPB(); circle(c, cx, cy, rCore * 0.32); emit(c, mainW, "#fff");
-    if (detail && rCore > 9) { const c2 = detailPB(); circle(c2, cx, cy, rCore * 0.15); emit(c2, detailW); }
+    // Espiral áurea excluida: una espiral nunca tiene simetría rotacional N
+    const allowedCores = CORE_VARIANTS.filter(v => v !== "espiral_aurea");
+    const coreVariant = allowedCores[Math.floor(rng() * allowedCores.length)];
+    const coreFragments = drawCore(cx, cy, rCore, N, rng, { coreVariant, detail, richDetail, textures, mainW, detailW, vestW, minCell, stroke });
+    out.push(...coreFragments);
   }
 
   doc.body.push(...out);
   return doc;
+}
+
+// ---------- Variantes de núcleo ----------
+// Devuelve un array de fragmentos SVG (como out.push).
+function drawCore(cx, cy, rCore, N, rng, opts) {
+  const { coreVariant, detail, richDetail, mainW, detailW, vestW, minCell, stroke } = opts;
+  const TAU = Math.PI * 2;
+  const frags = [];
+  const emit = (pb, w, fill = "none") => {
+    const p = pb.toPath({ stroke, strokeWidthMm: w, fill });
+    if (p) frags.push(p);
+  };
+  const mainPB = () => new PathBuilder();
+  const detailPB = () => new PathBuilder({ minClosedArea: minCell });
+  const circle = (pb, x, y, rad) => {
+    const n = rad > 15 ? 12 : 8;
+    const k = (4 / 3) * Math.tan(Math.PI / (2 * n)) * rad;
+    pb.moveTo(x + rad, y);
+    for (let i = 0; i < n; i++) {
+      const a0 = (i * TAU) / n, a1 = ((i + 1) * TAU) / n;
+      pb.cubicTo(x + rad * Math.cos(a0) - k * Math.sin(a0), y + rad * Math.sin(a0) + k * Math.cos(a0),
+        x + rad * Math.cos(a1) + k * Math.sin(a1), y + rad * Math.sin(a1) - k * Math.cos(a1),
+        x + rad * Math.cos(a1), y + rad * Math.sin(a1));
+    }
+    pb.close();
+  };
+  const P = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  const Mf = (pb, rr, a) => pb.moveTo(...P(rr, a));
+  const Lf = (pb, rr, a) => pb.lineTo(...P(rr, a));
+
+  if (coreVariant === "flor_radiante") {
+    // Flor radiante: 2 filas de pétalos + estambres centrales
+    let nC = N >= 12 && N % 2 === 0 ? N / 2 : N;
+    const fits = (n) => TAU * rCore * 0.6 / n >= 2;
+    if (!fits(nC)) { const divs = []; for (let k = 2; N / k >= 4; k++) if (N % k === 0) divs.push(N / k); nC = divs.find(fits) ?? 0; }
+    if (!nC) { const c = mainPB(); circle(c, cx, cy, rCore * 0.55); emit(c, mainW, "#fff"); return frags; }
+    const step = TAU / nC, w = (step / 2) * 0.9;
+    const roundCore = rng() < 0.5;
+    // Fila trasera
+    const back = mainPB();
+    for (let i = 0; i < nC; i++) {
+      const a = -Math.PI / 2 + i * step + step / 2;
+      petalShapeCore(back, cx, cy, rCore * 0.25, rCore * 0.92, a, w * 0.85, 1.05, roundCore);
+    }
+    emit(back, mainW, "#fff");
+    // Fila delantera (más corta)
+    const front = mainPB(), det = detailPB();
+    for (let i = 0; i < nC; i++) {
+      const a = -Math.PI / 2 + i * step;
+      petalShapeCore(front, cx, cy, rCore * 0.28, rCore * 0.72, a, w * 0.95, 1.1, roundCore);
+      if (detail && rCore > 9) petalShapeCore(det, cx, cy, rCore * 0.38, rCore * 0.58, a, w * 0.45, 1.05, roundCore);
+    }
+    emit(front, mainW, "#fff"); emit(det, detailW);
+    // Estambres centrales como cápsulas radiales (solo en núcleos grandes)
+    if (detail && rCore > 10) {
+      const v = detailPB();
+      const nStam = nC;
+      for (let i = 0; i < nStam; i++) {
+        const a = -Math.PI / 2 + (i * TAU) / nStam;
+        const [x0, y0] = P(rCore * 0.12, a);
+        const [x1, y1] = P(rCore * 0.3, a);
+        const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
+        if (len > 1.5) {
+          const nw = Math.max(0.2, rCore * 0.018);
+          const nx = -dy / len * nw, ny = dx / len * nw;
+          const [mx, my] = [(x0 + x1) / 2, (y0 + y1) / 2];
+          v.moveTo(x0, y0).quadTo(mx + nx, my + ny, x1, y1).quadTo(mx - nx, my - ny, x0, y0).close();
+          circle(v, x1, y1, Math.max(rCore * 0.025, 0.7));
+        }
+      }
+      emit(v, vestW);
+    }
+    // Disco central: radio mínimo para que sea coloreable
+    const coreDiskR = Math.max(rCore * 0.28, 1.2);
+    const c = mainPB(); circle(c, cx, cy, coreDiskR); emit(c, mainW, "#fff");
+    if (detail && rCore > 9) { const c2 = detailPB(); circle(c2, cx, cy, coreDiskR * 0.5); emit(c2, detailW); }
+
+  } else if (coreVariant === "flor_vida") {
+    // Flor de la vida: N círculos entrelazados (respeta la simetría del mandala)
+    const nPetals = N >= 6 ? (N % 2 === 0 ? N / 2 : N) : N;
+    const rPet = rCore * (nPetals <= 6 ? 0.42 : 0.38);
+    const m = mainPB(), d = detailPB(), v = detailPB();
+    for (let i = 0; i < nPetals; i++) {
+      const a = (i * TAU) / nPetals;
+      const [px, py] = P(rPet * 0.52, a);
+      circle(m, px, py, rPet);
+      if (detail && rPet > 3) circle(d, px, py, rPet * 0.6);
+      if (richDetail && rPet > 5) circle(v, px, py, rPet * 0.3);
+    }
+    emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+    const rim = mainPB(); circle(rim, cx, cy, rCore * 0.92); emit(rim, mainW, "#fff");
+    const coreDiskR = Math.max(rPet * 0.52, 1.2);
+    const c = mainPB(); circle(c, cx, cy, coreDiskR); emit(c, mainW, "#fff");
+    if (detail && coreDiskR > 2) { const c2 = detailPB(); circle(c2, cx, cy, coreDiskR * 0.5); emit(c2, detailW); }
+
+  } else if (coreVariant === "espiral_aurea") {
+    // Espiral áurea con celdas cerradas entre las vueltas
+    const turns = 2.5 + rng() * 1.5;
+    const m = mainPB(), d = detailPB();
+    const steps = 200;
+    const maxR = rCore * 0.85;
+    const minR = Math.max(rCore * 0.08, 1.0);
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const a = t * turns * TAU - Math.PI / 2;
+      const rr = minR + (maxR - minR) * Math.pow(t, 0.7);
+      pts.push([cx + rr * Math.cos(a), cy + rr * Math.sin(a)]);
+    }
+    m.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) m.lineTo(pts[i][0], pts[i][1]);
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const t = i / steps;
+      const a = t * turns * TAU - Math.PI / 2;
+      const rr = (minR + (maxR - minR) * Math.pow(t, 0.7)) * 0.7;
+      m.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a));
+    }
+    m.close();
+    emit(m, mainW, "#fff");
+    if (detail) {
+      const nDiv = Math.round(turns * N);
+      for (let i = 0; i < nDiv; i++) {
+        const t = i / nDiv;
+        const a = t * turns * TAU - Math.PI / 2;
+        const rIn = (minR + (maxR - minR) * Math.pow(t, 0.7)) * 0.72;
+        const rOut = minR + (maxR - minR) * Math.pow(t, 0.7);
+        d.moveTo(...P(rIn, a)).lineTo(...P(rOut, a));
+      }
+      emit(d, detailW);
+    }
+    const coreDiskR = Math.max(minR * 1.2, 1.0);
+    const c = mainPB(); circle(c, cx, cy, coreDiskR); emit(c, mainW, "#fff");
+
+  } else {
+    // estrella_compuesta: estrella de N puntas con estrella interna + líneas radiales
+    let nC = N >= 8 ? (N % 2 === 0 ? N / 2 : N) : N;
+    if (nC < 5) nC = N >= 4 ? N : 6;
+    const step = TAU / nC;
+    const m = mainPB(), d = detailPB(), v = detailPB();
+    const rOuter = rCore * 0.88, rInner = rCore * 0.45;
+    const rOuter2 = rCore * 0.55, rInner2 = rCore * 0.28;
+    // Estrella exterior
+    for (let i = 0; i <= 2 * nC; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / nC;
+      const rr = i % 2 ? rInner : rOuter;
+      (i === 0 ? Mf : Lf)(m, rr, a);
+    }
+    m.close();
+    // Estrella interior
+    if (detail) {
+      for (let i = 0; i <= 2 * nC; i++) {
+        const a = -Math.PI / 2 + step / 2 + (i * Math.PI) / nC;
+        const rr = i % 2 ? rInner2 : rOuter2;
+        (i === 0 ? Mf : Lf)(d, rr, a);
+      }
+      d.close();
+    }
+    if (richDetail) {
+      for (let i = 0; i < nC; i++) {
+        const a = -Math.PI / 2 + i * step;
+        v.moveTo(...P(rInner * 0.9, a)).lineTo(...P(rInner2 * 1.1, a + step / 2));
+      }
+    }
+    emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+    const coreDiskR = Math.max(rInner2 * 0.6, 1.0);
+    const c = mainPB(); circle(c, cx, cy, coreDiskR); emit(c, mainW, "#fff");
+    if (detail && coreDiskR > 1.5) { const c2 = detailPB(); circle(c2, cx, cy, coreDiskR * 0.5); emit(c2, detailW); }
+  }
+  return frags;
+}
+
+// Helper para el núcleo: pétalo en coordenadas absolutas
+function petalShapeCore(pb, cx, cy, r0, r1, a, w, belly = 1.05, round = false) {
+  const P = (r, ang) => [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
+  const h = r1 - r0;
+  pb.moveTo(...P(r0, a - w));
+  if (round) {
+    pb.cubicTo(...P(r0 + h * 0.45, a - w * belly), ...P(r1, a - w * 0.85), ...P(r1, a));
+    pb.cubicTo(...P(r1, a + w * 0.85), ...P(r0 + h * 0.45, a + w * belly), ...P(r0, a + w));
+  } else {
+    pb.cubicTo(...P(r0 + h * 0.45, a - w * belly), ...P(r0 + h * 0.85, a - w * 0.3), ...P(r1, a));
+    pb.cubicTo(...P(r0 + h * 0.85, a + w * 0.3), ...P(r0 + h * 0.45, a + w * belly), ...P(r0, a + w));
+  }
+  pb.close();
 }
