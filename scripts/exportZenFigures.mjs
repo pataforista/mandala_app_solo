@@ -116,7 +116,43 @@ function figureRings(name, def, zen) {
   try { deco = typeof d.deco === "function" ? d.deco() : (d.deco || []); } catch { deco = []; }
   const lines = [...parts, ...back, ...front, ...deco].filter((p) => p && p.cmds).map((p) => p.cmds);
   const strings = DETAIL > 0 ? stringLines(name, parts, zen) : [];
-  return { lines: [...sil, ...lines].flatMap(flatten), strings };
+  // union: piezas rellenas cuyo CONTORNO conjunto es la silueta (sin líneas donde una pieza entra en otra);
+  // detail: líneas interiores que se recortan a esa unión, así pueden sobrepasar el borde sin dejar rebabas
+  const union = (d.union || []).map((c) => flatten(c));
+  const detail = (d.detail || []).flatMap((c) => flatten(c));
+  return { lines: [...sil, ...lines].flatMap(flatten), strings, union, detail };
+}
+
+// Máscara de la unión de piezas: relleno par-impar por pieza (scanline) y O lógico entre piezas
+function unionMask(pieces, fr) {
+  const { w, h, x0, y0, k, pad } = fr, mask = new Uint8Array(w * h);
+  for (const rings of pieces) {
+    const edges = [];
+    for (const r of rings) for (let i = 0; i < r.length; i++) {
+      const a = r[i], b = r[(i + 1) % r.length];
+      edges.push([(a[0] - x0) * k + pad, (a[1] - y0) * k + pad, (b[0] - x0) * k + pad, (b[1] - y0) * k + pad]);
+    }
+    for (let y = 0; y < h; y++) {
+      const xs = [];
+      for (const [ax, ay, bx, by] of edges) if ((ay <= y + 0.5) !== (by <= y + 0.5)) xs.push(ax + ((y + 0.5 - ay) / (by - ay)) * (bx - ax));
+      xs.sort((p, q) => p - q);
+      for (let i = 0; i + 1 < xs.length; i += 2) for (let x = Math.max(0, Math.ceil(xs[i] - 0.5)); x <= Math.min(w - 1, Math.floor(xs[i + 1] - 0.5)); x++) mask[y * w + x] = 1;
+    }
+  }
+  return mask;
+}
+
+// Contorno de la máscara como tinta (mismo grosor que el resto de líneas)
+function maskOutline(ink, mask, w, h) {
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!mask[y * w + x]) continue;
+    if (x > 0 && x < w - 1 && y > 0 && y < h - 1 && mask[y * w + x - 1] && mask[y * w + x + 1] && mask[(y - 1) * w + x] && mask[(y + 1) * w + x]) continue;
+    for (let dy = -INK_R; dy <= INK_R; dy++) for (let dx = -INK_R; dx <= INK_R; dx++) {
+      if (dx * dx + dy * dy > INK_R * INK_R + 1) continue;
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && yy >= 0 && xx < w && yy < h) ink[yy * w + xx] = 1;
+    }
+  }
 }
 
 // ---------- Rasterizado ----------
@@ -313,12 +349,19 @@ function addEchoes(ink, w, h) {
 }
 
 async function figureToEntry(name, def, zen) {
-  const { lines, strings } = figureRings(name, def, zen);
-  const fr = frameOf(lines);
+  const { lines, strings, union, detail } = figureRings(name, def, zen);
+  const fr = frameOf([...lines, ...union.flat()]);
   if (!fr) return null;
   const { w, h } = fr;
   const ink = new Uint8Array(w * h);
   drawRings(ink, fr, lines);
+  if (union.length) {
+    const mask = unionMask(union, fr);
+    maskOutline(ink, mask, w, h);
+    const inner = new Uint8Array(w * h);
+    drawRings(inner, fr, detail);
+    for (let i = 0; i < inner.length; i++) if (inner[i] && mask[i]) ink[i] = 1; // detalle recortado a la silueta
+  }
   // Cuerdas de Zentangle: las más largas primero; una cuerda se queda sólo si no crea celdas
   // que no se puedan colorear (más pequeñas que MIN_CELL_PX)
   let kept = 0, tiny = tinyCells(ink, w, h);

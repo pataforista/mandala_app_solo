@@ -80,8 +80,9 @@ o con piezas sueltas: **ufo** (disco, cúpula y haz de luz que se cierra contra 
 grande con ojos almendrados), **kraken** (ahora un pulpo: manto redondo y cuatro tentáculos en S que no se
 cruzan; conserva el nombre `zentangle-kraken`) y **wendigo** (cabeza de ciervo con astas de líneas abiertas), **rabbit** (de frente: cabeza, orejas, cuerpo, panza y patas, todo
 cerrado), **mosasaurus** (cuerpo fusiforme con aletas que se cierran contra el vientre) y los terópodos
-**allosaurus** y **velociraptor**, que conservan la silueta de esqueleto de Zentangle pero sin escamas, ecos ni
-cortes de más (lo que los cargaba de tinta eran las texturas, no el contorno).
+**allosaurus** y **velociraptor**, armados con piezas simples (tronco, cola, cuello, cráneo, muslo, patas) cuyo
+contorno es la **unión** de las piezas (`union` en la definición): no quedan líneas donde una pieza entra en otra.
+Sus líneas interiores (`detail`: muslo, bandas de la cola, boca, ojo) se recortan a esa silueta.
 Regla de diseño: silueta grande y legible, 3–7 regiones cerradas, sin piezas que se crucen y sin ecos
 (`noEcho`). Para exportar las originales: `--original 1`. Para añadir más, basta otro objeto en
 `buildOverrides`, con las mismas claves que `FIGURES` en `figure.js`.
