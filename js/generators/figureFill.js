@@ -183,23 +183,63 @@ function packMotifs({ blocked, g, cell, x0, y0, gap, minR, maxR, rng, styleMode,
 }
 
 /**
- * Rellena el fondo de un medallón redondo alrededor de su figura central. Una figura sola en un
- * círculo blanco se ve vacía: los huecos que deja (sobre todo en figuras anchas) llevan motivos
- * pequeños, sin tocar la silueta ni el borde del círculo.
+ * Trama polar del medallón: rayos, anillos y pétalos de borde a su alrededor, cortados contra la
+ * silueta de la figura central. Una figura sola en un círculo blanco se lee como una ilustración
+ * pegada; con una trama radial (rayos × anillos, como el resto del mandala) forma parte de él.
+ * Las líneas terminan en la silueta (tocan su trazo), así las celdas quedan cerradas y coloreables.
  *
  * cx, cy, r: círculo (mm). cls, fw, fh: clases de la figura; ix, iy, iw, ih: dónde está su imagen (mm).
  */
-export function drawMedallionGaps({ cx, cy, r, cls, fw, fh, ix, iy, iw, ih, seed = 1, styleMode = "floral",
-  outlineMode = false, stroke = "#000", mainW = 0.55, detailW = 0.4 }) {
-  const rng = mulberry32(((seed >>> 0) ^ 0x3ED417) >>> 0);
-  const cell = 0.4, gap = 1.1;
-  const g = Math.ceil((2 * r) / cell), x0 = cx - r, y0 = cy - r;
+export function drawMedallionWeb({ cx, cy, r, cls, fw, fh, ix, iy, iw, ih, stroke = "#000", detailW = 0.4, outlineMode = false }) {
+  const cell = 0.4, g = Math.ceil((2 * r) / cell), x0 = cx - r, y0 = cy - r;
   const blocked = new Uint8Array(g * g);
   for (let gy = 0; gy < g; gy++) for (let gx = 0; gx < g; gx++) {
     const x = x0 + (gx + 0.5) * cell, y = y0 + (gy + 0.5) * cell;
-    if (Math.hypot(x - cx, y - cy) > r) { blocked[gy * g + gx] = 1; continue; }
     const px = Math.floor(((x - ix) / iw) * fw), py = Math.floor(((y - iy) / ih) * fh);
     if (px >= 0 && py >= 0 && px < fw && py < fh && cls[py * fw + px] !== 2) blocked[gy * g + gx] = 1;
   }
-  return packMotifs({ blocked, g, cell, x0, y0, gap, minR: outlineMode ? 2.6 : 2.2, maxR: 5, rng, styleMode, outlineMode, stroke, mainW, detailW, guardMax: 120 });
+  const dt = distanceTransform(blocked, g, g, false);
+  // Distancia (mm) del punto a la silueta; -1 si cae fuera de la rejilla
+  const away = (x, y) => {
+    const gx = Math.floor((x - x0) / cell), gy = Math.floor((y - y0) / cell);
+    return gx < 0 || gy < 0 || gx >= g || gy >= g ? -1 : dt[gy * g + gx] * cell;
+  };
+  const lines = new PathBuilder(), dots = new PathBuilder();
+  const step = 0.3;
+  // Recorre una curva muestreada y emite sólo los tramos libres (a ≥ 0.15 mm de la silueta)
+  const trace = (n, at) => {
+    let open = false;
+    for (let i = 0; i <= n; i++) {
+      const [x, y] = at(i / n);
+      if (away(x, y) >= 0.15) { if (open) lines.lineTo(x, y); else { lines.moveTo(x, y); open = true; } } else open = false;
+    }
+  };
+  const r1 = r - 3.4;              // anillo exterior: deja una banda de pétalos contra el borde
+  const rayN = outlineMode ? 12 : 16;
+  const radii = [r1, r1 * 0.66];
+  for (const rr of radii) trace(Math.ceil((2 * Math.PI * rr) / step), (t) => [cx + rr * Math.cos(t * 2 * Math.PI), cy + rr * Math.sin(t * 2 * Math.PI)]);
+  const rIn = r1 * 0.3;
+  for (let i = 0; i < rayN; i++) {
+    const a = (i * 2 * Math.PI) / rayN;
+    trace(Math.ceil((r1 - rIn) / step), (t) => [cx + (rIn + (r1 - rIn) * t) * Math.cos(a), cy + (rIn + (r1 - rIn) * t) * Math.sin(a)]);
+    // Punto sólido en el cruce con el anillo interior (si hay sitio)
+    const dx = cx + radii[1] * Math.cos(a), dy = cy + radii[1] * Math.sin(a);
+    if (away(dx, dy) >= 1.2) circle(dots, dx, dy, 0.45);
+  }
+  // Pétalos de borde: entre el anillo exterior y el círculo, centrados entre rayos
+  const petals = rayN * 2;
+  for (let i = 0; i < petals; i++) {
+    const a0 = (i * 2 * Math.PI) / petals, a1 = ((i + 1) * 2 * Math.PI) / petals, am = (a0 + a1) / 2;
+    const rc = r1 + (r - 0.5 - r1) * 2; // el ápice de la curva llega a la mitad del control
+    const tip = [cx + (r - 0.5) * Math.cos(am), cy + (r - 0.5) * Math.sin(am)];
+    if (away(tip[0], tip[1]) < 0.8 || away(cx + r1 * Math.cos(a0), cy + r1 * Math.sin(a0)) < 0.8 || away(cx + r1 * Math.cos(a1), cy + r1 * Math.sin(a1)) < 0.8) continue;
+    lines.moveTo(cx + r1 * Math.cos(a0), cy + r1 * Math.sin(a0));
+    lines.quadTo(cx + rc * Math.cos(am), cy + rc * Math.sin(am), cx + r1 * Math.cos(a1), cy + r1 * Math.sin(a1));
+  }
+  const out = [];
+  const pl = lines.toPath({ stroke, strokeWidthMm: detailW, fill: "none" });
+  if (pl) out.push(pl);
+  const pd = dots.toPath({ stroke, strokeWidthMm: 0.2, fill: stroke });
+  if (pd) out.push(pd);
+  return out;
 }
