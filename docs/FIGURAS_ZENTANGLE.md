@@ -96,6 +96,15 @@ Regla de diseño: silueta grande y legible, 3–7 regiones cerradas, sin piezas 
 (`noEcho`). Para exportar las originales: `--original 1`. Para añadir más, basta otro objeto en
 `buildOverrides`, con las mismas claves que `FIGURES` en `figure.js`.
 
+## Paquete de dinosaurios dibujados (láminas)
+
+`assets/figuras-dinosaurios.json` tiene 32 figuras sacadas de dos láminas de dibujo de línea (generadas con IA por
+quien usa la app): 28 animales, huevo con cría, nido, volcán, palmera, helecho y huella. Son mucho más expresivas
+que las hechas por código. `scripts/importSheet.mjs` las separa (componentes conectados), las recorta y las pasa
+por `processFigure`, la misma función que usa la app al subir una imagen; el sello se engorda poco (0.2 %, la
+app usa 1.6 %) porque estas líneas ya son gruesas. Todas llevan tema `prehistorico` y `rightsConfirmed: false`.
+`npm run check:figuras` da el semáforo: ver abajo sus límites.
+
 ## Íconos de un contorno y dibujos propios (SVG)
 
 `scripts/zenIcons.mjs` define cinco dinosaurios (braquiosaurio, estegosaurio, T. rex, triceratops, pterosaurio) como

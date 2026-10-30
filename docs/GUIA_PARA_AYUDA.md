@@ -59,11 +59,28 @@ se usa su motor de figuras.
 (**Figuras → Subir imágenes**) o en `preprocesar.html`. La app trae su propia lista de requisitos y
 verificación por imagen (resolución, fondo, celdas cerradas).
 
+## 3b. Dibujos en una lámina (varios animales en una imagen)
+
+Si los dibujos llegan en una lámina de línea negra sobre fondo blanco (como las generadas con IA), se separan
+solos:
+
+```
+node scripts/importSheet.mjs lamina.jpg --names trex,triceratops,... --theme prehistorico --out lamina.json
+node scripts/checkFigures.mjs lamina.json        # semáforo de zonas coloreables, en mm reales
+```
+
+Los nombres van en orden de lectura (filas de arriba abajo). Requiere Playwright. El paquete
+`assets/figuras-dinosaurios.json` (32 figuras) salió de dos láminas así. **Derechos:** las figuras entran con
+`rightsConfirmed: false`; hay que confirmarlas en la app. Quien genera dibujos con IA debe comprobar los
+términos de la herramienta para uso comercial: aquí no se puede verificar.
+
 ## 4. Mapa del código (para un desarrollador)
 
 | Archivo | Qué hace |
 |---|---|
 | `scripts/exportZenFigures.mjs` | Convierte figuras (del motor de Zentangle o SVG) en un paquete importable |
+| `scripts/importSheet.mjs` | Separa los animales de una lámina de línea y los empaqueta como figuras |
+| `scripts/checkFigures.mjs` | Semáforo de coloreabilidad de un paquete (zonas cerradas ≥ 4 mm a 45 mm de alto) |
 | `scripts/svgPath.mjs` | Lector de SVG → comandos M/L/Q/C/Z |
 | `scripts/zenOverrides.mjs` | Figuras redibujadas por código (ufo, greyalien, pulpo, wendigo, conejo, mosasaurio, terópodos) |
 | `scripts/zenIcons.mjs` | Íconos de un contorno hechos por código (opcionales: `--icons 1`); **no entran al paquete por defecto** |
