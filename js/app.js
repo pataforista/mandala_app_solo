@@ -792,7 +792,8 @@ function updateUndoRedoButtons() {
 }
 
 async function refreshGallery() {
-  const favorites = await getFavorites();
+  let favorites = [];
+  try { favorites = await getFavorites(); } catch (e) { console.error("No se pudieron leer los favoritos:", e); }
   galleryContainer.innerHTML = "";
   recentContainer.innerHTML = "";
 
@@ -1097,9 +1098,15 @@ function bindUI() {
         console.error("Could not create PNG thumbnail:", e);
       }
     }
-    await saveToFavorites(state, thumbnail);
-    saveFavBtn.loading = false;
-    alert("¡Guardado en favoritos!");
+    try {
+      await saveToFavorites(state, thumbnail);
+      alert("¡Guardado en favoritos!");
+    } catch (e) {
+      console.error("No se pudo guardar el favorito:", e);
+      alert("No se pudo guardar en favoritos (¿sin conexión?).");
+    } finally {
+      saveFavBtn.loading = false;
+    }
   };
 
   openGalleryBtn.onclick = () => {
@@ -2363,8 +2370,13 @@ function bindUI() {
             console.error("Could not create PNG thumbnail:", e);
           }
         }
-        await saveToFavorites(state, thumbnail);
-        alert("¡Guardado en favoritos!");
+        try {
+          await saveToFavorites(state, thumbnail);
+          alert("¡Guardado en favoritos!");
+        } catch (e) {
+          console.error("No se pudo guardar el favorito:", e);
+          alert("No se pudo guardar en favoritos (¿sin conexión?).");
+        }
       };
       saveFavoriteQuick();
     }

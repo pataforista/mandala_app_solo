@@ -380,8 +380,9 @@ function packFill({ A, obstacles, rng, gap, minis, style, theme = null, outlineM
       out.push(...sub(best.x, best.y, r, miniOpts(miniCount++, r)));
     } else if (r >= 5.0) {
       const kind = pickKind();
-      // Tulipanes y gotas casi derechos: cabeza abajo se leen como un error
-      drawFiller(kind, main, detail, best.x, best.y, r, kind === "tulip" || kind === "drop" ? (rot - Math.PI) * 0.12 : rot, rng, !outlineMode);
+      // Figuras con «arriba» casi derechas: cabeza abajo se leen como un error
+      const up = UPRIGHT[kind];
+      drawFiller(kind, main, detail, best.x, best.y, r, up === undefined ? rot : up + (rot - Math.PI) * 0.12, rng, !outlineMode);
     } else if (r >= 3.0) {
       // El sorteo es el mismo con o sin tema: el tema sólo cambia la figura pequeña
       const small = rng() < 0.5 ? "ring" : (rng() < 0.5 ? "heart" : "star");
@@ -410,6 +411,9 @@ export function circle(pb, x, y, rad) {
   }
   pb.close();
 }
+
+// Giro base de las figuras que tienen un «arriba» (el pájaro está dibujado con la cabeza en +v)
+const UPRIGHT = { tulip: 0, drop: 0, crown: 0, shell: 0, butterfly: 0, bird: Math.PI };
 
 // Motivos en coordenadas locales (u, v) ∈ [-1, 1], escalados a r y girados rot
 export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
@@ -519,26 +523,22 @@ export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
       main.close();
     }
   } else if (kind === "butterfly") {
-    // Mariposa: alas simétricas con venas internas
-    const wing = (pb, side) => {
-      const s = side;
-      M(pb, 0, 0.1);
-      C(pb, s * 0.4, 0.5, s * 0.9, 0.6, s * 0.95, 0.2);
-      C(pb, s * 0.98, -0.1, s * 0.7, -0.5, s * 0.3, -0.4);
-      C(pb, s * 0.1, -0.35, 0, -0.1, 0, 0.1);
-      pb.close();
-    };
-    wing(main, -1); wing(main, 1);
-    // Cuerpo central
-    M(main, -0.08, 0.3); L(main, 0.08, 0.3); L(main, 0.06, -0.4); L(main, -0.06, -0.4); main.close();
-    // Antenas
-    if (big) {
-      M(detail, -0.05, 0.3); Q(detail, -0.3, 0.7, -0.35, 0.8);
-      M(detail, 0.05, 0.3); Q(detail, 0.3, 0.7, 0.35, 0.8);
-      // Venas en alas
-      for (const sd of [-1, 1]) {
-        M(detail, sd * 0.15, 0.05); L(detail, sd * 0.6, 0.3);
-        M(detail, sd * 0.15, -0.1); L(detail, sd * 0.5, -0.2);
+    // Mariposa (cabeza en v = -0.45): cuerpo-cápsula y cuatro alas que nacen de su borde,
+    // sin líneas que lo crucen; manchas redondas en las alas si hay sitio.
+    M(main, -0.07, -0.4); C(main, -0.07, -0.52, 0.07, -0.52, 0.07, -0.4);
+    L(main, 0.07, 0.5); C(main, 0.07, 0.62, -0.07, 0.62, -0.07, 0.5);
+    main.close();
+    for (const sd of [-1, 1]) {
+      M(main, sd * 0.07, -0.28);
+      C(main, sd * 0.35, -0.78, sd * 1.0, -0.88, sd * 0.95, -0.38);
+      C(main, sd * 0.92, -0.06, sd * 0.5, 0.02, sd * 0.07, 0.02);
+      M(main, sd * 0.07, 0.06);
+      C(main, sd * 0.55, 0.0, sd * 0.88, 0.3, sd * 0.72, 0.6);
+      C(main, sd * 0.56, 0.86, sd * 0.2, 0.72, sd * 0.07, 0.42);
+      M(main, sd * 0.03, -0.49); Q(main, sd * 0.15, -0.76, sd * 0.3, -0.86);
+      if (big) {
+        circle(detail, ...T(sd * 0.56, -0.42), r * 0.16);
+        circle(detail, ...T(sd * 0.47, 0.38), r * 0.13);
       }
     }
   } else if (kind === "feather") {
@@ -552,28 +552,30 @@ export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
     if (big) {
       // Raquis central
       M(detail, 0, 0.85); L(detail, 0, -0.85);
-      // Barbas laterales
-      for (let i = 0; i < 5; i++) {
-        const t = 0.7 - i * 0.3;
-        M(detail, 0, t); L(detail, -0.18, t - 0.15);
-        M(detail, 0, t); L(detail, 0.18, t - 0.15);
+      // Barbas laterales: cortas y lejos de la punta, para no salirse del contorno
+      for (const t of [0.55, 0.25, -0.05, -0.3]) {
+        M(detail, 0, t); L(detail, -0.13, t - 0.12);
+        M(detail, 0, t); L(detail, 0.13, t - 0.12);
       }
     }
   } else if (kind === "shell") {
-    // Concha/vieira: forma semicircular con radios desde la base
-    M(main, -0.8, -0.3);
-    C(main, -0.85, 0.3, -0.5, 0.8, 0, 0.85);
-    C(main, 0.5, 0.8, 0.85, 0.3, 0.8, -0.3);
-    L(main, -0.8, -0.3);
+    // Vieira (v hacia abajo = bisagra): abanico con orejas; las costillas nacen de la bisagra
+    // y terminan justo sobre el contorno, para que cada gajo quede cerrado.
+    const dome = [[-0.88, 0.12], [-0.95, -0.55], [-0.45, -0.92], [0, -0.92], [0.45, -0.92], [0.95, -0.55], [0.88, 0.12]];
+    const hinge = [0, 0.58];
+    M(main, ...dome[0]);
+    C(main, ...dome[1], ...dome[2], ...dome[3]);
+    C(main, ...dome[4], ...dome[5], ...dome[6]);
+    L(main, 0.22, 0.58); L(main, 0.42, 0.88); L(main, -0.42, 0.88); L(main, -0.22, 0.58);
     main.close();
+    M(main, -0.22, 0.58); L(main, 0.22, 0.58);
     if (big) {
-      // Radios desde la base
-      const base = -0.3;
-      for (let i = 0; i < 7; i++) {
-        const a = -0.7 + (i / 6) * 1.4;
-        M(detail, a * 0.3, base);
-        L(detail, a * 0.9, base + 0.9);
+      const bez = (q0, q1, q2, q3, t) => q0.map((_, k) => (1 - t) ** 3 * q0[k] + 3 * (1 - t) ** 2 * t * q1[k] + 3 * (1 - t) * t * t * q2[k] + t ** 3 * q3[k]);
+      for (const [seg, t] of [[0, 0.3], [0, 0.7], [1, 0.3], [1, 0.7]]) {
+        const q = seg ? dome.slice(3, 7) : dome.slice(0, 4);
+        M(detail, ...hinge); L(detail, ...bez(...q, t));
       }
+      M(detail, ...hinge); L(detail, ...dome[3]);
     }
   } else if (kind === "bird") {
     // Pájaro estilizado: cuerpo, alas y cola
@@ -599,27 +601,14 @@ export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
       M(detail, 0.25, -0.4); L(detail, 0.4, -0.7);
     }
   } else if (kind === "crown") {
-    // Corona: forma de corona con puntas y joyas
-    M(main, -0.7, -0.2);
-    L(main, -0.7, 0.3);
-    L(main, -0.4, 0.1);
-    L(main, -0.2, 0.5);
-    L(main, 0, 0.2);
-    L(main, 0.2, 0.5);
-    L(main, 0.4, 0.1);
-    L(main, 0.7, 0.3);
-    L(main, 0.7, -0.2);
-    L(main, -0.7, -0.2);
+    // Corona (v hacia abajo = base): tres puntas con bola, una sola banda (dos líneas paralelas
+    // juntas dejaban una franja imposible de colorear) y una joya central si hay sitio.
+    M(main, -0.7, 0.5); L(main, -0.7, -0.05); L(main, -0.85, -0.6); L(main, -0.38, -0.18);
+    L(main, 0, -0.75); L(main, 0.38, -0.18); L(main, 0.85, -0.6); L(main, 0.7, -0.05); L(main, 0.7, 0.5);
     main.close();
-    if (big) {
-      // Joyas (círculos) en las puntas
-      for (const [ux, uy] of [[-0.4, 0.1], [0, 0.2], [0.4, 0.1]]) {
-        circle(detail, ...T(ux, uy + 0.15), r * 0.08);
-      }
-      // Banda inferior decorada
-      M(detail, -0.6, -0.1); L(detail, 0.6, -0.1);
-      M(detail, -0.6, 0); L(detail, 0.6, 0);
-    }
+    M(main, -0.7, 0.15); L(main, 0.7, 0.15);
+    for (const [ux, uy] of [[-0.85, -0.6], [0, -0.75], [0.85, -0.6]]) circle(main, ...T(ux, uy - 0.1), r * 0.1);
+    if (big) circle(detail, ...T(0, 0.33), r * 0.11);
   } else {
     // ring: circulito con punto
     circle(main, x, y, r * 0.85);

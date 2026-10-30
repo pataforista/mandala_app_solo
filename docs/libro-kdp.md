@@ -67,8 +67,8 @@ Quejas frecuentes en reseñas: doble cara, papel que traspasa, líneas pixeladas
 |---|---|---|
 | Nivel «Adulto · Trazo grueso» (1 mm, celdas ≥ 6 mm², sin texturas) | Diseñar → Nivel de dificultad | el segmento n.º 1 en ventas no tenía equivalente adulto |
 | Trazo según la dificultad de cada página (`strokeScaleFor`) | modo libro, dificultad mixta o progresiva | página fácil hasta +60 % de grosor; difícil hasta −15 %, nunca < 0,35 mm |
-| Reverso negro opcional (panel dentro de los márgenes) | Libro KDP → Textos y páginas extra | oculta lo que traspase el marcador; KDP sin sangrado no admite tinta hasta el corte |
-| Nitidez 600 DPI opcional | Libro KDP → Textos y páginas extra | líneas más limpias; avisa si el navegador (Safari móvil) no admite lienzos tan grandes |
+| Reverso negro opcional (panel dentro de los márgenes) | Libro KDP → 2 · Páginas extra → Título, autor e impresión | oculta lo que traspase el marcador; KDP sin sangrado no admite tinta hasta el corte |
+| Nitidez 600 DPI opcional | Libro KDP → 2 · Páginas extra → Título, autor e impresión | líneas más limpias; avisa si el navegador (Safari móvil) no admite lienzos tan grandes |
 | 50 mandalas por defecto y consejos de calidad en el resumen | Libro KDP | formato, cantidad, reverso en blanco y trazo fino |
 
 ### Composiciones corregidas (revisión del libro de 30 mandalas, semilla 3164907524)

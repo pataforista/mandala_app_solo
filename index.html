@@ -539,17 +539,16 @@
         <sl-tab-panel name="libro">
           <div class="control-group">
             <p class="hint">
-              Interior completo (sin sangrado, B/N): cada página es un mandala distinto. Márgenes, páginas pares y
-              texto sin fuentes externas se ajustan solos a las reglas de KDP. Parte de la semilla y el nivel de «Diseñar».
+              Interior completo para KDP (sin sangrado, B/N). Parte de la semilla y el nivel de «Diseñar»;
+              márgenes, páginas pares y textos se ajustan solos a las reglas de KDP.
             </p>
+            <div class="section-title" style="margin:8px 0 0;"><sl-icon name="collection"></sl-icon> 1 · Contenido</div>
             <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="50"></sl-input>
             <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="progresiva">
               <sl-option value="progresiva">Creciente: de fácil a difícil (recomendado)</sl-option>
               <sl-option value="mixta">Mixta (alterna)</sl-option>
               <sl-option value="fija">Fija (la complejidad actual)</sl-option>
             </sl-select>
-            <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco</sl-checkbox>
-            <sl-checkbox id="bookChapters" checked>Organizar en capítulos temáticos, cada uno con su portadilla</sl-checkbox>
             <sl-select id="bookProfile" label="Patrones del libro" size="small" value="rentable">
               <sl-option value="rentable">Los más vendidos para este formato (recomendado)</sl-option>
               <sl-option value="personalizada">Elegir yo las composiciones</sl-option>
@@ -564,7 +563,10 @@
               <sl-checkbox class="bookComp" value="gigante" checked>Gigante</sl-checkbox>
               <sl-checkbox class="bookComp" value="medio" checked>Medio mandala</sl-checkbox>
             </div>
-            <sl-details id="bookSpecials" summary="✨ Páginas sorprendentes" open>
+            <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco</sl-checkbox>
+            <sl-checkbox id="bookChapters" checked>Organizar en capítulos temáticos, cada uno con su portadilla</sl-checkbox>
+            <div class="section-title" style="margin:8px 0 0;"><sl-icon name="stars"></sl-icon> 2 · Páginas extra</div>
+            <sl-details id="bookSpecials" summary="✨ Páginas sorprendentes">
               <div class="control-group">
                 <sl-select id="bookGrowth" label="Mandala que crece" size="small" value="1" help-text="El mismo mandala en 4 páginas seguidas: cada una añade anillos.">
                   <sl-option value="0">Ninguno</sl-option>
@@ -581,13 +583,7 @@
                 </sl-select>
               </div>
             </sl-details>
-            <sl-button id="reviewBook" variant="default" size="medium" pill style="width: 100%;">
-              <sl-icon slot="prefix" name="grid-3x3-gap"></sl-icon>
-              Revisar páginas antes de crear
-            </sl-button>
-            <p id="bookReviewInfo" class="hint"></p>
-
-            <sl-details summary="Textos y páginas extra">
+            <sl-details summary="📝 Título, autor e impresión">
               <div class="control-group">
                 <sl-input id="bookTitle" label="Título (hoja de título)" size="small" placeholder="Mandalas para Colorear"></sl-input>
                 <sl-input id="bookSubtitle" label="Subtítulo (opcional)" size="small" placeholder="50 diseños antiestrés"></sl-input>
@@ -608,7 +604,13 @@
               </div>
             </sl-details>
             <p id="bookImagesInfo" class="hint"></p>
+            <div class="section-title" style="margin:8px 0 0;"><sl-icon name="check2-circle"></sl-icon> 3 · Revisar y crear</div>
             <div id="bookSummary" class="hint"></div>
+            <sl-button id="reviewBook" variant="primary" outline size="medium" pill style="width: 100%;">
+              <sl-icon slot="prefix" name="grid-3x3-gap"></sl-icon>
+              Revisar páginas antes de crear
+            </sl-button>
+            <p id="bookReviewInfo" class="hint"></p>
             <sl-button id="downloadBook" variant="success" size="medium" pill style="width: 100%;">
               <sl-icon slot="prefix" name="journal-bookmark"></sl-icon>
               Crear libro (PDF)
