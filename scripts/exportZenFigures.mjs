@@ -3,13 +3,14 @@
 //
 //   node scripts/exportZenFigures.mjs [--zen ../zentangle_app_solo_fixed] [--out figuras-zentangle.json]
 //                                     [--sets dino,dinoOrigamiMix,cryptids,cryptidsOrigami,kids] [--only trex,yeti] [--size 1000]
-//                                     [--use anillos|figura|medallon] [--detail 0.3] [--echo 56] [--scales 100]
+//                                     [--use anillos|figura|medallon] [--detail 0.3] [--echo 56] [--scales 100] [--feathers 90] [--fur 64]
 //
 // Cada figura se dibuja como contorno (silueta + piezas internas + detalles) sobre blanco.
 // --detail (0 = pocas, 1 = muchas): cuerdas que subdividen cada pieza en celdas coloreables,
 // las mismas que usa Zentangle (makeSections), recortadas al interior de la pieza.
 // --scales (px): escamas (arcos en rejilla hexagonal) en las regiones amplias de dinosaurios y criaturas
 // escamosas; sustituyen a los ecos en esas figuras.
+// --feathers / --fur (px): plumas (thunderbird, mothman, búho, aves) y mechones de pelo (yeti, bigfoot, osos…).
 // --echo (px): líneas paralelas al contorno por dentro (ecos), que siguen la anatomía de cada región.
 // Uso por defecto «anillos»: copias de la figura en corona alrededor de un mandala (pageComposer).
 // Con --use figura, las regiones cerradas (cls = 1) las rellena figureFill.js con mandalas.
@@ -30,6 +31,10 @@ const USE = ["anillos", "figura", "medallon"].includes(args.use) ? args.use : "a
 const DETAIL = Number.isFinite(parseFloat(args.detail)) ? Math.min(1, Math.max(0, parseFloat(args.detail))) : 0.3;
 const ECHO_PX = Number.isFinite(parseFloat(args.echo)) ? Math.max(0, parseFloat(args.echo)) : 56; // ancho de banda de los ecos (0 = sin ecos)
 const SCALE_PX = Number.isFinite(parseFloat(args.scales)) ? Math.max(0, parseFloat(args.scales)) : 100; // ancho de cada escama (0 = sin escamas)
+const FEATHER_PX = Number.isFinite(parseFloat(args.feathers)) ? Math.max(0, parseFloat(args.feathers)) : 90; // ancho de cada pluma (0 = sin plumas)
+const FUR_PX = Number.isFinite(parseFloat(args.fur)) ? Math.max(0, parseFloat(args.fur)) : 104;            // separación de los mechones de pelo (0 = sin pelo)
+const FURRY = new Set(["bigfoot", "yeti", "wendigo", "chupacabra", "jackalope", "bear", "fox", "rabbit", "cat"]);
+const FEATHERED = new Set(["thunderbird", "mothman", "owl", "bird", "penguin"]);
 const SCALY = new Set(["nessie", "fish", "kraken"]);    // además de los de science: "dino" (menos ammonite)
 const MIN_CELL_PX = 30;                                      // radio mínimo de una celda coloreable (≈1.7 mm a 55 mm de alto)
 const U = 100;                                               // unidades de figura → «mm» que espera makeSections
@@ -199,16 +204,18 @@ function classify(ink, w, h) {
   return cls;
 }
 
-// Escamas: arcos «de pez» en rejilla hexagonal, sólo donde la escama cabe entera dentro de una
-// región interior (sin tocar la tinta). Filas separadas media escama; las vecinas se cierran entre sí.
-function addScales(ink, w, h) {
-  if (!SCALE_PX) return 0;
+// Texturas por tema (escamas, plumas, pelo): se dibujan sólo donde caben enteras dentro de una región
+// interior, a ≥ 9 px de cualquier línea. Son trazos abiertos: no crean celdas diminutas.
+//   escamas: arcos «de pez» en rejilla hexagonal (las vecinas se cierran entre sí)
+//   plumas:  arcos apuntados hacia abajo, en filas que se solapan
+//   pelo:    mechones en V, en filas escalonadas
+function interiorMap(ink, w, h) {
   const dt = distanceTransform(ink, w, h, false);
   // Regiones interiores (las conectadas al borde son el fondo)
-  const lab = new Int32Array(w * h), stack = new Int32Array(w * h), out = [];
+  const lab = new Int32Array(w * h), stack = new Int32Array(w * h), outside = [];
   for (let s0 = 0; s0 < ink.length; s0++) {
     if (ink[s0] || lab[s0]) continue;
-    const id = out.length + 1;
+    const id = outside.length + 1;
     let top = 0, edge = false;
     stack[top++] = s0; lab[s0] = id;
     while (top) {
@@ -219,27 +226,53 @@ function addScales(ink, w, h) {
       if (y > 0 && !ink[i - w] && !lab[i - w]) { lab[i - w] = id; stack[top++] = i - w; }
       if (y < h - 1 && !ink[i + w] && !lab[i + w]) { lab[i + w] = id; stack[top++] = i + w; }
     }
-    out.push(edge);
+    outside.push(edge);
   }
-  const R = SCALE_PX / 2, fr = { w, h, x0: 0, y0: 0, k: 1, pad: 0 };
-  const arcs = [];
-  for (let row = 0, y = R; y < h - R; row++, y += R) {
-    for (let x = R + (row % 2 ? R : 0); x < w - R; x += SCALE_PX) {
+  return { dt, lab, outside };
+}
+
+function addTexture(ink, w, h, kind) {
+  const size = { scales: SCALE_PX, feathers: FEATHER_PX, fur: FUR_PX }[kind];
+  if (!size) return 0;
+  const { dt, lab, outside } = interiorMap(ink, w, h);
+  const fr = { w, h, x0: 0, y0: 0, k: 1, pad: 0 };
+  // ¿Todos los puntos caen en una región interior, lejos de la tinta? (margin: distancia mínima)
+  const valid = (pts, margin, skipEnds = 0) => pts.every(([px, py], n) => {
+    if (px < 0 || py < 0 || px >= w || py >= h) return false;
+    const i = py * w + px;
+    if (ink[i] || outside[lab[i] - 1] !== false) return false;
+    return n < skipEnds || n >= pts.length - skipEnds || dt[i] >= margin;
+  });
+  const strokes = [];
+  const R = size / 2;
+  if (kind === "scales") {
+    for (let row = 0, y = R; y < h - R; row++, y += R) for (let x = R + (row % 2 ? R : 0); x < w - R; x += size) {
       const pts = [];
-      let ok = true;
-      for (let a = 0; a <= 24 && ok; a++) {
-        const t = (a / 24) * Math.PI, px = Math.round(x + R * Math.cos(t)), py = Math.round(y + R * Math.sin(t));
-        const i = py * w + px;
-        // El arco entero dentro de una región interior, a ≥ 9 px de cualquier línea (salvo las puntas)
-        if (px < 0 || py < 0 || px >= w || py >= h || ink[i] || out[lab[i] - 1] !== false) { ok = false; break; }
-        if (a > 1 && a < 23 && dt[i] < 9) ok = false;
-        pts.push([px, py]);
-      }
-      if (ok) arcs.push(pts);
+      for (let a = 0; a <= 24; a++) { const t = (a / 24) * Math.PI; pts.push([Math.round(x + R * Math.cos(t)), Math.round(y + R * Math.sin(t))]); }
+      if (valid(pts, 9, 2)) strokes.push(pts);
     }
+  } else if (kind === "feathers") {
+    const depth = R * 1.5, rowStep = R * 1.1;
+    for (let row = 0, y = R * 0.6; y < h - depth; row++, y += rowStep) for (let x = R + (row % 2 ? R : 0); x < w - R; x += size) {
+      const pts = [];
+      for (let a = -12; a <= 12; a++) { const t = a / 12; pts.push([Math.round(x + R * t), Math.round(y + depth * (1 - Math.abs(t) ** 0.8))]); }
+      if (valid(pts, 9, 2)) strokes.push(pts);
+    }
+  } else {
+    const len = size * 0.55, half = size * 0.2, rowStep = size * 0.85;
+    for (let row = 0, y = size * 0.4; y < h - len; row++, y += rowStep) for (let x = size / 2 + (row % 2 ? size / 2 : 0); x < w - size / 2; x += size) {
+      // Dos trazos curvos que se juntan abajo: un mechón
+      for (const side of [-1, 1]) {
+        const pts = [];
+        for (let a = 0; a <= 10; a++) { const t = a / 10; pts.push([Math.round(x + side * half * (1 - t) ** 1.4), Math.round(y + len * t)]); }
+        strokes.push(pts);
+      }
+    }
+    // Un mechón entero o ninguno: se descartan los trazos de a pares si alguno no cabe
+    for (let i = strokes.length - 2; i >= 0; i -= 2) if (!valid(strokes[i], 9) || !valid(strokes[i + 1], 9)) strokes.splice(i, 2);
   }
-  drawRings(ink, fr, arcs);
-  return arcs.length;
+  drawRings(ink, fr, strokes);
+  return strokes.length;
 }
 
 // Ecos: en cada región interior grande, una línea paralela al contorno a ECHO_PX de distancia
@@ -294,9 +327,10 @@ async function figureToEntry(name, def, zen) {
     const t = tinyCells(trial, w, h);
     if (t <= tiny) { ink.set(trial); tiny = t; kept++; }
   }
-  const scaly = def.science === "dino" && name !== "ammonite" || SCALY.has(name);
-  const scales = scaly ? addScales(ink, w, h) : 0;
-  const echoes = scaly && scales ? 0 : addEchoes(ink, w, h);
+  // Textura según el tema; si pone alguna, sustituye a los ecos
+  const kind = def.science === "dino" && name !== "ammonite" || SCALY.has(name) ? "scales" : FURRY.has(name) ? "fur" : FEATHERED.has(name) ? "feathers" : null;
+  const scales = kind ? addTexture(ink, w, h, kind) : 0;
+  const echoes = scales ? 0 : addEchoes(ink, w, h);
   const cls = classify(ink, w, h);
   const gray = new Uint8Array(w * h);
   for (let i = 0; i < gray.length; i++) gray[i] = ink[i] ? 0 : 255;
@@ -305,7 +339,7 @@ async function figureToEntry(name, def, zen) {
   let inside = 0;
   for (const c of cls) if (c === 1) inside++;
   if (inside < w * h * 0.03) return { name, skipped: "sin regiones cerradas rellenables" };
-  console.log(`  ${name}: ${kept}/${strings.length} cuerdas, ${scales ? scales + " escamas" : echoes ? "con ecos" : "sin ecos"}`);
+  console.log(`  ${name}: ${kept}/${strings.length} cuerdas, ${scales ? scales + " trazos de " + kind : echoes ? "con ecos" : "sin ecos"}`);
   return { ...fig, name: `zentangle-${name}`, use: USE, source: "Zentangle (motor propio)", rightsConfirmed: true };
 }
 
