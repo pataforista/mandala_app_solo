@@ -73,6 +73,16 @@ banda de pétalos contra el borde, la misma lógica radial del resto del mandala
 silueta y terminan en su trazo, así las celdas quedan cerradas y coloreables. La figura se reduce al 70 % del
 círculo para dejar sitio a la trama. Se dibuja encima de la imagen, porque su fondo blanco es opaco.
 
+## Figuras redibujadas
+
+`scripts/zenOverrides.mjs` sustituye cuatro figuras del motor que, a ~45 mm, salían diminutas, cargadas de tinta
+o con piezas sueltas: **ufo** (disco, cúpula y haz de luz que se cierra contra el disco), **greyalien** (cabeza
+grande con ojos almendrados), **kraken** (ahora un pulpo: manto redondo y cuatro tentáculos en S que no se
+cruzan; conserva el nombre `zentangle-kraken`) y **wendigo** (cabeza de ciervo con astas de líneas abiertas).
+Regla de diseño: silueta grande y legible, 3–7 regiones cerradas, sin piezas que se crucen y sin ecos
+(`noEcho`). Para exportar las originales: `--original 1`. Para añadir más, basta otro objeto en
+`buildOverrides`, con las mismas claves que `FIGURES` en `figure.js`.
+
 ## Revisión de páginas completas
 
 Se generaron 164 páginas (41 figuras × 3 formatos KDP × estilos y semillas distintos, con y sin `figureCenter`):
@@ -89,5 +99,4 @@ del relleno de huecos tienen radio mínimo 4.2 mm (antes 3.0).
 - Las texturas son geométricas; no sustituyen un plumaje, unas escamas o un pelaje dibujados a mano. En
   figuras pequeñas o de miembros finos (wendigo, rabbit, chupacabra, thunderbird) caben pocos trazos.
 - Los espacios blancos dentro de las celdas grandes de cada figura no se rellenan; solo los de la corona.
-- El kraken sale con piezas rectangulares en la base: conviene revisarlo antes de usarlo en un libro.
 - Las variantes origami (`angularize`) no se exportan.

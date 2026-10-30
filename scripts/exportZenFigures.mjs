@@ -21,6 +21,7 @@ import { withStamp } from "../js/core/figureImport.js";
 import { encodeGrayPng, bytesToDataUrl } from "../js/core/grayPng.js";
 import { packFigures } from "../js/core/figurePack.js";
 import { distanceTransform } from "../js/core/lineArt.js";
+import { buildOverrides } from "./zenOverrides.mjs";
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, v, i, all) => (v.startsWith("--") ? [...a, [v.slice(2), all[i + 1]]] : a), []));
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -33,9 +34,9 @@ const ECHO_PX = Number.isFinite(parseFloat(args.echo)) ? Math.max(0, parseFloat(
 const SCALE_PX = Number.isFinite(parseFloat(args.scales)) ? Math.max(0, parseFloat(args.scales)) : 100; // ancho de cada escama (0 = sin escamas)
 const FEATHER_PX = Number.isFinite(parseFloat(args.feathers)) ? Math.max(0, parseFloat(args.feathers)) : 130; // ancho de cada pluma (0 = sin plumas)
 const FUR_PX = Number.isFinite(parseFloat(args.fur)) ? Math.max(0, parseFloat(args.fur)) : 104;            // separación de los mechones de pelo (0 = sin pelo)
-const FURRY = new Set(["bigfoot", "yeti", "wendigo", "chupacabra", "jackalope", "bear", "fox", "rabbit", "cat"]);
+const FURRY = new Set(["bigfoot", "yeti", "chupacabra", "jackalope", "bear", "fox", "rabbit", "cat"]);
 const FEATHERED = new Set(["thunderbird", "mothman", "owl", "bird", "penguin"]);
-const SCALY = new Set(["nessie", "fish", "kraken"]);    // además de los de science: "dino" (menos ammonite)
+const SCALY = new Set(["nessie", "fish"]);    // además de los de science: "dino" (menos ammonite)
 const MIN_CELL_PX = 30;                                      // radio mínimo de una celda coloreable (≈1.7 mm a 55 mm de alto)
 const U = 100;                                               // unidades de figura → «mm» que espera makeSections
 const INK_R = 2;                                             // radio de la línea (px)
@@ -46,7 +47,7 @@ async function loadZen() {
   const gen = path.join(zenDir, "js/generators");
   const src = fs.readFileSync(path.join(gen, "figure.js"), "utf8");
   const tmp = path.join(gen, `_figure_export_${process.pid}.mjs`);
-  fs.writeFileSync(tmp, `${src}\nexport { FIGURES, makeSections, flatten as zenFlatten, inside as zenInside };\n`);
+  fs.writeFileSync(tmp, `${src}\nexport { FIGURES, ell, xform, taper, smoothPoly, qpts, makeSections, flatten as zenFlatten, inside as zenInside };\n`);
   try {
     const mod = await import(pathToFileURL(tmp).href);
     const prng = await import(pathToFileURL(path.join(zenDir, "js/core/prng.js")).href);
@@ -330,7 +331,7 @@ async function figureToEntry(name, def, zen) {
   // Textura según el tema; si pone alguna, sustituye a los ecos
   const kind = def.science === "dino" && name !== "ammonite" || SCALY.has(name) ? "scales" : FURRY.has(name) ? "fur" : FEATHERED.has(name) ? "feathers" : null;
   const scales = kind ? addTexture(ink, w, h, kind) : 0;
-  const echoes = scales ? 0 : addEchoes(ink, w, h);
+  const echoes = scales || def.noEcho ? 0 : addEchoes(ink, w, h); // noEcho: figuras redibujadas, ya limpias
   const cls = classify(ink, w, h);
   const gray = new Uint8Array(w * h);
   for (let i = 0; i < gray.length; i++) gray[i] = ink[i] ? 0 : 255;
@@ -344,6 +345,8 @@ async function figureToEntry(name, def, zen) {
 }
 
 const zen = await loadZen();
+// Figuras redibujadas (zenOverrides.mjs) en lugar de las del motor; --original 1 las desactiva
+if (!args.original || args.original === "0") Object.assign(zen.FIGURES, buildOverrides(zen));
 const sets = (args.sets || "dino,dinoOrigamiMix,cryptids,cryptidsOrigami,kids").split(",");
 const wanted = args.only ? args.only.split(",") : [...new Set(sets.flatMap((s) => zen.FIGURE_SETS[s] || []))];
 const figures = [], skipped = [];
