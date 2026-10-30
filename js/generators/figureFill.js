@@ -133,6 +133,15 @@ export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw,
     const px = Math.floor(((u + sw / 2) / sw) * fw), py = Math.floor(((v + sh / 2) / sh) * fh);
     if (px >= 0 && py >= 0 && px < fw && py < fh && cls[py * fw + px] !== 2) blocked[gy * g + gx] = 1;
   }
+  return packMotifs({ blocked, g, cell, x0, y0, gap, minR: outlineMode ? 3.6 : 3.0, maxR: 9, rng, styleMode, outlineMode, stroke, mainW, detailW });
+}
+
+/**
+ * Empaquetado voraz de motivos sobre una rejilla g×g de celdas `cell` mm con origen (x0, y0).
+ * blocked: 1 = celda no disponible (figura, fuera del recinto). Cada motivo cabe entero en su hueco:
+ * los huecos que no llegan a minR llevan un punto sólido, nunca una celda diminuta. Devuelve SVG.
+ */
+function packMotifs({ blocked, g, cell, x0, y0, gap, minR, maxR, rng, styleMode, outlineMode, stroke, mainW, detailW, guardMax = 400 }) {
   const dist = distanceTransform(blocked, g, g, true);
   const avail = new Float32Array(g * g);
   for (let i = 0; i < avail.length; i++) avail[i] = blocked[i] ? -1 : dist[i] * cell - gap;
@@ -141,8 +150,7 @@ export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw,
   const kinds = Object.keys(W);
   const pickKind = () => { let t = rng() * kinds.reduce((s, q) => s + W[q], 0); for (const q of kinds) { t -= W[q]; if (t <= 0) return q; } return kinds[0]; };
   const main = new PathBuilder(), detail = new PathBuilder(), dots = new PathBuilder();
-  const minR = outlineMode ? 3.6 : 3.0, maxR = 9; // coloreable: nada de confeti
-  for (let guard = 0; guard < 400; guard++) {
+  for (let guard = 0; guard < guardMax; guard++) {
     let best = -1, bestScore = 0;
     for (let i = 0; i < avail.length; i++) {
       const a = avail[i];
@@ -172,4 +180,26 @@ export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw,
     if (p) out.push(p);
   }
   return out;
+}
+
+/**
+ * Rellena el fondo de un medallón redondo alrededor de su figura central. Una figura sola en un
+ * círculo blanco se ve vacía: los huecos que deja (sobre todo en figuras anchas) llevan motivos
+ * pequeños, sin tocar la silueta ni el borde del círculo.
+ *
+ * cx, cy, r: círculo (mm). cls, fw, fh: clases de la figura; ix, iy, iw, ih: dónde está su imagen (mm).
+ */
+export function drawMedallionGaps({ cx, cy, r, cls, fw, fh, ix, iy, iw, ih, seed = 1, styleMode = "floral",
+  outlineMode = false, stroke = "#000", mainW = 0.55, detailW = 0.4 }) {
+  const rng = mulberry32(((seed >>> 0) ^ 0x3ED417) >>> 0);
+  const cell = 0.4, gap = 1.1;
+  const g = Math.ceil((2 * r) / cell), x0 = cx - r, y0 = cy - r;
+  const blocked = new Uint8Array(g * g);
+  for (let gy = 0; gy < g; gy++) for (let gx = 0; gx < g; gx++) {
+    const x = x0 + (gx + 0.5) * cell, y = y0 + (gy + 0.5) * cell;
+    if (Math.hypot(x - cx, y - cy) > r) { blocked[gy * g + gx] = 1; continue; }
+    const px = Math.floor(((x - ix) / iw) * fw), py = Math.floor(((y - iy) / ih) * fh);
+    if (px >= 0 && py >= 0 && px < fw && py < fh && cls[py * fw + px] !== 2) blocked[gy * g + gx] = 1;
+  }
+  return packMotifs({ blocked, g, cell, x0, y0, gap, minR: outlineMode ? 2.6 : 2.2, maxR: 5, rng, styleMode, outlineMode, stroke, mainW, detailW, guardMax: 120 });
 }

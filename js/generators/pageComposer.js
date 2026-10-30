@@ -65,7 +65,7 @@ export function wantsComposition(opts) {
 // Círculo que encierra la silueta (si hay cls) para que la figura quepa entera en un medallón redondo
 export function fitOf(f) {
   const fit = f.cls ? enclosingCircle(f.cls, f.w, f.h) : null;
-  return fit ? { fit, imgW: f.w, imgH: f.h } : {};
+  return fit ? { fit, imgW: f.w, imgH: f.h, cls: f.cls } : {};
 }
 
 export function composePage(doc, opts, drawMandala) {

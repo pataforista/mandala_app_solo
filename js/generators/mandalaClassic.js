@@ -10,6 +10,7 @@
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder, coloringCullArea } from "../core/pathBuilder.js";
 import { wantsComposition, composePage } from "./pageComposer.js";
+import { drawMedallionGaps } from "./figureFill.js";
 import { fitBandCount } from "../core/bandMetrics.js";
 
 const TAU = Math.PI * 2;
@@ -676,7 +677,13 @@ export function generateMandalaClassic(doc, opts) {
     const inner = fit
       ? [`<image href="${art.href}" x="${(cx - fit.x * k).toFixed(2)}" y="${(cy - fit.y * k).toFixed(2)}" width="${(art.imgW * k).toFixed(2)}" height="${(art.imgH * k).toFixed(2)}" preserveAspectRatio="none" />`]
       : [`<image href="${art.href}" x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid meet" />`];
-    out.push(`<g clip-path="url(#${id})">`, ...inner, `</g>`);
+    // Una figura sola en un círculo blanco se ve vacía: los huecos que deja llevan motivos pequeños
+    // (encima de la imagen, cuyo fondo blanco es opaco; sin tocar su silueta ni el borde)
+    const gaps = fit && art.cls
+      ? drawMedallionGaps({ cx, cy, r: rIn - detailW / 2 - 0.4, cls: art.cls, fw: art.imgW, fh: art.imgH,
+          ix: cx - fit.x * k, iy: cy - fit.y * k, iw: art.imgW * k, ih: art.imgH * k, seed, styleMode, outlineMode, stroke, mainW, detailW })
+      : [];
+    out.push(`<g clip-path="url(#${id})">`, ...inner, ...gaps, `</g>`);
     doc.body.push(...out);
     return doc;
   }

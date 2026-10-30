@@ -59,7 +59,11 @@ El medallón es un círculo con la figura recortada por dentro. Antes la imagen 
 tamaño del círculo, así que una figura ancha (dinosaurios, ballena) llegaba al borde del cuadrado y el círculo
 le cortaba las puntas. Ahora `mandalaClassic.js` usa `centerArt.fit`: el círculo mínimo que encierra la
 silueta real (`enclosingCircle`, en `geometry.js`), y escala la figura para que ese círculo quepa en el
-medallón con un 5 % de aire. Aplica a los usos «Anillos» y «Medallón central». Sin `cls` (figuras sin silueta)
+medallón con un 5 % de aire. Aplica a los usos «Anillos» y «Medallón central».
+
+Una figura sola en un círculo blanco se ve vacía, así que `drawMedallionGaps` (en `figureFill.js`) llena los
+huecos que deja con motivos pequeños del estilo del mandala (mínimo ~2.2 mm de radio; los huecos menores llevan
+un punto sólido). Se dibujan encima de la imagen, porque su fondo blanco es opaco, y respetan la silueta. Sin `cls` (figuras sin silueta)
 se mantiene el ajuste anterior.
 
 ## Límites conocidos

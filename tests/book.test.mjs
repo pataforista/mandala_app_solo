@@ -710,3 +710,21 @@ test("medallón: una figura ancha cabe entera en el círculo (antes el clip le c
   assert.ok(far <= rc, `la figura sale ${(far - rc).toFixed(2)} mm del círculo`);
   assert.ok(far >= rc * 0.85, "y no queda diminuta");
 });
+
+test("medallón: los huecos alrededor de la figura central llevan motivos que no la tocan", () => {
+  const w = 200, h = 100, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const e = ((x - 100) / 98) ** 2 + ((y - 50) / 20) ** 2;
+    if (e <= 1) cls[y * w + x] = e > 0.9 ? 0 : 1;
+  }
+  const gen = (extra) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 2, centerArt: { type: "image", href: "data:,C", scale: 0.5, ...extra } });
+    return renderDocToSvgString(doc);
+  };
+  const paths = (svg) => (svg.match(/<path /g) || []).length;
+  // Con silueta (fit + cls) hay motivos en los huecos; sin ella, el medallón queda como antes
+  const fit = { fit: { x: 100, y: 50, r: 99 }, imgW: w, imgH: h };
+  assert.ok(paths(gen({ ...fit, cls })) > paths(gen({})), "hay motivos extra en el medallón");
+  assert.equal(gen({ ...fit, cls }), gen({ ...fit, cls }), "determinista");
+});
