@@ -384,7 +384,8 @@ async function figureToEntry(name, def, zen) {
   for (const c of cls) if (c === 1) inside++;
   if (inside < w * h * 0.03) return { name, skipped: "sin regiones cerradas rellenables" };
   console.log(`  ${name}: ${kept}/${strings.length} cuerdas, ${scales ? scales + " trazos de " + kind : echoes ? "con ecos" : "sin ecos"}`);
-  return { ...fig, name: `zentangle-${name}`, use: USE, source: "Zentangle (motor propio)", rightsConfirmed: true };
+  return { ...fig, name: `zentangle-${name}`, use: USE, source: "Zentangle (motor propio)", rightsConfirmed: true,
+    theme: def.science === "dino" || def.science === "dinoplain" || name === "nessie" ? "prehistorico" : "" };
 }
 
 const zen = await loadZen();

@@ -59,6 +59,15 @@ mariposas, estrellas…). Usa la silueta real de cada copia (`cls`, que `app.js`
 caja, así que los motivos entran entre patas y colas sin tocar el dibujo. Los huecos pequeños llevan un
 punto sólido. Si la figura no trae `cls`, la corona queda como antes.
 
+## Relleno temático (prehistórico)
+
+Las figuras de dinosaurios (y nessie) llevan `theme: "prehistorico"` en el paquete. Con ese tema, tanto el relleno
+de los huecos de la corona como el fondo de la página usan palmeras, helechos, huevos con grieta, huellas de tres
+dedos, pterosaurios y hojas, en lugar de flores, corazones y coronas (`SCATTER_THEMES.prehistorico` y los motivos
+nuevos de `drawFiller`). Palmeras y helechos solo salen cuando hay sitio (radio ≥ 7.5 mm); si no, se sustituyen
+por una hoja para que no queden celdas sin colorear. Un fondo elegido a mano (`opts.background`) tiene prioridad
+sobre el tema de la figura.
+
 ## Figura en el medallón (uso «Medallón central» o `figureCenter`)
 
 El medallón es un círculo con la figura recortada por dentro. Antes la imagen se ajustaba a un cuadrado del

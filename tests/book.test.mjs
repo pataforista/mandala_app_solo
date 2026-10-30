@@ -740,3 +740,20 @@ test("anillos: por defecto el centro es un núcleo de mandala, sin la figura; fi
   assert.ok(gen({ figureCenter: true }).includes('href="data:,C"'), "con figureCenter, la figura va al centro");
   assert.ok((gen({}).match(/<image href="data:,S"/g) || []).length >= 6, "las copias de la corona siguen");
 });
+
+test("anillos: el tema de la figura cambia el relleno (prehistórico: sin flores ni corazones) y se guarda en el paquete", () => {
+  const w = 100, h = 120, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 20; y < 100; y++) for (let x = 30; x < 70; x++) cls[y * w + x] = y === 20 || y === 99 || x === 30 || x === 69 ? 0 : 1;
+  const gen = (theme) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 4, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 4, figureRing: { href: "data:,S", centerHref: "data:,C", w, h, cls, theme } });
+    return renderDocToSvgString(doc);
+  };
+  const base = gen(undefined), pre = gen("prehistorico");
+  assert.notEqual(base, pre, "el tema cambia los motivos de relleno");
+  assert.equal(pre, gen("prehistorico"), "determinista");
+  assert.equal(gen("tema-que-no-existe"), base, "un tema desconocido no cambia nada");
+  // El paquete conserva el tema
+  const back = unpackFigures(packFigures([{ name: "a", href: "x", cls: new Uint8Array(4), w: 2, h: 2, theme: "prehistorico" }]));
+  assert.equal(back[0].theme, "prehistorico");
+});

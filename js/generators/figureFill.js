@@ -113,7 +113,7 @@ export function drawFigure({ figure, A, seed = 1, styleMode = "floral", fillInsi
  * cls, fw, fh: clases por píxel de la figura y su tamaño. Devuelve fragmentos SVG.
  */
 export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw, fh, seed = 1, styleMode = "floral",
-  outlineMode = false, stroke = "#000", mainW = 0.55, detailW = 0.4 }) {
+  outlineMode = false, stroke = "#000", mainW = 0.55, detailW = 0.4, weights = null }) {
   const rng = mulberry32(((seed >>> 0) ^ 0x6A9511) >>> 0);
   const cell = 0.7, gap = 1.6;
   const g = Math.ceil((2 * rHi) / cell), x0 = cx - rHi, y0 = cy - rHi;
@@ -133,7 +133,7 @@ export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw,
     const px = Math.floor(((u + sw / 2) / sw) * fw), py = Math.floor(((v + sh / 2) / sh) * fh);
     if (px >= 0 && py >= 0 && px < fw && py < fh && cls[py * fw + px] !== 2) blocked[gy * g + gx] = 1;
   }
-  return packMotifs({ blocked, g, cell, x0, y0, gap, minR: outlineMode ? 4.6 : 4.2, maxR: 9, rng, styleMode, outlineMode, stroke, mainW, detailW });
+  return packMotifs({ blocked, g, cell, x0, y0, gap, minR: outlineMode ? 4.6 : 4.2, maxR: weights ? 11 : 9, rng, styleMode, outlineMode, stroke, mainW, detailW, weights });
 }
 
 /**
@@ -141,12 +141,12 @@ export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw,
  * blocked: 1 = celda no disponible (figura, fuera del recinto). Cada motivo cabe entero en su hueco:
  * los huecos que no llegan a minR llevan un punto sólido, nunca una celda diminuta. Devuelve SVG.
  */
-function packMotifs({ blocked, g, cell, x0, y0, gap, minR, maxR, rng, styleMode, outlineMode, stroke, mainW, detailW, guardMax = 400 }) {
+function packMotifs({ blocked, g, cell, x0, y0, gap, minR, maxR, rng, styleMode, outlineMode, stroke, mainW, detailW, guardMax = 400, weights = null }) {
   const dist = distanceTransform(blocked, g, g, true);
   const avail = new Float32Array(g * g);
   for (let i = 0; i < avail.length; i++) avail[i] = blocked[i] ? -1 : dist[i] * cell - gap;
 
-  const W = FILLERS[styleMode] || FILLERS.floral;
+  const W = weights || FILLERS[styleMode] || FILLERS.floral;
   const kinds = Object.keys(W);
   const pickKind = () => { let t = rng() * kinds.reduce((s, q) => s + W[q], 0); for (const q of kinds) { t -= W[q]; if (t <= 0) return q; } return kinds[0]; };
   const main = new PathBuilder(), detail = new PathBuilder(), dots = new PathBuilder();
