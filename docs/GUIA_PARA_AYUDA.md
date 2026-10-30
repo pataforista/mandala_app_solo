@@ -70,9 +70,9 @@ node scripts/checkFigures.mjs lamina.json        # semáforo de zonas coloreable
 ```
 
 Los nombres van en orden de lectura (filas de arriba abajo). Requiere Playwright. El paquete
-`assets/figuras-dinosaurios.json` (32 figuras) salió de dos láminas así. **Derechos:** las figuras entran con
-`rightsConfirmed: false`; hay que confirmarlas en la app. Quien genera dibujos con IA debe comprobar los
-términos de la herramienta para uso comercial: aquí no se puede verificar.
+`assets/figuras-dinosaurios.json` (32 figuras) salió de dos láminas así. **Derechos:** `--rights 1` las marca como
+confirmadas (sin él entran sin confirmar y la app las marca «no lista» hasta que se marque la casilla). Quien genera
+dibujos con IA debe comprobar los términos de la herramienta para uso comercial: aquí no se puede verificar.
 
 ## 4. Mapa del código (para un desarrollador)
 

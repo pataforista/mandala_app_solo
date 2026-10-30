@@ -893,7 +893,7 @@ function renderFigureChecks() {
   const m = userFigures[activeFigure];
   if (!m) { box.innerHTML = ""; return; }
   const esc = (t) => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  box.innerHTML = `<div style="font-weight:600;margin-top:6px;">${esc(m.name)}</div>
+  box.innerHTML = `<div style="font-weight:600;margin-top:6px;">Imagen ${userFigures.indexOf(m) + 1}</div>
     <label style="display:block;margin:4px 0;">Fuente (URL, libro u «obra propia»)
       <input id="figSource" type="text" value="${esc(m.source)}" style="width:100%;padding:4px;border-radius:6px;border:1px solid #bbb;"></label>
     <label style="display:flex;gap:6px;align-items:center;"><input id="figRights" type="checkbox" ${m.rightsConfirmed ? "checked" : ""}> Confirmo que es de dominio público o mía</label>
@@ -917,7 +917,7 @@ function renderFigureList() {
     wrap.style.cssText = "position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:96px;";
     const thumb = document.createElement("img");
     thumb.src = m.fig.href;
-    thumb.title = `${m.name} — clic para verla en la vista previa`;
+    thumb.title = `Imagen ${i + 1} — clic para verla en la vista previa`;
     thumb.style.cssText = `width:52px;height:52px;border-radius:8px;object-fit:contain;background:#fff;cursor:pointer;border:2px solid ${i === activeFigure ? "var(--m3-primary, #6750a4)" : "#ccc"};`;
     thumb.onclick = () => { activeFigure = i; renderFigureList(); update(); };
     const del = document.createElement("button");
@@ -1878,11 +1878,15 @@ function bindUI() {
     const chosen = chosenFigures();
     const info = document.getElementById("bookImagesInfo");
     if (info) {
+      // Sólo cuentas: los nombres de las imágenes no se muestran
+      const byUse = FIGURE_USES.filter(u => u[0] !== "ninguno" && u[0] !== "extra").map(u => [u[1].toLowerCase(), chosen.filter(m => m.use === u[0]).length]).filter(([, n]) => n);
+      const extras = userFigures.filter(m => m.use === "extra" && m.fig).length;
       info.innerHTML = chosen.length
-        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano: ` + chosen.map(m => `${escapeXml(m.name)} (${FIGURE_USES.find(u => u[0] === m.use)[1].toLowerCase()})`).join(", ")
+        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano (${byUse.map(([t, n]) => `${n} · ${t}`).join(", ")})`
         : "Ninguna imagen lista: el libro será sólo de mandalas. Para incluir una, elige su uso en «Mis imágenes».";
+      if (extras) info.innerHTML += `<br>🌿 ${extras} ilustración(es) extra en el decorado de las páginas.`;
       const pend = pendingFigures();
-      if (pend.length) info.innerHTML += `<br>❌ No entran (no están listas): ${pend.map(m => escapeXml(m.name)).join(", ")}. Revisa su lista de verificación.`;
+      if (pend.length) info.innerHTML += `<br>❌ ${pend.length} no entran (no están listas). Revisa su lista de verificación en «Mis imágenes».`;
     }
     if (chosen.length > bookCount()) bookSummaryEl.innerHTML += `<br>⚠️ Hay ${chosen.length} imágenes elegidas y sólo ${bookCount()} páginas: sobran ${chosen.length - bookCount()}.`;
   };
@@ -2301,7 +2305,7 @@ function bindUI() {
         },
       });
       // Registro de fuentes (CSV) junto al PDF, si el libro lleva imágenes del usuario
-      if (sourceLog.some(r => r && r.image)) {
+      if (sourceLog.some(r => r && r.source)) { // sólo si alguna imagen trae fuente anotada
         const layout = bookLayout({ ...layoutOpts, mandalas: count + (layoutOpts.colorTest ? 1 : 0) });
         const off = layoutOpts.colorTest ? 1 : 0;
         const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;

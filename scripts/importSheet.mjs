@@ -113,7 +113,7 @@ for (const [k, c] of found.entries()) {
   const st = stampRaster(fig.cls, fig.w, fig.h, 720, extra ? EXTRA_STAMP : STAMP);
   const stampHref = bytesToDataUrl(await encodeGrayPng(st.gray, st.w, st.h));
   const entry = await withStamp({ href, cls: fig.cls, w: fig.w, h: fig.h, srcLong: Math.max(cw, ch), stampHref });
-  figures.push({ ...entry, name, use: extra ? "extra" : USE, source: args.source || path.basename(file), rightsConfirmed: args.rights === "1", theme: args.theme || "" });
+  figures.push({ ...entry, name, use: extra ? "extra" : USE, source: args.source || "", rightsConfirmed: args.rights === "1", theme: args.theme || "" });
   console.log(`  ${String(k + 1).padStart(2)} ${name.padEnd(18)} ${cw}×${ch} → ${fig.w}×${fig.h}, interior ${(100 * interior / fig.cls.length).toFixed(0)} %`);
   if (args.debug) fs.writeFileSync(path.join(args.debug, `${name}.png`), Buffer.from(href.split(",")[1], "base64"));
 }

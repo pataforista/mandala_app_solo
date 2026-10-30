@@ -103,7 +103,7 @@ quien usa la app): **26 animales** (uso «Anillos»: cada uno sale en una págin
 (uso «extra»: huevo con cría, nido, volcán, palmera, helecho y huella). Son mucho más expresivas
 que las hechas por código. `scripts/importSheet.mjs` las separa (componentes conectados), las recorta y las pasa
 por `processFigure`, la misma función que usa la app al subir una imagen; el sello se engorda poco (0.2 %, la
-app usa 1.6 %) porque estas líneas ya son gruesas. Todas llevan tema `prehistorico` y `rightsConfirmed: false`.
+app usa 1.6 %) porque estas líneas ya son gruesas. Todas llevan tema `prehistorico`, nombres neutros (`dinosaurio-01`…, `extra-01`…) y los derechos ya marcados (`--rights 1`), sin fuente anotada. La app no muestra nombres de imágenes (sólo cuentas y «Imagen N») y el registro de fuentes del libro sólo se genera si alguna imagen trae fuente.
 `npm run check:figuras` da el semáforo: ver abajo sus límites.
 
 ### Ilustración extra
