@@ -30,10 +30,10 @@ const SILHOUETTES_BY_STYLE = {
 // Estructura del disco (ver STRUCTURES en mandalaClassic.js) y tema de fondo (ver
 // BACKGROUNDS en pageComposer.js). Se reparten igual que la silueta: sin repetir en
 // páginas seguidas y equilibrados en el libro.
-export const BOOK_STRUCTURES = ["corona", "heroe", "equilibrio", "nucleo"];
-const STRUCTURE_WEIGHTS = [3, 2, 2, 1]; // «núcleo» puntúa algo menos: sale menos
-export const SCATTER_BACKGROUNDS = ["jardin", "cielo", "hojas", "dulce"];
-export const PATTERN_BACKGROUNDS = ["escamas", "flor_vida", "sol"];
+export const BOOK_STRUCTURES = ["corona", "heroe", "equilibrio", "nucleo", "aurea", "doble"];
+const STRUCTURE_WEIGHTS = [1.2, 1.1, 1.1, 1, 1, 0.9]; // muy equilibrado para evitar repeticiones
+export const SCATTER_BACKGROUNDS = ["jardin", "cielo", "hojas", "dulce", "estrellas", "vinas"];
+export const PATTERN_BACKGROUNDS = ["escamas", "flor_vida", "sol", "ondas", "mosaico"];
 // Temas sueltos que no combinan con todos los estilos (corazones alrededor de un mandala
 // geométrico se ven fuera de lugar). Cielo, jardín (figuras del propio estilo) y las
 // tramas van con todos.
@@ -212,10 +212,19 @@ export function shuffleBag(rng, options, weights = null) {
   return () => {
     if (!bag.length) {
       bag = shuffled(rng, pool);
-      // Evita la repetición en la costura entre rondas
-      if (bag.length > 1 && bag[bag.length - 1] === last) [bag[0], bag[bag.length - 1]] = [bag[bag.length - 1], bag[0]];
+      // Evita la repetición en la costura entre rondas de forma más estricta
+      if (bag.length > 1 && bag[bag.length - 1] === last) {
+        // Busca el primer elemento diferente al último y lo intercambia
+        for (let i = 0; i < bag.length - 1; i++) {
+          if (bag[i] !== last) {
+            [bag[bag.length - 1], bag[i]] = [bag[i], bag[bag.length - 1]];
+            break;
+          }
+        }
+      }
     }
     let v = bag.pop();
+    // Si el valor extraído es igual al último, busca uno diferente en el bag
     if (v === last && bag.length) {
       const k = bag.findIndex(x => x !== last);
       if (k >= 0) { const t = bag[k]; bag[k] = v; v = t; }

@@ -40,6 +40,8 @@ export const STRUCTURES = {
   equilibrio: { sil: 1.35, hero: 1.15, core: null },
   nucleo:     { sil: 1.7, hero: 1.0, core: 0.3, dropBand: true },
   heroe:      { sil: 1.2, hero: 2.8, core: null },
+  aurea:      { sil: 1.618, hero: 1.0, core: null, golden: true }, // proporción áurea
+  doble:      { sil: 1.8, hero: 1.4, core: 0.25, doubleRing: true }, // anillo doble decorado
 };
 
 // ---------- Variantes de núcleo ----------
@@ -103,11 +105,20 @@ export function generateMandalaClassic(doc, opts) {
   if (opts.maxBands) B = Math.max(2, Math.min(B, opts.maxBands));
   const rCoreBase = art ? R * artFrac : Math.max(R * (0.14 + rng() * 0.04), Math.min(R * 0.32, 5.5));
   const rCore = !art && ST.core ? Math.max(rCoreBase, R * ST.core) : rCoreBase;
+  
+  // Reparto de bandas: proporción áurea o estándar
+  const phi = 1.618033988749895;
   const weights = Array.from({ length: B }, (_, k) => {
-    let w = 0.7 + rng() * 0.5;
-    if (k === B - 1) w *= ST.sil;
-    if (k === B - 2) w *= ST.hero;
-    if (k === 0) w *= 0.8;
+    let w;
+    if (ST.golden) {
+      // Proporción áurea: cada banda es 1.618× la anterior
+      w = Math.pow(phi, k - B + 1);
+    } else {
+      w = 0.7 + rng() * 0.5;
+      if (k === B - 1) w *= ST.sil;
+      if (k === B - 2) w *= ST.hero;
+      if (k === 0) w *= 0.8;
+    }
     return w;
   });
   const beadSlots = new Set();

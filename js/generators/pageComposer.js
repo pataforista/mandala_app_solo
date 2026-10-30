@@ -38,8 +38,10 @@ export const SCATTER_THEMES = {
   cielo:  { star: 3, sun: 2, crescent: 2.5 },
   hojas:  { leaf: 3, tulip: 2, drop: 1.5 },
   dulce:  { heart: 3, clover: 2, drop: 1.5, daisy: 1 },
+  estrellas: { star: 4, sun: 2, crescent: 1.5, butterfly: 1 },
+  vinas: { leaf: 3, tulip: 2, feather: 1.5, drop: 1 },
 };
-export const PATTERN_THEMES = ["escamas", "flor_vida", "sol"];
+export const PATTERN_THEMES = ["escamas", "flor_vida", "sol", "ondas", "mosaico"];
 export const BACKGROUNDS = [...Object.keys(SCATTER_THEMES), ...PATTERN_THEMES];
 
 /**
@@ -667,6 +669,49 @@ function drawPattern({ kind, cx, cy, halo, variant = 0.5, A, gap, stroke, mainW,
         if (x + rr < X0 || x - rr > X1 || y + rr < Y0 || y - rr > Y1) continue;
         if (Math.hypot(x - cx, y - cy) + rr < halo) continue; // tapado por el halo
         circle(pb, x, y, rr);
+      }
+    }
+  } else if (kind === "ondas") {
+    // Ondas concéntricas ondulantes: anillos con ondulaciones sinusoidales
+    const waveAmp = cell * 0.3; // amplitud de la ondulación
+    const waveFreq = 8 + Math.floor(variant * 8); // frecuencia: 8-16 ondulaciones por anillo
+    let r = halo;
+    while (r < span) {
+      const segments = Math.max(32, Math.round((TAU * r) / 2));
+      const step = TAU / segments;
+      pb.moveTo(...P(r + waveAmp * Math.sin(waveFreq * 0), 0));
+      for (let i = 1; i <= segments; i++) {
+        const a = i * step;
+        const rr = r + waveAmp * Math.sin(waveFreq * a);
+        pb.lineTo(...P(rr, a));
+      }
+      pb.close();
+      r += cell * 0.8;
+      // Aumenta la frecuencia con el radio para mantener proporción
+      if ((r * TAU) / waveFreq > cell * 3) { /* mantener frecuencia */ }
+    }
+  } else if (kind === "mosaico") {
+    // Mosaico: red de rombos entrelazados (estilo geométrico islámico)
+    const size = cell * 1.2;
+    const dy = size * Math.sqrt(3) / 2;
+    const jMax = Math.ceil((Math.max(cy - Y0, Y1 - cy) + size) / dy);
+    const iMax = Math.ceil((Math.max(cx - X0, X1 - cx) + size) / size) + 1;
+    for (let j = -jMax; j <= jMax; j++) {
+      for (let i = -iMax; i <= iMax; i++) {
+        const x = cx + (i + (Math.abs(j) % 2) / 2) * size;
+        const y = cy + j * dy;
+        if (x + size < X0 || x - size > X1 || y + size < Y0 || y - size > Y1) continue;
+        if (Math.hypot(x - cx, y - cy) + size * 0.5 < halo) continue;
+        // Rombo: 4 vértices
+        const pts = [
+          [x, y - size * 0.5],
+          [x + size * 0.45, y],
+          [x, y + size * 0.5],
+          [x - size * 0.45, y]
+        ];
+        pb.moveTo(pts[0][0], pts[0][1]);
+        for (let k = 1; k < 4; k++) pb.lineTo(pts[k][0], pts[k][1]);
+        pb.close();
       }
     }
   } else {
