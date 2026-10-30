@@ -19,14 +19,15 @@ export const COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gig
 export const FRAME_STYLES = ["redondeado", "doble", "feston", "ninguno"];
 
 // Motivos de relleno que mejor acompañan cada estilo del mandala
+// Nuevos: butterfly, feather, shell, bird, crown — más variedad visual
 export const FILLERS = {
-  floral:    { daisy: 3, heart: 2, leaf: 2, star: 0.5, sun: 1 },
-  geometric: { daisy: 1, heart: 0.3, leaf: 0.5, star: 3, sun: 2 },
-  islamico:  { daisy: 2, heart: 0.5, leaf: 1, star: 3, sun: 1 },
-  sashiko:   { daisy: 2, heart: 1, leaf: 1, star: 1, sun: 2 },
-  azteca:    { daisy: 1, heart: 0.3, leaf: 1, star: 2, sun: 3 },
-  yantra:    { daisy: 3, heart: 0.5, leaf: 1, star: 1.5, sun: 2 },
-  celtico:   { daisy: 2, heart: 2, leaf: 3, star: 0.5, sun: 1 },
+  floral:    { daisy: 3, heart: 2, leaf: 2, star: 0.5, sun: 1, butterfly: 1.5, feather: 1, shell: 0.8 },
+  geometric: { daisy: 1, heart: 0.3, leaf: 0.5, star: 3, sun: 2, shell: 1.5, crown: 1 },
+  islamico:  { daisy: 2, heart: 0.5, leaf: 1, star: 3, sun: 1, crown: 1.5, shell: 1 },
+  sashiko:   { daisy: 2, heart: 1, leaf: 1, star: 1, sun: 2, feather: 1.5, shell: 1 },
+  azteca:    { daisy: 1, heart: 0.3, leaf: 1, star: 2, sun: 3, crown: 2, shell: 1.5 },
+  yantra:    { daisy: 3, heart: 0.5, leaf: 1, star: 1.5, sun: 2, shell: 1, crown: 0.8 },
+  celtico:   { daisy: 2, heart: 2, leaf: 3, star: 0.5, sun: 1, feather: 2, butterfly: 1 },
 };
 
 // Temas de fondo. Antes todos los fondos esparcían las mismas 5 figuras y las páginas
@@ -514,6 +515,108 @@ export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
       C(main, ...p(0.9, 0.02), ...p(0.86, 0.02), ...p(0.88, 0.08));
       C(main, ...p(1.0, 0.55), ...p(0.35, 0.55), ...p(0.12, 0));
       main.close();
+    }
+  } else if (kind === "butterfly") {
+    // Mariposa: alas simétricas con venas internas
+    const wing = (pb, side) => {
+      const s = side;
+      M(pb, 0, 0.1);
+      C(pb, s * 0.4, 0.5, s * 0.9, 0.6, s * 0.95, 0.2);
+      C(pb, s * 0.98, -0.1, s * 0.7, -0.5, s * 0.3, -0.4);
+      C(pb, s * 0.1, -0.35, 0, -0.1, 0, 0.1);
+      pb.close();
+    };
+    wing(main, -1); wing(main, 1);
+    // Cuerpo central
+    M(main, -0.08, 0.3); L(main, 0.08, 0.3); L(main, 0.06, -0.4); L(main, -0.06, -0.4); main.close();
+    // Antenas
+    if (big) {
+      M(detail, -0.05, 0.3); Q(detail, -0.3, 0.7, -0.35, 0.8);
+      M(detail, 0.05, 0.3); Q(detail, 0.3, 0.7, 0.35, 0.8);
+      // Venas en alas
+      for (const sd of [-1, 1]) {
+        M(detail, sd * 0.15, 0.05); L(detail, sd * 0.6, 0.3);
+        M(detail, sd * 0.15, -0.1); L(detail, sd * 0.5, -0.2);
+      }
+    }
+  } else if (kind === "feather") {
+    // Pluma: raquis central con barbas laterales
+    M(main, 0, 0.95);
+    C(main, -0.15, 0.7, -0.25, 0.3, -0.2, -0.2);
+    C(main, -0.15, -0.6, -0.05, -0.85, 0, -0.95);
+    C(main, 0.05, -0.85, 0.15, -0.6, 0.2, -0.2);
+    C(main, 0.25, 0.3, 0.15, 0.7, 0, 0.95);
+    main.close();
+    if (big) {
+      // Raquis central
+      M(detail, 0, 0.85); L(detail, 0, -0.85);
+      // Barbas laterales
+      for (let i = 0; i < 5; i++) {
+        const t = 0.7 - i * 0.3;
+        M(detail, 0, t); L(detail, -0.18, t - 0.15);
+        M(detail, 0, t); L(detail, 0.18, t - 0.15);
+      }
+    }
+  } else if (kind === "shell") {
+    // Concha/vieira: forma semicircular con radios desde la base
+    M(main, -0.8, -0.3);
+    C(main, -0.85, 0.3, -0.5, 0.8, 0, 0.85);
+    C(main, 0.5, 0.8, 0.85, 0.3, 0.8, -0.3);
+    L(main, -0.8, -0.3);
+    main.close();
+    if (big) {
+      // Radios desde la base
+      const base = -0.3;
+      for (let i = 0; i < 7; i++) {
+        const a = -0.7 + (i / 6) * 1.4;
+        M(detail, a * 0.3, base);
+        L(detail, a * 0.9, base + 0.9);
+      }
+    }
+  } else if (kind === "bird") {
+    // Pájaro estilizado: cuerpo, alas y cola
+    // Cuerpo
+    M(main, 0, 0.4);
+    C(main, -0.3, 0.3, -0.4, 0, -0.3, -0.3);
+    C(main, -0.2, -0.5, 0.2, -0.5, 0.3, -0.3);
+    C(main, 0.4, 0, 0.3, 0.3, 0, 0.4);
+    main.close();
+    // Cabeza
+    circle(main, ...T(0.25, 0.35), r * 0.15);
+    if (big) {
+      // Alas extendidas
+      M(detail, -0.2, 0.1);
+      C(detail, -0.6, 0.3, -0.9, 0.1, -0.85, -0.1);
+      C(detail, -0.8, -0.2, -0.5, -0.1, -0.2, 0);
+      M(detail, 0.2, 0.1);
+      C(detail, 0.6, 0.3, 0.9, 0.1, 0.85, -0.1);
+      C(detail, 0.8, -0.2, 0.5, -0.1, 0.2, 0);
+      // Cola
+      M(detail, -0.25, -0.4); L(detail, -0.4, -0.7);
+      M(detail, 0, -0.45); L(detail, 0, -0.75);
+      M(detail, 0.25, -0.4); L(detail, 0.4, -0.7);
+    }
+  } else if (kind === "crown") {
+    // Corona: forma de corona con puntas y joyas
+    M(main, -0.7, -0.2);
+    L(main, -0.7, 0.3);
+    L(main, -0.4, 0.1);
+    L(main, -0.2, 0.5);
+    L(main, 0, 0.2);
+    L(main, 0.2, 0.5);
+    L(main, 0.4, 0.1);
+    L(main, 0.7, 0.3);
+    L(main, 0.7, -0.2);
+    L(main, -0.7, -0.2);
+    main.close();
+    if (big) {
+      // Joyas (círculos) en las puntas
+      for (const [ux, uy] of [[-0.4, 0.1], [0, 0.2], [0.4, 0.1]]) {
+        circle(detail, ...T(ux, uy + 0.15), r * 0.08);
+      }
+      // Banda inferior decorada
+      M(detail, -0.6, -0.1); L(detail, 0.6, -0.1);
+      M(detail, -0.6, 0); L(detail, 0.6, 0);
     }
   } else {
     // ring: circulito con punto
