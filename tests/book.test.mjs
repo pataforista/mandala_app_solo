@@ -757,3 +757,26 @@ test("anillos: el tema de la figura cambia el relleno (prehistórico: sin flores
   const back = unpackFigures(packFigures([{ name: "a", href: "x", cls: new Uint8Array(4), w: 2, h: 2, theme: "prehistorico" }]));
   assert.equal(back[0].theme, "prehistorico");
 });
+
+test("ilustración extra: se mezcla en el relleno de la página sin tocar la figura ni cambiar páginas sin extras", () => {
+  const w = 100, h = 120, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 20; y < 100; y++) for (let x = 30; x < 70; x++) cls[y * w + x] = y === 20 || y === 99 || x === 30 || x === 69 ? 0 : 1;
+  const ring = { href: "data:,S", centerHref: "data:,C", w, h, cls, theme: "prehistorico" };
+  const gen = (extraArt) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 6, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 6, figureRing: ring, extraArt });
+    return renderDocToSvgString(doc);
+  };
+  const extra = [{ href: "data:,X", w: 80, h: 100 }];
+  const con = gen(extra), sin = gen(undefined);
+  const n = (svg, tag) => (svg.match(new RegExp(`<image href="${tag}"`, "g")) || []).length;
+  assert.ok(n(con, "data:,X") > 0, "aparecen las ilustraciones extra");
+  assert.equal(n(sin, "data:,X"), 0);
+  assert.equal(con, gen(extra), "determinista");
+  assert.equal(n(con, "data:,S"), n(sin, "data:,S"), "las copias de la corona no cambian");
+  assert.equal(sin, gen(null), "sin extras la página es la de siempre");
+  // Cada ilustración cabe en su hueco: su caja circunscrita no pasa de la mitad de la página
+  for (const m of con.matchAll(/<image href="data:,X" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)) {
+    assert.ok(+m[3] > 0 && +m[4] > 0 && Math.hypot(+m[3], +m[4]) < 60, "tamaño razonable");
+  }
+});

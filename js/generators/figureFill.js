@@ -9,7 +9,7 @@
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder } from "../core/pathBuilder.js";
 import { distanceTransform } from "../core/lineArt.js";
-import { FILLERS, drawFiller, circle } from "./pageComposer.js";
+import { FILLERS, drawFiller, circle, extraImage, EXTRA_MIN_R, EXTRA_SHARE } from "./pageComposer.js";
 
 /**
  * figure: { href, cls, w, h } (cls: 0 tinta, 1 interior, 2 exterior; ver processFigure)
@@ -113,7 +113,7 @@ export function drawFigure({ figure, A, seed = 1, styleMode = "floral", fillInsi
  * cls, fw, fh: clases por píxel de la figura y su tamaño. Devuelve fragmentos SVG.
  */
 export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw, fh, seed = 1, styleMode = "floral",
-  outlineMode = false, stroke = "#000", mainW = 0.55, detailW = 0.4, weights = null }) {
+  outlineMode = false, stroke = "#000", mainW = 0.55, detailW = 0.4, weights = null, extraArt = null }) {
   const rng = mulberry32(((seed >>> 0) ^ 0x6A9511) >>> 0);
   const cell = 0.7, gap = 1.6;
   const g = Math.ceil((2 * rHi) / cell), x0 = cx - rHi, y0 = cy - rHi;
@@ -133,7 +133,7 @@ export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw,
     const px = Math.floor(((u + sw / 2) / sw) * fw), py = Math.floor(((v + sh / 2) / sh) * fh);
     if (px >= 0 && py >= 0 && px < fw && py < fh && cls[py * fw + px] !== 2) blocked[gy * g + gx] = 1;
   }
-  return packMotifs({ blocked, g, cell, x0, y0, gap, minR: outlineMode ? 4.6 : 4.2, maxR: weights ? 11 : 9, rng, styleMode, outlineMode, stroke, mainW, detailW, weights });
+  return packMotifs({ blocked, g, cell, x0, y0, gap, minR: outlineMode ? 4.6 : 4.2, maxR: weights ? 11 : 9, rng, styleMode, outlineMode, stroke, mainW, detailW, weights, extraArt });
 }
 
 /**
@@ -141,7 +141,7 @@ export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw,
  * blocked: 1 = celda no disponible (figura, fuera del recinto). Cada motivo cabe entero en su hueco:
  * los huecos que no llegan a minR llevan un punto sólido, nunca una celda diminuta. Devuelve SVG.
  */
-function packMotifs({ blocked, g, cell, x0, y0, gap, minR, maxR, rng, styleMode, outlineMode, stroke, mainW, detailW, guardMax = 400, weights = null }) {
+function packMotifs({ blocked, g, cell, x0, y0, gap, minR, maxR, rng, styleMode, outlineMode, stroke, mainW, detailW, guardMax = 400, weights = null, extraArt = null }) {
   const dist = distanceTransform(blocked, g, g, true);
   const avail = new Float32Array(g * g);
   for (let i = 0; i < avail.length; i++) avail[i] = blocked[i] ? -1 : dist[i] * cell - gap;
@@ -149,7 +149,7 @@ function packMotifs({ blocked, g, cell, x0, y0, gap, minR, maxR, rng, styleMode,
   const W = weights || FILLERS[styleMode] || FILLERS.floral;
   const kinds = Object.keys(W);
   const pickKind = () => { let t = rng() * kinds.reduce((s, q) => s + W[q], 0); for (const q of kinds) { t -= W[q]; if (t <= 0) return q; } return kinds[0]; };
-  const main = new PathBuilder(), detail = new PathBuilder(), dots = new PathBuilder();
+  const main = new PathBuilder(), detail = new PathBuilder(), dots = new PathBuilder(), imgs = [];
   for (let guard = 0; guard < guardMax; guard++) {
     let best = -1, bestScore = 0;
     for (let i = 0; i < avail.length; i++) {
@@ -162,7 +162,8 @@ function packMotifs({ blocked, g, cell, x0, y0, gap, minR, maxR, rng, styleMode,
     const gx = best % g, gy = (best / g) | 0;
     const x = x0 + (gx + 0.5) * cell, y = y0 + (gy + 0.5) * cell;
     const r = Math.min(avail[best], maxR);
-    if (r >= minR) drawFiller(pickKind(), main, detail, x, y, r, rng() * Math.PI * 2, rng, !outlineMode && r >= 6);
+    if (r >= minR && extraArt?.length && r >= EXTRA_MIN_R && rng() < EXTRA_SHARE) imgs.push(extraImage(extraArt[Math.floor(rng() * extraArt.length)], x, y, r, rng() < 0.5));
+    else if (r >= minR) drawFiller(pickKind(), main, detail, x, y, r, rng() * Math.PI * 2, rng, !outlineMode && r >= 6);
     else circle(dots, x, y, Math.max(0.5, r * 0.5)); // hueco pequeño: un punto sólido, sin celdas diminutas
     const reach = Math.ceil((r + maxR + gap) / cell);
     for (let yy = Math.max(0, gy - reach); yy < Math.min(g, gy + reach + 1); yy++) {
@@ -174,7 +175,7 @@ function packMotifs({ blocked, g, cell, x0, y0, gap, minR, maxR, rng, styleMode,
       }
     }
   }
-  const out = [];
+  const out = [...imgs];
   for (const [pb, w, fill] of [[main, mainW, "#fff"], [detail, detailW, "none"], [dots, 0.2, stroke]]) {
     const p = pb.toPath({ stroke, strokeWidthMm: w, fill });
     if (p) out.push(p);

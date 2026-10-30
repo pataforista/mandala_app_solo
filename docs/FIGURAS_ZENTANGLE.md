@@ -99,11 +99,21 @@ Regla de diseño: silueta grande y legible, 3–7 regiones cerradas, sin piezas 
 ## Paquete de dinosaurios dibujados (láminas)
 
 `assets/figuras-dinosaurios.json` tiene 32 figuras sacadas de dos láminas de dibujo de línea (generadas con IA por
-quien usa la app): 28 animales, huevo con cría, nido, volcán, palmera, helecho y huella. Son mucho más expresivas
+quien usa la app): **26 animales** (uso «Anillos»: cada uno sale en una página del libro) y **6 ilustraciones extra**
+(uso «extra»: huevo con cría, nido, volcán, palmera, helecho y huella). Son mucho más expresivas
 que las hechas por código. `scripts/importSheet.mjs` las separa (componentes conectados), las recorta y las pasa
 por `processFigure`, la misma función que usa la app al subir una imagen; el sello se engorda poco (0.2 %, la
 app usa 1.6 %) porque estas líneas ya son gruesas. Todas llevan tema `prehistorico` y `rightsConfirmed: false`.
 `npm run check:figuras` da el semáforo: ver abajo sus límites.
+
+### Ilustración extra
+
+Las figuras con uso **«Ilustración extra (decorado de fondo)»** no son una página: se mezclan, dibujadas a mano, con
+los motivos vectoriales del relleno de **todas** las páginas (fondo y huecos de la corona), en huecos de radio
+≥ 7 mm y con probabilidad 0.55 (`opts.extraArt`, `extraImage` en `pageComposer.js`). Su sello es más grueso (2.5 %
+del alto, ~0.5 mm a 20 mm de alto) porque con el normal quedarían con línea de ~0.2 mm, menos de lo imprimible.
+No cuentan como figuras del libro ni se revisan como tales. Con `--extras nombre1,nombre2` el importador de
+láminas las marca. Una página sin extras queda exactamente igual que antes.
 
 ## Íconos de un contorno y dibujos propios (SVG)
 

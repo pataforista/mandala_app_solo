@@ -501,16 +501,20 @@ const FIGURE_USES = [
   ["figura", "Figura rellena de mandalas"],
   ["anillos", "Anillos alrededor de un mandala"],
   ["medallon", "Medallón central"],
+  ["extra", "Ilustración extra (decorado de fondo)"],
 ];
 
 // Imagen del usuario según el uso que ELIGIÓ para ella (nada es automático):
 // figura rellena, anillos de copias alrededor de un mandala o medallón central.
 // La vista previa usa la imagen seleccionada (borde morado) con su uso.
 function resolveUserImage(s, entry = userFigures[activeFigure]) {
-  const out = { figure: null, centerArt: null, figureRing: null,
+  // Ilustraciones extra (huevos, huellas, palmeras…): no son la figura de la página sino decorado; van en el
+  // relleno de TODAS las páginas, tenga o no la página una figura elegida
+  const extraArt = userFigures.filter(m => m.use === "extra" && m.fig).map(m => ({ href: m.fig.stampHref || m.fig.href, w: m.fig.w, h: m.fig.h }));
+  const out = { figure: null, centerArt: null, figureRing: null, extraArt: extraArt.length ? extraArt : null,
     figureDensity: s.figureDensity, figureFillInside: s.figureFillInside, figureFillOutside: s.figureFillOutside };
   const fig = entry?.fig;
-  if (!fig || !entry.use || entry.use === "ninguno") return out;
+  if (!fig || !entry.use || entry.use === "ninguno" || entry.use === "extra") return out;
   const stamp = fig.stampHref || fig.href;
   if (entry.use === "figura") out.figure = fig;
   else if (entry.use === "anillos") out.figureRing = { href: stamp, centerHref: stamp, w: fig.w, h: fig.h, cls: fig.cls, theme: fig.theme };
@@ -1775,8 +1779,9 @@ function bindUI() {
   const bookVaryEl = document.getElementById("bookVary");
   const bookDifficultyEl = document.getElementById("bookDifficulty");
   // Sólo las imágenes con uso elegido a mano Y que pasan la lista de verificación
-  const chosenFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && figureStatus(m).ready);
-  const pendingFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && !figureStatus(m).ready);
+  const isPageFigure = (m) => m.use && m.use !== "ninguno" && m.use !== "extra"; // «extra» es decorado, no una página
+  const chosenFigures = () => userFigures.filter(m => isPageFigure(m) && figureStatus(m).ready);
+  const pendingFigures = () => userFigures.filter(m => isPageFigure(m) && !figureStatus(m).ready);
   // Reverso: "blanco" | "negro" | "ninguno" (doble cara, sin páginas en blanco)
   const bookBackEl = document.getElementById("bookBack");
   const backMode = () => bookBackEl?.value || "blanco";

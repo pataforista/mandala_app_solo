@@ -71,6 +71,17 @@ export function fitOf(f) {
   return fit ? { fit, imgW: f.w, imgH: f.h, cls: f.cls } : {};
 }
 
+// «Ilustración extra»: dibujos hechos a mano (palmera, helecho, nido, huella…) que se mezclan con los motivos
+// vectoriales del relleno. Sólo en huecos de radio ≥ EXTRA_MIN_R: a menos tamaño su trazo quedaría más fino que lo
+// imprimible. Se encaja la caja entera en el círculo del hueco (su fondo blanco no pisa a los vecinos).
+export const EXTRA_MIN_R = 7;
+export const EXTRA_SHARE = 0.55;
+export function extraImage(art, x, y, r, flip) {
+  const k = (2 * r * 0.98) / Math.hypot(art.w, art.h), w = art.w * k, h = art.h * k;
+  const tf = flip ? ` transform="translate(${(2 * x).toFixed(2)} 0) scale(-1 1)"` : "";
+  return `<image href="${art.href}" x="${(x - w / 2).toFixed(2)}" y="${(y - h / 2).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" preserveAspectRatio="none"${tf} />`;
+}
+
 export function composePage(doc, opts, drawMandala) {
   const {
     seed = 1, stroke = "#000", strokeWidthMm = 0.55, pageBorder = true, includeFrames = true,
@@ -218,7 +229,7 @@ export function composePage(doc, opts, drawMandala) {
       // Huecos blancos entre copias y alrededor del medallón (si la figura trae su silueta cls)
       if (ring.cls) {
         content.push(...drawRingGaps({ cx: acx, cy: acy, rLo: d - Math.max(1.5, R * 0.02), rHi: rExt, n, rm, sw, sh, mirror,
-          cls: ring.cls, fw: ring.w, fh: ring.h, seed, styleMode, outlineMode, stroke, mainW, detailW, weights: SCATTER_THEMES[opts.background] || SCATTER_THEMES[ring.theme] || null }));
+          cls: ring.cls, fw: ring.w, fh: ring.h, seed, styleMode, outlineMode, stroke, mainW, detailW, weights: SCATTER_THEMES[opts.background] || SCATTER_THEMES[ring.theme] || null, extraArt: opts.extraArt }));
       }
       // Mandala interior: núcleo propio del mandala. La figura sólo va al centro con opts.figureCenter
       // (una figura sola en un círculo se lee como una ilustración pegada, no como parte del mandala)
@@ -330,7 +341,7 @@ export function composePage(doc, opts, drawMandala) {
   // ---------- Relleno del espacio libre ----------
   const theme = SCATTER_THEMES[opts.background] || (opts.figureRing && SCATTER_THEMES[opts.figureRing.theme]) || null;
   const fillItems = fill ? packFill({ A, obstacles, rng, gap, minis: fill.minis, style: styleMode, theme,
-    outlineMode, stroke, mainW, detailW, sub, miniOpts }) : [];
+    outlineMode, stroke, mainW, detailW, sub, miniOpts, extraArt: opts.extraArt }) : [];
   if (fillPattern) fillItems.push(...drawPattern({ ...fillPattern, A, gap, stroke, mainW, detailW, outlineMode }));
 
   // ---------- Ensamblado ----------
@@ -359,7 +370,7 @@ function emitTo(arr, pb, w, fill = "none", stroke = "#000") {
 }
 
 // ---------- Empaquetado voraz de círculos ----------
-function packFill({ A, obstacles, rng, gap, minis, style, theme = null, outlineMode, stroke, mainW, detailW, sub, miniOpts }) {
+function packFill({ A, obstacles, rng, gap, minis, style, theme = null, outlineMode, stroke, mainW, detailW, sub, miniOpts, extraArt = null }) {
   const step = 2;
   const pts = [];
   for (let y = A.y0 + step / 2; y < A.y1; y += step) {
@@ -394,6 +405,8 @@ function packFill({ A, obstacles, rng, gap, minis, style, theme = null, outlineM
     const rot = rng() * TAU;
     if (minis && r >= 13 && miniCount < 14) {
       out.push(...sub(best.x, best.y, r, miniOpts(miniCount++, r)));
+    } else if (extraArt?.length && r >= EXTRA_MIN_R && rng() < EXTRA_SHARE) {
+      out.push(extraImage(extraArt[Math.floor(rng() * extraArt.length)], best.x, best.y, r, rng() < 0.5));
     } else if (r >= 5.0) {
       const kind = pickKind();
       // Figuras con «arriba» casi derechas: cabeza abajo se leen como un error

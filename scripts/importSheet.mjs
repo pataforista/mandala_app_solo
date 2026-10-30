@@ -4,7 +4,8 @@
 //
 //   node scripts/importSheet.mjs lamina.jpg --names trex,triceratops,... --out lamina.json
 //        [--theme prehistorico] [--use anillos|medallon|figura] [--source "Gemini (generada por el usuario)"]
-//        [--rights 1] [--grow 14] [--min 120] [--outlong 1500] [--hollow 1] [--stamp 0.002] [--debug carpeta]
+//        [--rights 1] [--grow 14] [--min 120] [--outlong 1500] [--hollow 1] [--stamp 0.002]
+//        [--extras nido-huevo,volcan,...]  figuras de «ilustración extra» (decorado de fondo): sello grueso, uso «extra» [--debug carpeta]
 //
 // Los nombres se asignan en orden de lectura (filas de arriba abajo, cada fila de izquierda a derecha). Sin --names se
 // usan fig-01, fig-02… Requiere Playwright (ya instalado en este entorno) sólo para decodificar la imagen.
@@ -22,6 +23,8 @@ const args = Object.fromEntries(argv.reduce((a, v, i) => (v.startsWith("--") ? [
 if (!file) { console.error("uso: node scripts/importSheet.mjs lamina.jpg --names a,b,c --out paquete.json"); process.exit(2); }
 const GROW = parseInt(args.grow, 10) || 14, MIN_BOX = parseInt(args.min, 10) || 120, OUT_LONG = parseInt(args.outlong, 10) || 1500;
 const STAMP = Number.isFinite(parseFloat(args.stamp)) ? parseFloat(args.stamp) : 0.002;
+const EXTRAS = new Set((args.extras || "").split(",").filter(Boolean));
+const EXTRA_STAMP = 0.025; // a ~20 mm de alto, 0.025 × alto = 0.5 mm de línea (el mínimo imprimible es ~0.26 mm)
 const USE = ["anillos", "medallon", "figura"].includes(args.use) ? args.use : "anillos";
 const outFile = path.resolve(args.out || "figuras-lamina.json");
 
@@ -103,14 +106,14 @@ for (const [k, c] of found.entries()) {
   }
   const fig = processFigure(crop, cw, ch, { mode: "lineas", threshold: 110, removeBackground: true, keepMain: true, simplify: 0.3, outLong: OUT_LONG, hollow: args.hollow === "1" });
   const href = bytesToDataUrl(await encodeGrayPng(fig.gray, fig.w, fig.h));
-  const name = names[k] || `fig-${String(k + 1).padStart(2, "0")}`;
   let interior = 0; for (const v of fig.cls) if (v === 1) interior++;
   // Sello (la versión que se repite en la corona): estos dibujos ya traen línea gruesa, así que se engorda poco
   // (la app, por defecto, la engorda un 1.6 % del lado largo y empasta ojos, dientes y dedos)
-  const st = stampRaster(fig.cls, fig.w, fig.h, 720, STAMP);
+  const name = names[k] || `fig-${String(k + 1).padStart(2, "0")}`, extra = EXTRAS.has(name);
+  const st = stampRaster(fig.cls, fig.w, fig.h, 720, extra ? EXTRA_STAMP : STAMP);
   const stampHref = bytesToDataUrl(await encodeGrayPng(st.gray, st.w, st.h));
   const entry = await withStamp({ href, cls: fig.cls, w: fig.w, h: fig.h, srcLong: Math.max(cw, ch), stampHref });
-  figures.push({ ...entry, name, use: USE, source: args.source || path.basename(file), rightsConfirmed: args.rights === "1", theme: args.theme || "" });
+  figures.push({ ...entry, name, use: extra ? "extra" : USE, source: args.source || path.basename(file), rightsConfirmed: args.rights === "1", theme: args.theme || "" });
   console.log(`  ${String(k + 1).padStart(2)} ${name.padEnd(18)} ${cw}×${ch} → ${fig.w}×${fig.h}, interior ${(100 * interior / fig.cls.length).toFixed(0)} %`);
   if (args.debug) fs.writeFileSync(path.join(args.debug, `${name}.png`), Buffer.from(href.split(",")[1], "base64"));
 }
