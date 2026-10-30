@@ -10,7 +10,7 @@
 // al mandala ni a otro motivo: todas las celdas quedan cerradas y coloreables.
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder } from "../core/pathBuilder.js";
-import { drawFigure } from "./figureFill.js";
+import { drawFigure, drawRingGaps } from "./figureFill.js";
 
 const TAU = Math.PI * 2;
 
@@ -205,6 +205,11 @@ export function composePage(doc, opts, drawMandala) {
         content.push(`<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${ang.toFixed(2)})${flip}"><image href="${ring.href}" x="${(-sw / 2).toFixed(2)}" y="${(-sh / 2).toFixed(2)}" width="${sw.toFixed(2)}" height="${sh.toFixed(2)}" preserveAspectRatio="none" /></g>`);
       }
       const rIn = d;
+      // Huecos blancos entre copias y alrededor del medallón (si la figura trae su silueta cls)
+      if (ring.cls) {
+        content.push(...drawRingGaps({ cx: acx, cy: acy, rLo: d - Math.max(1.5, R * 0.02), rHi: rExt, n, rm, sw, sh, mirror,
+          cls: ring.cls, fw: ring.w, fh: ring.h, seed, styleMode, outlineMode, stroke, mainW, detailW }));
+      }
       // Mandala interior con la figura completa en el medallón
       const ri = rIn - Math.max(1.5, R * 0.02);
       content.push(...sub(acx, acy, ri, { maxBands: 2, centerArt: ring.centerHref ? { type: "image", href: ring.centerHref, scale: 0.62 } : null }));

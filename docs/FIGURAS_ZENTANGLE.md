@@ -23,7 +23,7 @@ node scripts/exportZenFigures.mjs --zen ../zentangle_app_solo_fixed --out assets
 ```
 
 Opciones: `--sets dino,dinoOrigamiMix,cryptids,cryptidsOrigami,kids,bio`, `--only trex,yeti`,
-`--size 1000` (lado largo en px), `--use anillos|figura|medallon` (uso inicial), `--detail 0..1` (cuerdas, 0 las apaga), `--echo 56` (ancho de banda de los ecos en px, 0 los apaga).
+`--size 1000` (lado largo en px), `--use anillos|figura|medallon` (uso inicial), `--detail 0..1` (cuerdas, 0 las apaga), `--echo 56` (ancho de banda de los ecos en px, 0 los apaga), `--scales 100` (ancho de escama en px, 0 las apaga).
 
 El script no modifica el repositorio de Zentangle: carga una copia temporal de
 `figure.js` con `FIGURES` exportado y la borra al terminar.
@@ -41,14 +41,25 @@ El script no modifica el repositorio de Zentangle: carga una copia temporal de
      (con el trazo grueso del sello quedarían rellenas de tinta).
    - **Ecos**: líneas paralelas al contorno por dentro (curvas de nivel de la transformada de
      distancia), una o dos por región, solo si el núcleo restante sigue siendo coloreable.
+   - **Escamas** (dinosaurios, nessie, kraken, fish; no ammonite): arcos «de pez» en rejilla hexagonal,
+     solo donde la escama cabe entera en una región amplia. Sustituyen a los ecos en esas figuras.
 5. Empaqueta con `figurePack.js` (mismo formato que `preprocesar.html`).
+
+## Huecos blancos de la corona
+
+Con la figura de uso «Anillos», `pageComposer.js` llama a `drawRingGaps` (en `figureFill.js`): rellena el
+espacio entre copias vecinas y entre ellas y el medallón con motivos del estilo del mandala (flores, hojas,
+mariposas, estrellas…). Usa la silueta real de cada copia (`cls`, que `app.js` pasa en `figureRing`), no su
+caja, así que los motivos entran entre patas y colas sin tocar el dibujo. Los huecos pequeños llevan un
+punto sólido. Si la figura no trae `cls`, la corona queda como antes.
 
 ## Límites conocidos
 
 - Hereda la calidad de las siluetas de Zentangle: las de pocos puntos se ven «de juguete».
-- Nueve figuras quedan sin ecos porque sus regiones son demasiado estrechas (diplodocus, ankylosaurus,
-  dimetrodon, pterosaur, mosasaurus, ammonite, nessie, jerseydevil, rabbit): solo llevan cuerdas.
+- Las escamas solo caben en regiones amplias: en patas y colas finas no aparecen. Ammonite, jerseydevil y
+  rabbit no llevan ni ecos ni escamas porque sus regiones son demasiado estrechas: solo cuerdas.
 - Las cuerdas y los ecos son geométricos; no sustituyen un plumaje, unas escamas o un pelaje dibujados
-  a mano. Para eso haría falta una textura por tema (escamas en dinosaurios, pelo en yeti).
+  a mano. Falta una textura propia para pelo (yeti, bigfoot) y plumas (thunderbird, mothman).
+- Los espacios blancos dentro de las celdas grandes de cada figura no se rellenan; solo los de la corona.
 - El kraken sale con piezas rectangulares en la base: conviene revisarlo antes de usarlo en un libro.
 - Las variantes origami (`angularize`) no se exportan.

@@ -665,3 +665,24 @@ test("silueta de reemplazo: acorde al estilo y de otra familia visual", async ()
     assert.notEqual(s, "heart");
   }
 });
+
+test("anillos: los huecos de la corona se rellenan sin tocar la silueta de las copias", () => {
+  // Figura sintética: caja 100×120 con un óvalo (cls 1) y tinta (0) en su contorno; el resto es fondo (2)
+  const w = 100, h = 120, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const e = ((x - 50) / 36) ** 2 + ((y - 60) / 52) ** 2;
+    if (e <= 1) cls[y * w + x] = e > 0.9 ? 0 : 1;
+  }
+  const ring = { href: "data:,S", centerHref: "data:,C", w, h };
+  const gen = (r) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 2, figureRing: r });
+    return renderDocToSvgString(doc);
+  };
+  const sin = gen(ring), con = gen({ ...ring, cls });
+  assert.ok(con.length > sin.length, "con cls hay motivos extra en la corona");
+  assert.equal(con, gen({ ...ring, cls }), "determinista");
+  // Mismas copias de la figura con y sin relleno
+  const copias = (svg) => (svg.match(/<image href="data:,S"/g) || []).length;
+  assert.equal(copias(con), copias(sin));
+});

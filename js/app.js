@@ -512,7 +512,7 @@ function resolveUserImage(s, entry = userFigures[activeFigure]) {
   if (!fig || !entry.use || entry.use === "ninguno") return out;
   const stamp = fig.stampHref || fig.href;
   if (entry.use === "figura") out.figure = fig;
-  else if (entry.use === "anillos") out.figureRing = { href: stamp, centerHref: stamp, w: fig.w, h: fig.h };
+  else if (entry.use === "anillos") out.figureRing = { href: stamp, centerHref: stamp, w: fig.w, h: fig.h, cls: fig.cls };
   else if (entry.use === "medallon") out.centerArt = { type: "image", href: stamp, scale: s.centerArtScale };
   return out;
 }

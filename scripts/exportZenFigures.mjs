@@ -3,11 +3,13 @@
 //
 //   node scripts/exportZenFigures.mjs [--zen ../zentangle_app_solo_fixed] [--out figuras-zentangle.json]
 //                                     [--sets dino,dinoOrigamiMix,cryptids,cryptidsOrigami,kids] [--only trex,yeti] [--size 1000]
-//                                     [--use anillos|figura|medallon] [--detail 0.3] [--echo 56]
+//                                     [--use anillos|figura|medallon] [--detail 0.3] [--echo 56] [--scales 100]
 //
 // Cada figura se dibuja como contorno (silueta + piezas internas + detalles) sobre blanco.
 // --detail (0 = pocas, 1 = muchas): cuerdas que subdividen cada pieza en celdas coloreables,
 // las mismas que usa Zentangle (makeSections), recortadas al interior de la pieza.
+// --scales (px): escamas (arcos en rejilla hexagonal) en las regiones amplias de dinosaurios y criaturas
+// escamosas; sustituyen a los ecos en esas figuras.
 // --echo (px): líneas paralelas al contorno por dentro (ecos), que siguen la anatomía de cada región.
 // Uso por defecto «anillos»: copias de la figura en corona alrededor de un mandala (pageComposer).
 // Con --use figura, las regiones cerradas (cls = 1) las rellena figureFill.js con mandalas.
@@ -27,6 +29,8 @@ const SIZE = Math.max(400, parseInt(args.size, 10) || 1000); // lado largo en px
 const USE = ["anillos", "figura", "medallon"].includes(args.use) ? args.use : "anillos";
 const DETAIL = Number.isFinite(parseFloat(args.detail)) ? Math.min(1, Math.max(0, parseFloat(args.detail))) : 0.3;
 const ECHO_PX = Number.isFinite(parseFloat(args.echo)) ? Math.max(0, parseFloat(args.echo)) : 56; // ancho de banda de los ecos (0 = sin ecos)
+const SCALE_PX = Number.isFinite(parseFloat(args.scales)) ? Math.max(0, parseFloat(args.scales)) : 100; // ancho de cada escama (0 = sin escamas)
+const SCALY = new Set(["nessie", "fish", "kraken"]);    // además de los de science: "dino" (menos ammonite)
 const MIN_CELL_PX = 30;                                      // radio mínimo de una celda coloreable (≈1.7 mm a 55 mm de alto)
 const U = 100;                                               // unidades de figura → «mm» que espera makeSections
 const INK_R = 2;                                             // radio de la línea (px)
@@ -195,6 +199,49 @@ function classify(ink, w, h) {
   return cls;
 }
 
+// Escamas: arcos «de pez» en rejilla hexagonal, sólo donde la escama cabe entera dentro de una
+// región interior (sin tocar la tinta). Filas separadas media escama; las vecinas se cierran entre sí.
+function addScales(ink, w, h) {
+  if (!SCALE_PX) return 0;
+  const dt = distanceTransform(ink, w, h, false);
+  // Regiones interiores (las conectadas al borde son el fondo)
+  const lab = new Int32Array(w * h), stack = new Int32Array(w * h), out = [];
+  for (let s0 = 0; s0 < ink.length; s0++) {
+    if (ink[s0] || lab[s0]) continue;
+    const id = out.length + 1;
+    let top = 0, edge = false;
+    stack[top++] = s0; lab[s0] = id;
+    while (top) {
+      const i = stack[--top], x = i % w, y = (i / w) | 0;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) edge = true;
+      if (x > 0 && !ink[i - 1] && !lab[i - 1]) { lab[i - 1] = id; stack[top++] = i - 1; }
+      if (x < w - 1 && !ink[i + 1] && !lab[i + 1]) { lab[i + 1] = id; stack[top++] = i + 1; }
+      if (y > 0 && !ink[i - w] && !lab[i - w]) { lab[i - w] = id; stack[top++] = i - w; }
+      if (y < h - 1 && !ink[i + w] && !lab[i + w]) { lab[i + w] = id; stack[top++] = i + w; }
+    }
+    out.push(edge);
+  }
+  const R = SCALE_PX / 2, fr = { w, h, x0: 0, y0: 0, k: 1, pad: 0 };
+  const arcs = [];
+  for (let row = 0, y = R; y < h - R; row++, y += R) {
+    for (let x = R + (row % 2 ? R : 0); x < w - R; x += SCALE_PX) {
+      const pts = [];
+      let ok = true;
+      for (let a = 0; a <= 24 && ok; a++) {
+        const t = (a / 24) * Math.PI, px = Math.round(x + R * Math.cos(t)), py = Math.round(y + R * Math.sin(t));
+        const i = py * w + px;
+        // El arco entero dentro de una región interior, a ≥ 9 px de cualquier línea (salvo las puntas)
+        if (px < 0 || py < 0 || px >= w || py >= h || ink[i] || out[lab[i] - 1] !== false) { ok = false; break; }
+        if (a > 1 && a < 23 && dt[i] < 9) ok = false;
+        pts.push([px, py]);
+      }
+      if (ok) arcs.push(pts);
+    }
+  }
+  drawRings(ink, fr, arcs);
+  return arcs.length;
+}
+
 // Ecos: en cada región interior grande, una línea paralela al contorno a ECHO_PX de distancia
 // (curva de nivel de la transformada de distancia). Sólo si el núcleo que queda sigue siendo coloreable.
 function addEchoes(ink, w, h) {
@@ -247,7 +294,9 @@ async function figureToEntry(name, def, zen) {
     const t = tinyCells(trial, w, h);
     if (t <= tiny) { ink.set(trial); tiny = t; kept++; }
   }
-  const echoes = addEchoes(ink, w, h);
+  const scaly = def.science === "dino" && name !== "ammonite" || SCALY.has(name);
+  const scales = scaly ? addScales(ink, w, h) : 0;
+  const echoes = scaly && scales ? 0 : addEchoes(ink, w, h);
   const cls = classify(ink, w, h);
   const gray = new Uint8Array(w * h);
   for (let i = 0; i < gray.length; i++) gray[i] = ink[i] ? 0 : 255;
@@ -256,7 +305,7 @@ async function figureToEntry(name, def, zen) {
   let inside = 0;
   for (const c of cls) if (c === 1) inside++;
   if (inside < w * h * 0.03) return { name, skipped: "sin regiones cerradas rellenables" };
-  console.log(`  ${name}: ${kept}/${strings.length} cuerdas, ${echoes ? "con ecos" : "sin ecos"}`);
+  console.log(`  ${name}: ${kept}/${strings.length} cuerdas, ${scales ? scales + " escamas" : echoes ? "con ecos" : "sin ecos"}`);
   return { ...fig, name: `zentangle-${name}`, use: USE, source: "Zentangle (motor propio)", rightsConfirmed: true };
 }
 

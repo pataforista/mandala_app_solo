@@ -101,3 +101,75 @@ export function drawFigure({ figure, A, seed = 1, styleMode = "floral", fillInsi
   }
   return out;
 }
+
+/**
+ * Rellena los huecos blancos de la corona de «anillos»: el espacio entre copias vecinas y entre
+ * ellas y el medallón. Mismo principio que drawFigure (empaquetado voraz de círculos sobre una
+ * transformada de distancia), pero el espacio bloqueado es la silueta real de cada copia
+ * (cls ≠ 2), no su caja. Cada motivo cabe entero en su hueco, sin tocar el dibujo.
+ *
+ * cx, cy: centro. rLo, rHi: radios interior y exterior de la corona (mm).
+ * n, rm, sw, sh, mirror: las copias (nº, radio de su centro, ancho y alto en mm, espejo alterno).
+ * cls, fw, fh: clases por píxel de la figura y su tamaño. Devuelve fragmentos SVG.
+ */
+export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw, fh, seed = 1, styleMode = "floral",
+  outlineMode = false, stroke = "#000", mainW = 0.55, detailW = 0.4 }) {
+  const rng = mulberry32(((seed >>> 0) ^ 0x6A9511) >>> 0);
+  const cell = 0.7, gap = 1.6;
+  const g = Math.ceil((2 * rHi) / cell), x0 = cx - rHi, y0 = cy - rHi;
+  const wedge = 360 / n;
+  const blocked = new Uint8Array(g * g);
+  for (let gy = 0; gy < g; gy++) for (let gx = 0; gx < g; gx++) {
+    const dx = x0 + (gx + 0.5) * cell - cx, dy = y0 + (gy + 0.5) * cell - cy;
+    const r = Math.hypot(dx, dy);
+    if (r < rLo || r > rHi) { blocked[gy * g + gx] = 1; continue; }
+    // Copia más cercana por ángulo (cada caja cabe en su cuña)
+    let deg = (Math.atan2(dx, -dy) * 180) / Math.PI; if (deg < 0) deg += 360;
+    const i = Math.round(deg / wedge) % n, a = (i * wedge * Math.PI) / 180;
+    const ex = dx - rm * Math.sin(a), ey = dy + rm * Math.cos(a);
+    let u = ex * Math.cos(a) + ey * Math.sin(a);
+    const v = -ex * Math.sin(a) + ey * Math.cos(a);
+    if (mirror && i % 2) u = -u;
+    const px = Math.floor(((u + sw / 2) / sw) * fw), py = Math.floor(((v + sh / 2) / sh) * fh);
+    if (px >= 0 && py >= 0 && px < fw && py < fh && cls[py * fw + px] !== 2) blocked[gy * g + gx] = 1;
+  }
+  const dist = distanceTransform(blocked, g, g, true);
+  const avail = new Float32Array(g * g);
+  for (let i = 0; i < avail.length; i++) avail[i] = blocked[i] ? -1 : dist[i] * cell - gap;
+
+  const W = FILLERS[styleMode] || FILLERS.floral;
+  const kinds = Object.keys(W);
+  const pickKind = () => { let t = rng() * kinds.reduce((s, q) => s + W[q], 0); for (const q of kinds) { t -= W[q]; if (t <= 0) return q; } return kinds[0]; };
+  const main = new PathBuilder(), detail = new PathBuilder(), dots = new PathBuilder();
+  const minR = outlineMode ? 3.6 : 3.0, maxR = 9; // coloreable: nada de confeti
+  for (let guard = 0; guard < 400; guard++) {
+    let best = -1, bestScore = 0;
+    for (let i = 0; i < avail.length; i++) {
+      const a = avail[i];
+      if (a < 1.4) continue;
+      const s = Math.min(a, maxR) * (0.85 + rng() * 0.3);
+      if (s > bestScore) { bestScore = s; best = i; }
+    }
+    if (best < 0) break;
+    const gx = best % g, gy = (best / g) | 0;
+    const x = x0 + (gx + 0.5) * cell, y = y0 + (gy + 0.5) * cell;
+    const r = Math.min(avail[best], maxR);
+    if (r >= minR) drawFiller(pickKind(), main, detail, x, y, r, rng() * Math.PI * 2, rng, !outlineMode && r >= 6);
+    else circle(dots, x, y, Math.max(0.5, r * 0.5)); // hueco pequeño: un punto sólido, sin celdas diminutas
+    const reach = Math.ceil((r + maxR + gap) / cell);
+    for (let yy = Math.max(0, gy - reach); yy < Math.min(g, gy + reach + 1); yy++) {
+      for (let xx = Math.max(0, gx - reach); xx < Math.min(g, gx + reach + 1); xx++) {
+        const j = yy * g + xx;
+        if (avail[j] < 0) continue;
+        const v = Math.hypot((xx - gx) * cell, (yy - gy) * cell) - r - gap;
+        if (v < avail[j]) avail[j] = v;
+      }
+    }
+  }
+  const out = [];
+  for (const [pb, w, fill] of [[main, mainW, "#fff"], [detail, detailW, "none"], [dots, 0.2, stroke]]) {
+    const p = pb.toPath({ stroke, strokeWidthMm: w, fill });
+    if (p) out.push(p);
+  }
+  return out;
+}
