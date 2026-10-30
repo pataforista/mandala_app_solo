@@ -35,7 +35,7 @@ No bajes el trazo de 0,8 mm en un libro para adultos: en papel de KDP una línea
 3. **Patrones:** «Los más vendidos para este formato», con **capítulos temáticos** activados.
 4. **Páginas sorprendentes:** opcionales. Los mandalas misteriosos tienen celdas pequeñas por diseño:
    ponlos sólo en libros para adultos con paciencia; quítalos en libros «large print» o infantiles.
-5. **Textos y páginas extra:** título, autor, **reverso en blanco** (recomendado para marcadores).
+5. **Título, autor e impresión** (en «2 · Páginas extra»): título, autor, **reverso en blanco** (recomendado para marcadores).
 6. Lee el **resumen** debajo: debe decir «✅ Cumple los requisitos de interior de KDP».
    Cualquier ⚠️ se corrige antes de seguir.
 
