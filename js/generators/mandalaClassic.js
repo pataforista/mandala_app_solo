@@ -345,7 +345,19 @@ export function generateMandalaClassic(doc, opts) {
         C(pb, rOut, a + half * 0.4, rOut, a + half, rIn, a + half);
       };
       for (let i = 0; i < b.n; i++) bump(m, b.r0 + h * 0.15, b.r1, b.off + i * step, step / 2);
-      if (detail) {
+      // Como silueta exterior cada lóbulo es grande: un solo contorno interior lo deja pobre.
+      // Arcos concéntricos + pétalo central (estilo abanico), sin puntos que parezcan remaches.
+      const nested = detail && b.k === B - 1 && h * 0.14 >= 2.5;
+      if (nested) {
+        // Los arcos nacen del anillo (no de una cuerda recta): se leen como abanico, no como letras «D»
+        const ring = b.r0 + h * 0.15;
+        for (let i = 0; i < b.n; i++) {
+          const a = b.off + i * step;
+          bump(d, ring, b.r1 - h * 0.15, a, step * 0.4);
+          bump(d, ring, b.r1 - h * 0.37, a, step * 0.27);
+          petalShape(d, ring, b.r1 - h * 0.55, a, step * 0.12, 1.15, true);
+        }
+      } else if (detail) {
         for (let i = 0; i < b.n; i++) { bump(d, b.r0 + h * 0.18, b.r1 - h * 0.3, b.off + i * step, step * 0.36); d.close(); }
         if (textures && richDetail) {
           for (let i = 0; i < b.n; i++) {
