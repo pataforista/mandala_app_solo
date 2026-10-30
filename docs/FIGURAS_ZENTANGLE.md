@@ -75,10 +75,13 @@ círculo para dejar sitio a la trama. Se dibuja encima de la imagen, porque su f
 
 ## Figuras redibujadas
 
-`scripts/zenOverrides.mjs` sustituye cuatro figuras del motor que, a ~45 mm, salían diminutas, cargadas de tinta
+`scripts/zenOverrides.mjs` sustituye ocho figuras del motor que, a ~45 mm, salían diminutas, cargadas de tinta
 o con piezas sueltas: **ufo** (disco, cúpula y haz de luz que se cierra contra el disco), **greyalien** (cabeza
 grande con ojos almendrados), **kraken** (ahora un pulpo: manto redondo y cuatro tentáculos en S que no se
-cruzan; conserva el nombre `zentangle-kraken`) y **wendigo** (cabeza de ciervo con astas de líneas abiertas).
+cruzan; conserva el nombre `zentangle-kraken`) y **wendigo** (cabeza de ciervo con astas de líneas abiertas), **rabbit** (de frente: cabeza, orejas, cuerpo, panza y patas, todo
+cerrado), **mosasaurus** (cuerpo fusiforme con aletas que se cierran contra el vientre) y los terópodos
+**allosaurus** y **velociraptor**, que conservan la silueta de esqueleto de Zentangle pero sin escamas, ecos ni
+cortes de más (lo que los cargaba de tinta eran las texturas, no el contorno).
 Regla de diseño: silueta grande y legible, 3–7 regiones cerradas, sin piezas que se crucen y sin ecos
 (`noEcho`). Para exportar las originales: `--original 1`. Para añadir más, basta otro objeto en
 `buildOverrides`, con las mismas claves que `FIGURES` en `figure.js`.

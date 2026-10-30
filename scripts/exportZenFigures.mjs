@@ -34,7 +34,7 @@ const ECHO_PX = Number.isFinite(parseFloat(args.echo)) ? Math.max(0, parseFloat(
 const SCALE_PX = Number.isFinite(parseFloat(args.scales)) ? Math.max(0, parseFloat(args.scales)) : 100; // ancho de cada escama (0 = sin escamas)
 const FEATHER_PX = Number.isFinite(parseFloat(args.feathers)) ? Math.max(0, parseFloat(args.feathers)) : 130; // ancho de cada pluma (0 = sin plumas)
 const FUR_PX = Number.isFinite(parseFloat(args.fur)) ? Math.max(0, parseFloat(args.fur)) : 104;            // separación de los mechones de pelo (0 = sin pelo)
-const FURRY = new Set(["bigfoot", "yeti", "chupacabra", "jackalope", "bear", "fox", "rabbit", "cat"]);
+const FURRY = new Set(["bigfoot", "yeti", "chupacabra", "jackalope", "bear", "fox", "cat"]);
 const FEATHERED = new Set(["thunderbird", "mothman", "owl", "bird", "penguin"]);
 const SCALY = new Set(["nessie", "fish"]);    // además de los de science: "dino" (menos ammonite)
 const MIN_CELL_PX = 30;                                      // radio mínimo de una celda coloreable (≈1.7 mm a 55 mm de alto)

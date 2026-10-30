@@ -5,7 +5,7 @@
 //
 // h: herramientas del motor de Zentangle { ell, xform, taper, smoothPoly, qpts }.
 export function buildOverrides(h) {
-  const { ell, xform, taper, smoothPoly, qpts } = h;
+  const { ell, xform, taper, smoothPoly, qpts } = h; // h = módulo cargado de figure.js (con FIGURES)
   const mirror = (cmds) => xform(cmds, 0, 0, 0, -1, 1);
   const line = (...pts) => pts.map(([x, y], i) => [i ? "L" : "M", x, y]);
 
@@ -73,5 +73,44 @@ export function buildOverrides(h) {
     science: "cryptid", noEcho: true,
   };
 
-  return { ufo, greyalien, kraken, wendigo };
+  // ---- Terópodos: se conserva la silueta de esqueleto de Zentangle (buena), pero sin escamas, sin ecos
+  // y con un solo corte por pieza: lo que los cargaba de tinta a ~45 mm eran las texturas, no el contorno ----
+  const lighter = (name) => {
+    const d = h.FIGURES[name];
+    return {
+      ...d, science: "dinoplain", noEcho: true,
+      parts: (d.parts || []).map((p) => (p.strings ? { ...p, strings: { ...p.strings, a: [1, 1], b: [1, 1] } } : p)),
+    };
+  };
+  const allosaurus = lighter("allosaurus"), velociraptor = lighter("velociraptor");
+
+  // ---- Mosasaurio: cuerpo fusiforme, dos aletas anchas y cola con aleta ----
+  const MOSA = smoothPoly([[0.98, -0.08], [0.82, -0.2], [0.6, -0.2], [0.3, -0.3], [-0.1, -0.3], [-0.5, -0.2], [-0.78, -0.06], [-0.9, -0.36], [-0.99, -0.34],
+    [-0.94, -0.04], [-0.99, 0.26], [-0.9, 0.28], [-0.76, 0.08], [-0.45, 0.2], [-0.05, 0.28], [0.35, 0.26], [0.65, 0.14], [0.8, 0.06], [0.96, 0.0]]);
+  // Aletas abiertas por arriba: arrancan en la línea del vientre y se cierran contra ella (sin lazos dentro del cuerpo)
+  const flipper = (x) => [["M", x - 0.1, 0.19], ["C", x - 0.15, 0.4, x - 0.03, 0.6, x + 0.1, 0.64], ["C", x + 0.22, 0.56, x + 0.2, 0.36, x + 0.12, 0.18]];
+  const MOSA_FLIP = [flipper(0.22), flipper(-0.3)];
+  const mosasaurus = {
+    parts: [{ cmds: MOSA, strings: { angle: Math.PI / 2, a: [0, 0], b: [2, 2] } }],
+    front: MOSA_FLIP.map((cmds) => ({ cmds })),
+    deco: () => [{ cmds: ell(0.7, -0.08, 0.055) }],
+    silhouette: [MOSA, ...MOSA_FLIP],
+    science: "dinoplain", noEcho: true,
+  };
+
+  // ---- Conejo de frente: cabeza, orejas, cuerpo, panza y patas, todo cerrado ----
+  const R_HEAD = ell(0, -0.3, 0.3, 0.27), R_BODY = ell(0, 0.4, 0.42, 0.46);
+  const R_EAR = (sx) => xform(ell(0, 0, 0.1, 0.4), sx * 0.15, -0.95, sx * 0.1);
+  const R_EAR_IN = (sx) => xform(ell(0, 0, 0.045, 0.27), sx * 0.15, -0.93, sx * 0.1);
+  const R_FOOT = (sx) => ell(sx * 0.22, 0.9, 0.18, 0.085);
+  const rabbit = {
+    parts: [{ cmds: R_HEAD }, { cmds: R_BODY }],
+    front: [R_EAR(-1), R_EAR(1), ell(0, 0.44, 0.23, 0.27), R_FOOT(-1), R_FOOT(1)].map((cmds) => ({ cmds })),
+    deco: () => [{ cmds: R_EAR_IN(-1) }, { cmds: R_EAR_IN(1) }, { cmds: ell(-0.11, -0.34, 0.055) }, { cmds: ell(0.11, -0.34, 0.055) },
+      { cmds: ell(0, -0.2, 0.035, 0.025) }],
+    silhouette: [R_HEAD, R_BODY, R_EAR(-1), R_EAR(1), R_FOOT(-1), R_FOOT(1)],
+    science: "kids", noEcho: true,
+  };
+
+  return { ufo, greyalien, kraken, wendigo, allosaurus, velociraptor, mosasaurus, rabbit };
 }
