@@ -22,6 +22,8 @@ import { encodeGrayPng, bytesToDataUrl } from "../js/core/grayPng.js";
 import { packFigures } from "../js/core/figurePack.js";
 import { distanceTransform } from "../js/core/lineArt.js";
 import { buildOverrides } from "./zenOverrides.mjs";
+import { buildIcons } from "./zenIcons.mjs";
+import { parseSvg } from "./svgPath.mjs";
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, v, i, all) => (v.startsWith("--") ? [...a, [v.slice(2), all[i + 1]]] : a), []));
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -384,15 +386,36 @@ async function figureToEntry(name, def, zen) {
   for (const c of cls) if (c === 1) inside++;
   if (inside < w * h * 0.03) return { name, skipped: "sin regiones cerradas rellenables" };
   console.log(`  ${name}: ${kept}/${strings.length} cuerdas, ${scales ? scales + " trazos de " + kind : echoes ? "con ecos" : "sin ecos"}`);
-  return { ...fig, name: `zentangle-${name}`, use: USE, source: "Zentangle (motor propio)", rightsConfirmed: true,
-    theme: def.science === "dino" || def.science === "dinoplain" || name === "nessie" ? "prehistorico" : "" };
+  return { ...fig, name: name.startsWith("svg-") ? name.slice(4) : `zentangle-${name}`, use: USE,
+    source: name.startsWith("svg-") ? "SVG importado" : "Zentangle (motor propio)",
+    // Un dibujo ajeno entra SIN derechos confirmados: --rights 1 sólo si quien lo trae asegura que puede usarlo en un libro
+    rightsConfirmed: name.startsWith("svg-") ? args.rights === "1" : true,
+    theme: name.startsWith("svg-") ? (args.theme || "") : def.science === "dino" || def.science === "dinoplain" || name === "nessie" ? "prehistorico" : "" };
 }
 
 const zen = await loadZen();
 // Figuras redibujadas (zenOverrides.mjs) en lugar de las del motor; --original 1 las desactiva
 if (!args.original || args.original === "0") Object.assign(zen.FIGURES, buildOverrides(zen));
+// Íconos de un solo contorno (zenIcons.mjs): opcionales, no entran al paquete por defecto
+if (args.icons === "1") Object.assign(zen.FIGURES, buildIcons(zen));
+// --svg CARPETA: dibujos hechos por una persona (ver docs/GUIA_PARA_AYUDA.md). --svgmode silhouette: las formas con
+// relleno son la silueta (su unión) y las de sólo trazo son detalle interior; outline (por defecto): todo es línea.
+const svgNames = [];
+if (args.svg) {
+  const dir = path.resolve(args.svg);
+  for (const file of fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".svg")).sort()) {
+    const { shapes, warnings } = parseSvg(fs.readFileSync(path.join(dir, file), "utf8"));
+    for (const w of warnings) console.log(`  ${file}: ${w}`);
+    if (!shapes.length) { console.log(`  ${file}: sin formas (path, circle, ellipse, rect, polygon)`); continue; }
+    const name = "svg-" + path.basename(file, path.extname(file));
+    zen.FIGURES[name] = args.svgmode === "silhouette"
+      ? { union: shapes.filter((x) => x.filled).map((x) => x.cmds), detail: shapes.filter((x) => !x.filled).map((x) => x.cmds), noEcho: true }
+      : { parts: shapes.map((x) => ({ cmds: x.cmds })), noEcho: true };
+    svgNames.push(name);
+  }
+}
 const sets = (args.sets || "dino,dinoOrigamiMix,cryptids,cryptidsOrigami,kids").split(",");
-const wanted = args.only ? args.only.split(",") : [...new Set(sets.flatMap((s) => zen.FIGURE_SETS[s] || []))];
+const wanted = args.svg ? svgNames : args.only ? args.only.split(",") : [...new Set(sets.flatMap((s) => zen.FIGURE_SETS[s] || []))];
 const figures = [], skipped = [];
 for (const name of wanted) {
   const def = zen.FIGURES[name];

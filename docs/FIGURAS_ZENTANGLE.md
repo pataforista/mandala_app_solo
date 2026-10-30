@@ -96,6 +96,13 @@ Regla de diseño: silueta grande y legible, 3–7 regiones cerradas, sin piezas 
 (`noEcho`). Para exportar las originales: `--original 1`. Para añadir más, basta otro objeto en
 `buildOverrides`, con las mismas claves que `FIGURES` en `figure.js`.
 
+## Íconos de un contorno y dibujos propios (SVG)
+
+`scripts/zenIcons.mjs` define cinco dinosaurios (braquiosaurio, estegosaurio, T. rex, triceratops, pterosaurio) como
+una sola curva con esquinas donde hacen falta (`outline`). Son más limpios que los armados con piezas, pero no
+llegan al nivel de un dibujo hecho por una persona, así que son **opcionales**: `--icons 1`. Para traer dibujos
+propios en SVG está `--svg CARPETA`; ver `docs/GUIA_PARA_AYUDA.md`.
+
 ## Revisión de páginas completas
 
 Se generaron 164 páginas (41 figuras × 3 formatos KDP × estilos y semillas distintos, con y sin `figureCenter`):
