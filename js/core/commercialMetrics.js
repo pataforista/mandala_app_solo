@@ -148,6 +148,33 @@ export function measureSvg(svg, { petals = null, center = null } = {}) {
   };
   // Igual que las pruebas: en pétalos pares vale el orden N o N/2 (armónico)
   if (petals && center) out.asimetria = Math.min(...(petals % 2 === 0 ? [petals, petals / 2] : [petals]).map(n => asymmetry(els, n, center)));
+  
+  // FASE 8: Métricas nuevas
+  // Cobertura de tinta: % del área total que tiene tinta (trazos)
+  if (center) {
+    const totalArea = Math.PI * Math.pow(Math.max(...cells.map(c => Math.sqrt(c.area / Math.PI))) * 2, 2);
+    const inkArea = cells.reduce((sum, c) => sum + c.area, 0);
+    out.cobertura = Math.min(100, (inkArea / totalArea) * 100);
+    
+    // Balance radial: distribución de tinta por anillos concéntricos
+    const rings = 5;
+    const maxR = Math.max(...cells.map(c => Math.sqrt(c.area / Math.PI))) * 2;
+    const ringAreas = Array(rings).fill(0);
+    for (const el of els) for (const s of el.subs) if (s.closed && s.pts.length >= 3) {
+      const cx = s.pts.reduce((sum, p) => sum + p[0], 0) / s.pts.length;
+      const cy = s.pts.reduce((sum, p) => sum + p[1], 0) / s.pts.length;
+      const r = Math.hypot(cx - center.x, cy - center.y);
+      const ringIdx = Math.min(rings - 1, Math.floor((r / maxR) * rings));
+      ringAreas[ringIdx] += shoelace(s.pts);
+    }
+    const avgPerRing = ringAreas.reduce((a, b) => a + b, 0) / rings;
+    out.balanceRadial = 100 - (ringAreas.reduce((sum, a) => sum + Math.abs(a - avgPerRing), 0) / (rings * avgPerRing)) * 100;
+    
+    // Riqueza de detalle: número de subtrayectos por mm²
+    const totalSubpaths = els.reduce((sum, el) => sum + el.subs.length, 0);
+    out.riquezaDetalle = totalSubpaths / Math.max(1, totalArea / 100);
+  }
+  
   return out;
 }
 
