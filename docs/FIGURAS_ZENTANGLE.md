@@ -25,7 +25,7 @@ node scripts/exportZenFigures.mjs --zen ../zentangle_app_solo_fixed --out assets
 ```
 
 Opciones: `--sets dino,dinoOrigamiMix,cryptids,cryptidsOrigami,kids,bio`, `--only trex,yeti`,
-`--size 1000` (lado largo en px), `--use anillos|figura|medallon` (uso inicial), `--detail 0..1` (cuerdas, 0 las apaga), `--echo 56` (ancho de banda de los ecos en px, 0 los apaga), `--scales 100`, `--feathers 90` (ancho de pluma) y `--fur 104` (separación de mechones), todos en px y con 0 para apagarlos.
+`--size 1000` (lado largo en px), `--use anillos|figura|medallon` (uso inicial), `--detail 0..1` (cuerdas, 0 las apaga), `--echo 56` (ancho de banda de los ecos en px, 0 los apaga), `--scales 100`, `--feathers 130` (ancho de pluma) y `--fur 104` (separación de mechones), todos en px y con 0 para apagarlos.
 
 El script no modifica el repositorio de Zentangle: carga una copia temporal de
 `figure.js` con `FIGURES` exportado y la borra al terminar.
@@ -45,7 +45,7 @@ El script no modifica el repositorio de Zentangle: carga una copia temporal de
      distancia), una o dos por región, solo si el núcleo restante sigue siendo coloreable.
    - **Escamas** (dinosaurios, nessie, kraken, fish; no ammonite): arcos «de pez» en rejilla hexagonal,
      solo donde la escama cabe entera en una región amplia. Sustituyen a los ecos en esas figuras.
-   - **Plumas** (thunderbird, mothman, owl, bird, penguin): arcos apuntados hacia abajo, en filas que se solapan.
+   - **Plumas** (thunderbird, mothman, owl, bird, penguin): arcos apuntados hacia abajo, en filas que se solapan (130 px: con 90 el pingüino parecía una piña).
    - **Pelo** (bigfoot, yeti, wendigo, chupacabra, jackalope, bear, fox, rabbit, cat): mechones en V en filas
      escalonadas, separados ~104 px para que el trazo grueso del sello no los funda en manchas.
    Cada textura se dibuja solo donde cabe entera dentro de una región, y si pone alguna sustituye a los ecos.
@@ -72,6 +72,14 @@ silueta (`cls`), `drawMedallionWeb` (en `figureFill.js`) la rodea de una trama p
 banda de pétalos contra el borde, la misma lógica radial del resto del mandala. Las líneas se cortan contra la
 silueta y terminan en su trazo, así las celdas quedan cerradas y coloreables. La figura se reduce al 70 % del
 círculo para dejar sitio a la trama. Se dibuja encima de la imagen, porque su fondo blanco es opaco.
+
+## Revisión de páginas completas
+
+Se generaron 164 páginas (41 figuras × 3 formatos KDP × estilos y semillas distintos, con y sin `figureCenter`):
+sin errores, sin `NaN` ni `undefined` en el SVG. En la métrica «celdas pequeñas» (< 6 mm², objetivo < 5 %) la
+corona con figura da ~18–23 %, parecido a las composiciones de fondo ya existentes (8–18 %); los puntos sólidos
+del relleno suman ~5 puntos porque la métrica los cuenta como celdas aunque no se coloreen. Por eso los motivos
+del relleno de huecos tienen radio mínimo 4.2 mm (antes 3.0).
 
 ## Límites conocidos
 

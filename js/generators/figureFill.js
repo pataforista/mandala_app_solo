@@ -133,7 +133,7 @@ export function drawRingGaps({ cx, cy, rLo, rHi, n, rm, sw, sh, mirror, cls, fw,
     const px = Math.floor(((u + sw / 2) / sw) * fw), py = Math.floor(((v + sh / 2) / sh) * fh);
     if (px >= 0 && py >= 0 && px < fw && py < fh && cls[py * fw + px] !== 2) blocked[gy * g + gx] = 1;
   }
-  return packMotifs({ blocked, g, cell, x0, y0, gap, minR: outlineMode ? 3.6 : 3.0, maxR: 9, rng, styleMode, outlineMode, stroke, mainW, detailW });
+  return packMotifs({ blocked, g, cell, x0, y0, gap, minR: outlineMode ? 4.6 : 4.2, maxR: 9, rng, styleMode, outlineMode, stroke, mainW, detailW });
 }
 
 /**
