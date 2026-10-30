@@ -53,6 +53,15 @@ mariposas, estrellas…). Usa la silueta real de cada copia (`cls`, que `app.js`
 caja, así que los motivos entran entre patas y colas sin tocar el dibujo. Los huecos pequeños llevan un
 punto sólido. Si la figura no trae `cls`, la corona queda como antes.
 
+## Figura en el medallón
+
+El medallón es un círculo con la figura recortada por dentro. Antes la imagen se ajustaba a un cuadrado del
+tamaño del círculo, así que una figura ancha (dinosaurios, ballena) llegaba al borde del cuadrado y el círculo
+le cortaba las puntas. Ahora `mandalaClassic.js` usa `centerArt.fit`: el círculo mínimo que encierra la
+silueta real (`enclosingCircle`, en `geometry.js`), y escala la figura para que ese círculo quepa en el
+medallón con un 5 % de aire. Aplica a los usos «Anillos» y «Medallón central». Sin `cls` (figuras sin silueta)
+se mantiene el ajuste anterior.
+
 ## Límites conocidos
 
 - Hereda la calidad de las siluetas de Zentangle: las de pocos puntos se ven «de juguete».

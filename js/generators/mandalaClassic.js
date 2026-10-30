@@ -669,7 +669,13 @@ export function generateMandalaClassic(doc, opts) {
     const id = `art-${(seed >>> 0).toString(36)}-${doc.defs.length}`;
     doc.defs.push(`<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${rIn - detailW / 2}" /></clipPath>`);
     const s = rIn * 2 * (art.zoom ?? 1);
-    const inner = [`<image href="${art.href}" x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid meet" />`];
+    // Con fit (círculo que encierra la silueta, en píxeles de la imagen) la figura entra entera en
+    // el medallón: sin él, una figura ancha llegaba al borde del cuadrado y el círculo le cortaba las puntas
+    const fit = art.fit && art.fit.r > 0 && art.imgW > 0 && art.imgH > 0 ? art.fit : null;
+    const k = fit ? (0.95 * (rIn - detailW) * (art.zoom ?? 1)) / fit.r : 0;
+    const inner = fit
+      ? [`<image href="${art.href}" x="${(cx - fit.x * k).toFixed(2)}" y="${(cy - fit.y * k).toFixed(2)}" width="${(art.imgW * k).toFixed(2)}" height="${(art.imgH * k).toFixed(2)}" preserveAspectRatio="none" />`]
+      : [`<image href="${art.href}" x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid meet" />`];
     out.push(`<g clip-path="url(#${id})">`, ...inner, `</g>`);
     doc.body.push(...out);
     return doc;

@@ -17,6 +17,7 @@ import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
 import { escapeXml } from "./core/svgText.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
+import { fitOf } from "./generators/pageComposer.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
@@ -513,7 +514,7 @@ function resolveUserImage(s, entry = userFigures[activeFigure]) {
   const stamp = fig.stampHref || fig.href;
   if (entry.use === "figura") out.figure = fig;
   else if (entry.use === "anillos") out.figureRing = { href: stamp, centerHref: stamp, w: fig.w, h: fig.h, cls: fig.cls };
-  else if (entry.use === "medallon") out.centerArt = { type: "image", href: stamp, scale: s.centerArtScale };
+  else if (entry.use === "medallon") out.centerArt = { type: "image", href: stamp, scale: s.centerArtScale, ...fitOf(fig) };
   return out;
 }
 

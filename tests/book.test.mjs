@@ -686,3 +686,27 @@ test("anillos: los huecos de la corona se rellenan sin tocar la silueta de las c
   const copias = (svg) => (svg.match(/<image href="data:,S"/g) || []).length;
   assert.equal(copias(con), copias(sin));
 });
+
+test("medallón: una figura ancha cabe entera en el círculo (antes el clip le cortaba las puntas)", () => {
+  // Óvalo muy ancho (como un dinosaurio de perfil) en una caja 200×100
+  const w = 200, h = 100, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const e = ((x - 100) / 98) ** 2 + ((y - 50) / 20) ** 2;
+    if (e <= 1) cls[y * w + x] = e > 0.9 ? 0 : 1;
+  }
+  const doc = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 10 });
+  generateMandalaClassic(doc, { ...BASE, seed: 2, figureRing: { href: "data:,S", centerHref: "data:,C", w, h, cls } });
+  const svg = renderDocToSvgString(doc);
+  const clip = svg.match(/<clipPath id="art-[^"]+"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/);
+  const img = svg.match(/<image href="data:,C" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/);
+  assert.ok(clip && img, "medallón con imagen");
+  const [cx, cy, rc] = clip.slice(1).map(Number), [ix, iy, iw, ih] = img.slice(1).map(Number);
+  // La punta más lejana de la silueta, ya en mm, cae dentro del círculo
+  let far = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (cls[y * w + x] === 2) continue;
+    far = Math.max(far, Math.hypot(ix + ((x + 0.5) / w) * iw - cx, iy + ((y + 0.5) / h) * ih - cy));
+  }
+  assert.ok(far <= rc, `la figura sale ${(far - rc).toFixed(2)} mm del círculo`);
+  assert.ok(far >= rc * 0.85, "y no queda diminuta");
+});

@@ -11,6 +11,7 @@
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder } from "../core/pathBuilder.js";
 import { drawFigure, drawRingGaps } from "./figureFill.js";
+import { enclosingCircle } from "../core/geometry.js";
 
 const TAU = Math.PI * 2;
 
@@ -61,6 +62,12 @@ export function wantsComposition(opts) {
  * Dibuja la página completa: marco + mandala principal + elementos secundarios.
  * drawMandala(doc, opts) dibuja un disco con opts.center/opts.radius (generador clásico).
  */
+// Círculo que encierra la silueta (si hay cls) para que la figura quepa entera en un medallón redondo
+export function fitOf(f) {
+  const fit = f.cls ? enclosingCircle(f.cls, f.w, f.h) : null;
+  return fit ? { fit, imgW: f.w, imgH: f.h } : {};
+}
+
 export function composePage(doc, opts, drawMandala) {
   const {
     seed = 1, stroke = "#000", strokeWidthMm = 0.55, pageBorder = true, includeFrames = true,
@@ -212,7 +219,7 @@ export function composePage(doc, opts, drawMandala) {
       }
       // Mandala interior con la figura completa en el medallón
       const ri = rIn - Math.max(1.5, R * 0.02);
-      content.push(...sub(acx, acy, ri, { maxBands: 2, centerArt: ring.centerHref ? { type: "image", href: ring.centerHref, scale: 0.62 } : null }));
+      content.push(...sub(acx, acy, ri, { maxBands: 2, centerArt: ring.centerHref ? { type: "image", href: ring.centerHref, scale: 0.62, ...fitOf(ring) } : null }));
       obstacles.push({ x: acx, y: acy, r: R });
       fill = { minis: false };
       break;
