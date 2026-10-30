@@ -3,9 +3,11 @@
 //
 //   node scripts/exportZenFigures.mjs [--zen ../zentangle_app_solo_fixed] [--out figuras-zentangle.json]
 //                                     [--sets dino,dinoOrigamiMix,cryptids,cryptidsOrigami,kids] [--only trex,yeti] [--size 1000]
+//                                     [--use anillos|figura|medallon]
 //
 // Cada figura se dibuja como contorno (silueta + piezas internas + detalles) sobre blanco.
-// Las regiones cerradas del interior quedan como cls = 1 y las rellena figureFill.js con mandalas.
+// Uso por defecto «anillos»: copias de la figura en corona alrededor de un mandala (pageComposer).
+// Con --use figura, las regiones cerradas (cls = 1) las rellena figureFill.js con mandalas.
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -18,6 +20,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const zenDir = args.zen ? path.resolve(args.zen) : path.resolve(here, "../../zentangle_app_solo_fixed");
 const outFile = path.resolve(args.out || "figuras-zentangle.json");
 const SIZE = Math.max(400, parseInt(args.size, 10) || 1000); // lado largo en px
+const USE = ["anillos", "figura", "medallon"].includes(args.use) ? args.use : "anillos";
 const INK_R = 2;                                             // radio de la línea (px)
 const MIN_REGION = 0.0006;                                   // regiones menores (fracción del interior) → cls 3
 
@@ -142,7 +145,7 @@ async function figureToEntry(name, def, createRNG) {
   let inside = 0;
   for (const c of cls) if (c === 1) inside++;
   if (inside < w * h * 0.03) return { name, skipped: "sin regiones cerradas rellenables" };
-  return { ...fig, name: `zentangle-${name}`, use: "figura", source: "Zentangle (motor propio)", rightsConfirmed: true };
+  return { ...fig, name: `zentangle-${name}`, use: USE, source: "Zentangle (motor propio)", rightsConfirmed: true };
 }
 
 const zen = await loadZen();
