@@ -10,7 +10,8 @@
 // al mandala ni a otro motivo: todas las celdas quedan cerradas y coloreables.
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder } from "../core/pathBuilder.js";
-import { drawFigure } from "./figureFill.js";
+import { drawFigure, drawRingGaps } from "./figureFill.js";
+import { enclosingCircle } from "../core/geometry.js";
 
 const TAU = Math.PI * 2;
 
@@ -40,6 +41,9 @@ export const SCATTER_THEMES = {
   dulce:  { heart: 3, clover: 2, drop: 1.5, daisy: 1 },
   estrellas: { star: 4, sun: 2, crescent: 1.5, butterfly: 1 },
   vinas: { leaf: 3, tulip: 2, feather: 1.5, drop: 1 },
+  // Páginas de dinosaurios: vegetación y huellas, no flores ni corazones. Palmeras y helechos sólo salen
+  // grandes (si no, drawFiller los sustituye por una hoja); los pequeños son hojas, huevos y huellas.
+  prehistorico: { palm: 3, fern: 2.5, egg: 1.5, footprint: 1.5, pterosaur: 1.3, leaf: 1.2 },
 };
 export const PATTERN_THEMES = ["escamas", "flor_vida", "sol", "ondas", "mosaico"];
 export const BACKGROUNDS = [...Object.keys(SCATTER_THEMES), ...PATTERN_THEMES];
@@ -61,6 +65,23 @@ export function wantsComposition(opts) {
  * Dibuja la página completa: marco + mandala principal + elementos secundarios.
  * drawMandala(doc, opts) dibuja un disco con opts.center/opts.radius (generador clásico).
  */
+// Círculo que encierra la silueta (si hay cls) para que la figura quepa entera en un medallón redondo
+export function fitOf(f) {
+  const fit = f.cls ? enclosingCircle(f.cls, f.w, f.h) : null;
+  return fit ? { fit, imgW: f.w, imgH: f.h, cls: f.cls } : {};
+}
+
+// «Ilustración extra»: dibujos hechos a mano (palmera, helecho, nido, huella…) que se mezclan con los motivos
+// vectoriales del relleno. Sólo en huecos de radio ≥ EXTRA_MIN_R: a menos tamaño su trazo quedaría más fino que lo
+// imprimible. Se encaja la caja entera en el círculo del hueco (su fondo blanco no pisa a los vecinos).
+export const EXTRA_MIN_R = 7;
+export const EXTRA_SHARE = 0.55;
+export function extraImage(art, x, y, r, flip) {
+  const k = (2 * r * 0.98) / Math.hypot(art.w, art.h), w = art.w * k, h = art.h * k;
+  const tf = flip ? ` transform="translate(${(2 * x).toFixed(2)} 0) scale(-1 1)"` : "";
+  return `<image href="${art.href}" x="${(x - w / 2).toFixed(2)}" y="${(y - h / 2).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" preserveAspectRatio="none"${tf} />`;
+}
+
 export function composePage(doc, opts, drawMandala) {
   const {
     seed = 1, stroke = "#000", strokeWidthMm = 0.55, pageBorder = true, includeFrames = true,
@@ -205,9 +226,15 @@ export function composePage(doc, opts, drawMandala) {
         content.push(`<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${ang.toFixed(2)})${flip}"><image href="${ring.href}" x="${(-sw / 2).toFixed(2)}" y="${(-sh / 2).toFixed(2)}" width="${sw.toFixed(2)}" height="${sh.toFixed(2)}" preserveAspectRatio="none" /></g>`);
       }
       const rIn = d;
-      // Mandala interior con la figura completa en el medallón
+      // Huecos blancos entre copias y alrededor del medallón (si la figura trae su silueta cls)
+      if (ring.cls) {
+        content.push(...drawRingGaps({ cx: acx, cy: acy, rLo: d - Math.max(1.5, R * 0.02), rHi: rExt, n, rm, sw, sh, mirror,
+          cls: ring.cls, fw: ring.w, fh: ring.h, seed, styleMode, outlineMode, stroke, mainW, detailW, weights: SCATTER_THEMES[opts.background] || SCATTER_THEMES[ring.theme] || null, extraArt: opts.extraArt }));
+      }
+      // Mandala interior: núcleo propio del mandala. La figura sólo va al centro con opts.figureCenter
+      // (una figura sola en un círculo se lee como una ilustración pegada, no como parte del mandala)
       const ri = rIn - Math.max(1.5, R * 0.02);
-      content.push(...sub(acx, acy, ri, { maxBands: 2, centerArt: ring.centerHref ? { type: "image", href: ring.centerHref, scale: 0.62 } : null }));
+      content.push(...sub(acx, acy, ri, { maxBands: 2, centerArt: ring.centerHref && opts.figureCenter ? { type: "image", href: ring.centerHref, scale: 0.62, ...fitOf(ring) } : null }));
       obstacles.push({ x: acx, y: acy, r: R });
       fill = { minis: false };
       break;
@@ -312,9 +339,9 @@ export function composePage(doc, opts, drawMandala) {
   }
 
   // ---------- Relleno del espacio libre ----------
-  const theme = SCATTER_THEMES[opts.background] || null;
+  const theme = SCATTER_THEMES[opts.background] || (opts.figureRing && SCATTER_THEMES[opts.figureRing.theme]) || null;
   const fillItems = fill ? packFill({ A, obstacles, rng, gap, minis: fill.minis, style: styleMode, theme,
-    outlineMode, stroke, mainW, detailW, sub, miniOpts }) : [];
+    outlineMode, stroke, mainW, detailW, sub, miniOpts, extraArt: opts.extraArt }) : [];
   if (fillPattern) fillItems.push(...drawPattern({ ...fillPattern, A, gap, stroke, mainW, detailW, outlineMode }));
 
   // ---------- Ensamblado ----------
@@ -343,7 +370,7 @@ function emitTo(arr, pb, w, fill = "none", stroke = "#000") {
 }
 
 // ---------- Empaquetado voraz de círculos ----------
-function packFill({ A, obstacles, rng, gap, minis, style, theme = null, outlineMode, stroke, mainW, detailW, sub, miniOpts }) {
+function packFill({ A, obstacles, rng, gap, minis, style, theme = null, outlineMode, stroke, mainW, detailW, sub, miniOpts, extraArt = null }) {
   const step = 2;
   const pts = [];
   for (let y = A.y0 + step / 2; y < A.y1; y += step) {
@@ -378,6 +405,8 @@ function packFill({ A, obstacles, rng, gap, minis, style, theme = null, outlineM
     const rot = rng() * TAU;
     if (minis && r >= 13 && miniCount < 14) {
       out.push(...sub(best.x, best.y, r, miniOpts(miniCount++, r)));
+    } else if (extraArt?.length && r >= EXTRA_MIN_R && rng() < EXTRA_SHARE) {
+      out.push(extraImage(extraArt[Math.floor(rng() * extraArt.length)], best.x, best.y, r, rng() < 0.5));
     } else if (r >= 5.0) {
       const kind = pickKind();
       // Figuras con «arriba» casi derechas: cabeza abajo se leen como un error
@@ -386,7 +415,7 @@ function packFill({ A, obstacles, rng, gap, minis, style, theme = null, outlineM
     } else if (r >= 3.0) {
       // El sorteo es el mismo con o sin tema: el tema sólo cambia la figura pequeña
       const small = rng() < 0.5 ? "ring" : (rng() < 0.5 ? "heart" : "star");
-      drawFiller(theme && small !== "ring" ? (theme.star ? "star" : theme.heart ? "heart" : "drop") : small, main, detail, best.x, best.y, r, rot, rng, false);
+      drawFiller(theme && small !== "ring" ? (theme.star ? "star" : theme.heart ? "heart" : theme.egg ? "egg" : "drop") : small, main, detail, best.x, best.y, r, rot, rng, false);
     } else {
       circle(dots, best.x, best.y, Math.max(0.55, r * 0.5));
     }
@@ -413,10 +442,14 @@ export function circle(pb, x, y, rad) {
 }
 
 // Giro base de las figuras que tienen un «arriba» (el pájaro está dibujado con la cabeza en +v)
-const UPRIGHT = { tulip: 0, drop: 0, crown: 0, shell: 0, butterfly: 0, bird: Math.PI };
+const UPRIGHT = { tulip: 0, drop: 0, crown: 0, shell: 0, butterfly: 0, bird: Math.PI, palm: 0, fern: 0, egg: 0 };
 
 // Motivos en coordenadas locales (u, v) ∈ [-1, 1], escalados a r y girados rot
 export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
+  // Formas con partes finas: si el motivo es pequeño, sus celdas no se podrían colorear; se sustituyen
+  if ((kind === "palm" || kind === "fern") && r < 7.5) kind = "leaf";
+  else if (kind === "footprint" && r < 5) kind = "leaf";
+  else if (kind === "pterosaur" && r < 4.5) kind = "leaf";
   const c = Math.cos(rot), s = Math.sin(rot);
   const T = (u, v) => [x + r * (u * c - v * s), y + r * (u * s + v * c)];
   const M = (pb, u, v) => pb.moveTo(...T(u, v));
@@ -486,6 +519,57 @@ export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
       M(detail, 0, 0.8); L(detail, 0, -0.72);
       for (const t of [0.35, -0.05, -0.4]) for (const sd of [-1, 1]) { M(detail, 0, t); L(detail, sd * 0.32, t - 0.28); }
     }
+  } else if (kind === "egg") {
+    // Huevo con grieta en zigzag
+    M(main, 0, -0.95);
+    C(main, 0.72, -0.95, 0.82, 0.2, 0.5, 0.7);
+    C(main, 0.3, 1.0, -0.3, 1.0, -0.5, 0.7);
+    C(main, -0.82, 0.2, -0.72, -0.95, 0, -0.95);
+    main.close();
+    if (big) {
+      M(detail, -0.74, 0.05);
+      for (const [u, v] of [[-0.4, -0.22], [-0.05, 0.08], [0.3, -0.22], [0.72, 0.05]]) L(detail, u, v);
+    }
+  } else if (kind === "palm") {
+    // Palmera: tronco curvo y cinco frondas en abanico, caídas hacia los lados
+    const lf = (bx, by, tx, ty, wid) => {
+      const dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy) || 1, nx = (-dy / d) * wid * 2, ny = (dx / d) * wid * 2, mx = (bx + tx) / 2, my = (by + ty) / 2;
+      M(main, bx, by); Q(main, mx + nx, my + ny, tx, ty); Q(main, mx - nx, my - ny, bx, by); main.close();
+      if (big) { M(detail, bx, by); L(detail, tx, ty); }
+    };
+    M(main, -0.1, 0.98); C(main, -0.06, 0.5, -0.12, 0.1, -0.05, -0.25); L(main, 0.06, -0.25); C(main, 0.12, 0.1, 0.06, 0.5, 0.1, 0.98); main.close();
+    for (const a of [-78, -40, 0, 40, 78]) {
+      const t = (a * Math.PI) / 180, drop = 0.3 * (Math.abs(a) / 78);
+      lf(0, -0.25, 0.8 * Math.sin(t), -0.25 - 0.8 * Math.cos(t) + drop, 0.17);
+    }
+  } else if (kind === "fern") {
+    // Helecho: tallo curvo con cuatro pares de pinnas
+    const sx = (t) => 0.1 * Math.sin(2.2 * t), sy = (t) => 0.95 - 1.9 * t;
+    M(main, sx(0), sy(0));
+    for (let i = 1; i <= 10; i++) L(main, sx(i / 10), sy(i / 10));
+    for (const t of [0.22, 0.42, 0.62, 0.82]) for (const sd of [-1, 1]) {
+      const bx = sx(t), by = sy(t), len = 0.62 * (1 - 0.55 * t), a = (60 * Math.PI) / 180, tx = bx + sd * len * Math.sin(a), ty = by - len * Math.cos(a);
+      const dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy), nx = (-dy / d) * 0.26, ny = (dx / d) * 0.26;
+      M(main, bx, by); Q(main, (bx + tx) / 2 + nx, (by + ty) / 2 + ny, tx, ty); Q(main, (bx + tx) / 2 - nx, (by + ty) / 2 - ny, bx, by); main.close();
+    }
+  } else if (kind === "footprint") {
+    // Huella de dinosaurio de tres dedos
+    const toe = (a) => {
+      const t = (a * Math.PI) / 180, bx = 0, by = 0.3, tx = Math.sin(t) * 0.95, ty = 0.3 - Math.cos(t) * 0.95;
+      const dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy), nx = (-dy / d) * 0.3, ny = (dx / d) * 0.3;
+      M(main, bx, by); Q(main, (bx + tx) / 2 + nx, (by + ty) / 2 + ny, tx, ty); Q(main, (bx + tx) / 2 - nx, (by + ty) / 2 - ny, bx, by); main.close();
+    };
+    for (const a of [-36, 0, 36]) toe(a);
+    M(main, 0.33, 0.55); C(main, 0.33, 0.95, -0.33, 0.95, -0.33, 0.55); C(main, -0.33, 0.28, 0.33, 0.28, 0.33, 0.55); main.close();
+  } else if (kind === "pterosaur") {
+    // Pterosaurio visto desde arriba: alas membranosas con borde festoneado y cola corta
+    const half = [[0.1, -0.65], [0.14, -0.28], [0.62, -0.48], [1.0, -0.08], [0.72, -0.02], [0.58, 0.14], [0.4, 0.02], [0.22, 0.2], [0.14, 0.5]];
+    M(main, 0, -0.92);
+    for (const [u, v] of half) L(main, u, v);
+    L(main, 0, 0.95);
+    for (const [u, v] of [...half].reverse()) L(main, -u, v);
+    main.close();
+    if (big) { M(detail, 0.14, -0.28); L(detail, 1.0, -0.08); M(detail, 0.14, -0.28); L(detail, 0.72, -0.02); M(detail, -0.14, -0.28); L(detail, -1.0, -0.08); M(detail, -0.14, -0.28); L(detail, -0.72, -0.02); }
   } else if (kind === "crescent") {
     // Luna creciente: arco exterior y arco interior desplazado
     M(main, 0.15, -0.95);

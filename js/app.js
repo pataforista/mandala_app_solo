@@ -17,6 +17,7 @@ import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
 import { escapeXml } from "./core/svgText.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
+import { fitOf } from "./generators/pageComposer.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
@@ -500,20 +501,24 @@ const FIGURE_USES = [
   ["figura", "Figura rellena de mandalas"],
   ["anillos", "Anillos alrededor de un mandala"],
   ["medallon", "Medallón central"],
+  ["extra", "Ilustración extra (decorado de fondo)"],
 ];
 
 // Imagen del usuario según el uso que ELIGIÓ para ella (nada es automático):
 // figura rellena, anillos de copias alrededor de un mandala o medallón central.
 // La vista previa usa la imagen seleccionada (borde morado) con su uso.
 function resolveUserImage(s, entry = userFigures[activeFigure]) {
-  const out = { figure: null, centerArt: null, figureRing: null,
+  // Ilustraciones extra (huevos, huellas, palmeras…): no son la figura de la página sino decorado; van en el
+  // relleno de TODAS las páginas, tenga o no la página una figura elegida
+  const extraArt = userFigures.filter(m => m.use === "extra" && m.fig).map(m => ({ href: m.fig.stampHref || m.fig.href, w: m.fig.w, h: m.fig.h }));
+  const out = { figure: null, centerArt: null, figureRing: null, extraArt: extraArt.length ? extraArt : null,
     figureDensity: s.figureDensity, figureFillInside: s.figureFillInside, figureFillOutside: s.figureFillOutside };
   const fig = entry?.fig;
-  if (!fig || !entry.use || entry.use === "ninguno") return out;
+  if (!fig || !entry.use || entry.use === "ninguno" || entry.use === "extra") return out;
   const stamp = fig.stampHref || fig.href;
   if (entry.use === "figura") out.figure = fig;
-  else if (entry.use === "anillos") out.figureRing = { href: stamp, centerHref: stamp, w: fig.w, h: fig.h };
-  else if (entry.use === "medallon") out.centerArt = { type: "image", href: stamp, scale: s.centerArtScale };
+  else if (entry.use === "anillos") out.figureRing = { href: stamp, centerHref: stamp, w: fig.w, h: fig.h, cls: fig.cls, theme: fig.theme };
+  else if (entry.use === "medallon") out.centerArt = { type: "image", href: stamp, scale: s.centerArtScale, ...fitOf(fig) };
   return out;
 }
 
@@ -888,7 +893,7 @@ function renderFigureChecks() {
   const m = userFigures[activeFigure];
   if (!m) { box.innerHTML = ""; return; }
   const esc = (t) => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-  box.innerHTML = `<div style="font-weight:600;margin-top:6px;">${esc(m.name)}</div>
+  box.innerHTML = `<div style="font-weight:600;margin-top:6px;">Imagen ${userFigures.indexOf(m) + 1}</div>
     <label style="display:block;margin:4px 0;">Fuente (URL, libro u «obra propia»)
       <input id="figSource" type="text" value="${esc(m.source)}" style="width:100%;padding:4px;border-radius:6px;border:1px solid #bbb;"></label>
     <label style="display:flex;gap:6px;align-items:center;"><input id="figRights" type="checkbox" ${m.rightsConfirmed ? "checked" : ""}> Confirmo que es de dominio público o mía</label>
@@ -912,7 +917,7 @@ function renderFigureList() {
     wrap.style.cssText = "position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:96px;";
     const thumb = document.createElement("img");
     thumb.src = m.fig.href;
-    thumb.title = `${m.name} — clic para verla en la vista previa`;
+    thumb.title = `Imagen ${i + 1} — clic para verla en la vista previa`;
     thumb.style.cssText = `width:52px;height:52px;border-radius:8px;object-fit:contain;background:#fff;cursor:pointer;border:2px solid ${i === activeFigure ? "var(--m3-primary, #6750a4)" : "#ccc"};`;
     thumb.onclick = () => { activeFigure = i; renderFigureList(); update(); };
     const del = document.createElement("button");
@@ -1774,8 +1779,9 @@ function bindUI() {
   const bookVaryEl = document.getElementById("bookVary");
   const bookDifficultyEl = document.getElementById("bookDifficulty");
   // Sólo las imágenes con uso elegido a mano Y que pasan la lista de verificación
-  const chosenFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && figureStatus(m).ready);
-  const pendingFigures = () => userFigures.filter(m => m.use && m.use !== "ninguno" && !figureStatus(m).ready);
+  const isPageFigure = (m) => m.use && m.use !== "ninguno" && m.use !== "extra"; // «extra» es decorado, no una página
+  const chosenFigures = () => userFigures.filter(m => isPageFigure(m) && figureStatus(m).ready);
+  const pendingFigures = () => userFigures.filter(m => isPageFigure(m) && !figureStatus(m).ready);
   // Reverso: "blanco" | "negro" | "ninguno" (doble cara, sin páginas en blanco)
   const bookBackEl = document.getElementById("bookBack");
   const backMode = () => bookBackEl?.value || "blanco";
@@ -1872,11 +1878,15 @@ function bindUI() {
     const chosen = chosenFigures();
     const info = document.getElementById("bookImagesInfo");
     if (info) {
+      // Sólo cuentas: los nombres de las imágenes no se muestran
+      const byUse = FIGURE_USES.filter(u => u[0] !== "ninguno" && u[0] !== "extra").map(u => [u[1].toLowerCase(), chosen.filter(m => m.use === u[0]).length]).filter(([, n]) => n);
+      const extras = userFigures.filter(m => m.use === "extra" && m.fig).length;
       info.innerHTML = chosen.length
-        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano: ` + chosen.map(m => `${escapeXml(m.name)} (${FIGURE_USES.find(u => u[0] === m.use)[1].toLowerCase()})`).join(", ")
+        ? `🖼️ ${chosen.length} imagen(es) elegida(s) a mano (${byUse.map(([t, n]) => `${n} · ${t}`).join(", ")})`
         : "Ninguna imagen lista: el libro será sólo de mandalas. Para incluir una, elige su uso en «Mis imágenes».";
+      if (extras) info.innerHTML += `<br>🌿 ${extras} ilustración(es) extra en el decorado de las páginas.`;
       const pend = pendingFigures();
-      if (pend.length) info.innerHTML += `<br>❌ No entran (no están listas): ${pend.map(m => escapeXml(m.name)).join(", ")}. Revisa su lista de verificación.`;
+      if (pend.length) info.innerHTML += `<br>❌ ${pend.length} no entran (no están listas). Revisa su lista de verificación en «Mis imágenes».`;
     }
     if (chosen.length > bookCount()) bookSummaryEl.innerHTML += `<br>⚠️ Hay ${chosen.length} imágenes elegidas y sólo ${bookCount()} páginas: sobran ${chosen.length - bookCount()}.`;
   };
@@ -2295,7 +2305,7 @@ function bindUI() {
         },
       });
       // Registro de fuentes (CSV) junto al PDF, si el libro lleva imágenes del usuario
-      if (sourceLog.some(r => r && r.image)) {
+      if (sourceLog.some(r => r && r.source)) { // sólo si alguna imagen trae fuente anotada
         const layout = bookLayout({ ...layoutOpts, mandalas: count + (layoutOpts.colorTest ? 1 : 0) });
         const off = layoutOpts.colorTest ? 1 : 0;
         const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;

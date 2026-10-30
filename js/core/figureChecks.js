@@ -123,8 +123,9 @@ export function checkFigure(fig, use, meta = {}) {
   }
 
   // 6. Derechos de uso
-  if (meta.rightsConfirmed && (meta.source || "").trim()) add("ok", "Derechos confirmados y fuente registrada.");
-  else add("error", "Falta confirmar que es de dominio público o propia, y anotar su fuente.", "Marca la casilla y escribe la fuente (URL o libro).", TOOLS.rights);
+  // Basta con confirmarla; la fuente es opcional (si se anota, queda en el registro de fuentes del libro)
+  if (meta.rightsConfirmed) add("ok", (meta.source || "").trim() ? "Derechos confirmados y fuente registrada." : "Marcada como propia o de uso libre.");
+  else add("error", "Falta confirmar que es de dominio público o propia.", "Marca la casilla (y, si quieres, anota su fuente).", TOOLS.rights);
 
   const ready = use !== "ninguno" && !checks.some(c => c.level === "error");
   return { ready, checks };

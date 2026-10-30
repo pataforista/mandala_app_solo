@@ -6,7 +6,8 @@
   "scripts": {
     "start": "npx -y serve .",
     "dev": "npx -y serve .",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "check:figuras": "node scripts/checkFigures.mjs assets/figuras-dinosaurios.json"
   },
   "keywords": [],
   "author": "",

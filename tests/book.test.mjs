@@ -6,7 +6,7 @@ import { inflateSync } from "node:zlib";
 import { createDoc } from "../js/core/svgDoc.js";
 import { renderDocToSvgString } from "../js/core/svgRender.js";
 import { generateMandalaClassic } from "../js/generators/mandalaClassic.js";
-import { COMPOSITIONS, FRAME_STYLES } from "../js/generators/pageComposer.js";
+import { COMPOSITIONS, FRAME_STYLES, fitOf } from "../js/generators/pageComposer.js";
 import { planBook, shuffleBag, BOOK_STYLES, bestSellerProfile } from "../js/core/bookPlan.js";
 import { kdpGutterMm, kdpSafeMarginMm, bookLayout, kdpChecklist } from "../js/core/kdp.js";
 import { encodeGrayPng, rgbaToGray } from "../js/core/grayPng.js";
@@ -233,7 +233,7 @@ test("figura: clics sobre el fondo y 'sólo figura principal' quitan fondo oscur
   assert.ok(withClick.w / withClick.h < 0.85, `relación ${withClick.w}/${withClick.h}`);
 });
 
-test("anillos de figuras: copias que no se pisan, sello de trazo grueso y medallón", () => {
+test("anillos de figuras: copias que no se pisan, sello de trazo grueso y centro sin figura", () => {
   const w = 120, h = 150;
   const cls = new Uint8Array(w * h).fill(2);
   for (let y = 20; y < 130; y++) for (let x = 20; x < 100; x++) cls[y * w + x] = (x === 20 || x === 99 || y === 20 || y === 129) ? 0 : 1;
@@ -265,7 +265,7 @@ test("anillos de figuras: copias que no se pisan, sello de trazo grueso y medall
       .map(m => +m[2] - cx).filter(r => r > rm + sh / 2);
     const rOutLine = Math.min(...ring);
     assert.ok(Math.hypot(d + sh, sw / 2) <= rOutLine, `${preset}: la esquina sale del anillo`);
-    assert.match(svg, /<image href="data:,C"/, "falta la figura en el medallón");
+    assert.doesNotMatch(svg, /<image href="data:,C"/, "el centro es un núcleo de mandala, sin la figura");
   }
 });
 
@@ -663,5 +663,120 @@ test("silueta de reemplazo: acorde al estilo y de otra familia visual", async ()
     const s = alternateSilhouette("geometric", "lotus", k);
     assert.notEqual(SILHOUETTE_FAMILY[s], SILHOUETTE_FAMILY.lotus);
     assert.notEqual(s, "heart");
+  }
+});
+
+test("anillos: los huecos de la corona se rellenan sin tocar la silueta de las copias", () => {
+  // Figura sintética: caja 100×120 con un óvalo (cls 1) y tinta (0) en su contorno; el resto es fondo (2)
+  const w = 100, h = 120, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const e = ((x - 50) / 36) ** 2 + ((y - 60) / 52) ** 2;
+    if (e <= 1) cls[y * w + x] = e > 0.9 ? 0 : 1;
+  }
+  const ring = { href: "data:,S", centerHref: "data:,C", w, h };
+  const gen = (r) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 2, figureRing: r });
+    return renderDocToSvgString(doc);
+  };
+  const sin = gen(ring), con = gen({ ...ring, cls });
+  assert.ok(con.length > sin.length, "con cls hay motivos extra en la corona");
+  assert.equal(con, gen({ ...ring, cls }), "determinista");
+  // Mismas copias de la figura con y sin relleno
+  const copias = (svg) => (svg.match(/<image href="data:,S"/g) || []).length;
+  assert.equal(copias(con), copias(sin));
+});
+
+test("medallón: una figura ancha cabe entera en el círculo (antes el clip le cortaba las puntas)", () => {
+  // Óvalo muy ancho (como un dinosaurio de perfil) en una caja 200×100
+  const w = 200, h = 100, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const e = ((x - 100) / 98) ** 2 + ((y - 50) / 20) ** 2;
+    if (e <= 1) cls[y * w + x] = e > 0.9 ? 0 : 1;
+  }
+  const doc = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 10 });
+  generateMandalaClassic(doc, { ...BASE, seed: 2, centerArt: { type: "image", href: "data:,C", scale: 0.62, ...fitOf({ w, h, cls }) } });
+  const svg = renderDocToSvgString(doc);
+  const clip = svg.match(/<clipPath id="art-[^"]+"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/);
+  const img = svg.match(/<image href="data:,C" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/);
+  assert.ok(clip && img, "medallón con imagen");
+  const [cx, cy, rc] = clip.slice(1).map(Number), [ix, iy, iw, ih] = img.slice(1).map(Number);
+  // La punta más lejana de la silueta, ya en mm, cae dentro del círculo
+  let far = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (cls[y * w + x] === 2) continue;
+    far = Math.max(far, Math.hypot(ix + ((x + 0.5) / w) * iw - cx, iy + ((y + 0.5) / h) * ih - cy));
+  }
+  assert.ok(far <= rc, `la figura sale ${(far - rc).toFixed(2)} mm del círculo`);
+  assert.ok(far >= rc * 0.6, "y no queda diminuta");
+});
+
+test("medallón: la figura central lleva una trama polar a su alrededor", () => {
+  const w = 200, h = 100, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const e = ((x - 100) / 98) ** 2 + ((y - 50) / 20) ** 2;
+    if (e <= 1) cls[y * w + x] = e > 0.9 ? 0 : 1;
+  }
+  const gen = (extra) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 2, centerArt: { type: "image", href: "data:,C", scale: 0.5, ...extra } });
+    return renderDocToSvgString(doc);
+  };
+  const paths = (svg) => (svg.match(/<path /g) || []).length;
+  // Con silueta (fit + cls) hay trama polar; sin ella, el medallón queda como antes
+  const fit = { fit: { x: 100, y: 50, r: 99 }, imgW: w, imgH: h };
+  assert.ok(paths(gen({ ...fit, cls })) > paths(gen({})), "hay trama extra en el medallón");
+  assert.equal(gen({ ...fit, cls }), gen({ ...fit, cls }), "determinista");
+});
+
+test("anillos: por defecto el centro es un núcleo de mandala, sin la figura; figureCenter la pone en el medallón", () => {
+  const ring = { href: "data:,S", centerHref: "data:,C", w: 100, h: 120 };
+  const gen = (extra) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 2, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 2, figureRing: ring, ...extra });
+    return renderDocToSvgString(doc);
+  };
+  assert.ok(!gen({}).includes('href="data:,C"'), "sin figura en el centro");
+  assert.ok(gen({ figureCenter: true }).includes('href="data:,C"'), "con figureCenter, la figura va al centro");
+  assert.ok((gen({}).match(/<image href="data:,S"/g) || []).length >= 6, "las copias de la corona siguen");
+});
+
+test("anillos: el tema de la figura cambia el relleno (prehistórico: sin flores ni corazones) y se guarda en el paquete", () => {
+  const w = 100, h = 120, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 20; y < 100; y++) for (let x = 30; x < 70; x++) cls[y * w + x] = y === 20 || y === 99 || x === 30 || x === 69 ? 0 : 1;
+  const gen = (theme) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 4, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 4, figureRing: { href: "data:,S", centerHref: "data:,C", w, h, cls, theme } });
+    return renderDocToSvgString(doc);
+  };
+  const base = gen(undefined), pre = gen("prehistorico");
+  assert.notEqual(base, pre, "el tema cambia los motivos de relleno");
+  assert.equal(pre, gen("prehistorico"), "determinista");
+  assert.equal(gen("tema-que-no-existe"), base, "un tema desconocido no cambia nada");
+  // El paquete conserva el tema
+  const back = unpackFigures(packFigures([{ name: "a", href: "x", cls: new Uint8Array(4), w: 2, h: 2, theme: "prehistorico" }]));
+  assert.equal(back[0].theme, "prehistorico");
+});
+
+test("ilustración extra: se mezcla en el relleno de la página sin tocar la figura ni cambiar páginas sin extras", () => {
+  const w = 100, h = 120, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 20; y < 100; y++) for (let x = 30; x < 70; x++) cls[y * w + x] = y === 20 || y === 99 || x === 30 || x === 69 ? 0 : 1;
+  const ring = { href: "data:,S", centerHref: "data:,C", w, h, cls, theme: "prehistorico" };
+  const gen = (extraArt) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 6, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 6, figureRing: ring, extraArt });
+    return renderDocToSvgString(doc);
+  };
+  const extra = [{ href: "data:,X", w: 80, h: 100 }];
+  const con = gen(extra), sin = gen(undefined);
+  const n = (svg, tag) => (svg.match(new RegExp(`<image href="${tag}"`, "g")) || []).length;
+  assert.ok(n(con, "data:,X") > 0, "aparecen las ilustraciones extra");
+  assert.equal(n(sin, "data:,X"), 0);
+  assert.equal(con, gen(extra), "determinista");
+  assert.equal(n(con, "data:,S"), n(sin, "data:,S"), "las copias de la corona no cambian");
+  assert.equal(sin, gen(null), "sin extras la página es la de siempre");
+  // Cada ilustración cabe en su hueco: su caja circunscrita no pasa de la mitad de la página
+  for (const m of con.matchAll(/<image href="data:,X" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)) {
+    assert.ok(+m[3] > 0 && +m[4] > 0 && Math.hypot(+m[3], +m[4]) < 60, "tamaño razonable");
   }
 });

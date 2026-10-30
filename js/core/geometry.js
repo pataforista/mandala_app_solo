@@ -101,3 +101,33 @@ function gcd(a, b) {
   while (b) [a, b] = [b, a % b];
   return a || 1;
 }
+
+/**
+ * Círculo mínimo que contiene la silueta de una figura (cls ≠ 2: tinta o interior), en píxeles de
+ * la figura. Sirve para encajar la figura entera en un medallón redondo sin que el círculo le
+ * corte las puntas (patas, cola, orejas). Aproximación de Bădoiu–Clarkson sobre el borde:
+ * error < 1 % con 300 pasos. Devuelve null si no hay silueta.
+ */
+export function enclosingCircle(cls, w, h) {
+  const pts = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (cls[y * w + x] === 2) continue;
+    // Sólo el borde: un píxel de figura con algún vecino de fondo (o en el borde de la rejilla)
+    if (x === 0 || y === 0 || x === w - 1 || y === h - 1 || cls[y * w + x - 1] === 2 || cls[y * w + x + 1] === 2 || cls[(y - 1) * w + x] === 2 || cls[(y + 1) * w + x] === 2) pts.push(x, y);
+  }
+  const n = pts.length / 2;
+  if (!n) return null;
+  let cx = pts[0], cy = pts[1];
+  for (let it = 1; it <= 300; it++) {
+    let far = 0, fd = -1;
+    for (let i = 0; i < n; i++) {
+      const d = (pts[2 * i] - cx) ** 2 + (pts[2 * i + 1] - cy) ** 2;
+      if (d > fd) { fd = d; far = i; }
+    }
+    cx += (pts[2 * far] - cx) / (it + 1);
+    cy += (pts[2 * far + 1] - cy) / (it + 1);
+  }
+  let r2 = 0;
+  for (let i = 0; i < n; i++) r2 = Math.max(r2, (pts[2 * i] - cx) ** 2 + (pts[2 * i + 1] - cy) ** 2);
+  return { x: cx, y: cy, r: Math.sqrt(r2) + 1 };
+}

@@ -10,6 +10,7 @@
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder, coloringCullArea } from "../core/pathBuilder.js";
 import { wantsComposition, composePage } from "./pageComposer.js";
+import { drawMedallionWeb } from "./figureFill.js";
 import { fitBandCount } from "../core/bandMetrics.js";
 
 const TAU = Math.PI * 2;
@@ -669,8 +670,21 @@ export function generateMandalaClassic(doc, opts) {
     const id = `art-${(seed >>> 0).toString(36)}-${doc.defs.length}`;
     doc.defs.push(`<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${rIn - detailW / 2}" /></clipPath>`);
     const s = rIn * 2 * (art.zoom ?? 1);
-    const inner = [`<image href="${art.href}" x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid meet" />`];
-    out.push(`<g clip-path="url(#${id})">`, ...inner, `</g>`);
+    // Con fit (círculo que encierra la silueta, en píxeles de la imagen) la figura entra entera en
+    // el medallón: sin él, una figura ancha llegaba al borde del cuadrado y el círculo le cortaba las puntas
+    const fit = art.fit && art.fit.r > 0 && art.imgW > 0 && art.imgH > 0 ? art.fit : null;
+    const k = fit ? ((art.cls ? 0.7 : 0.95) * (rIn - detailW) * (art.zoom ?? 1)) / fit.r : 0;
+    const inner = fit
+      ? [`<image href="${art.href}" x="${(cx - fit.x * k).toFixed(2)}" y="${(cy - fit.y * k).toFixed(2)}" width="${(art.imgW * k).toFixed(2)}" height="${(art.imgH * k).toFixed(2)}" preserveAspectRatio="none" />`]
+      : [`<image href="${art.href}" x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid meet" />`];
+    // Una figura sola en un círculo blanco se lee como una ilustración pegada: con silueta (cls) se
+    // reduce un poco y se rodea de una trama polar (rayos, anillos, pétalos), encima de la imagen
+    // porque su fondo blanco es opaco; sin silueta, el medallón queda como antes
+    const gaps = fit && art.cls
+      ? drawMedallionWeb({ cx, cy, r: rIn - detailW / 2 - 0.3, cls: art.cls, fw: art.imgW, fh: art.imgH,
+          ix: cx - fit.x * k, iy: cy - fit.y * k, iw: art.imgW * k, ih: art.imgH * k, stroke, detailW, outlineMode })
+      : [];
+    out.push(`<g clip-path="url(#${id})">`, ...inner, ...gaps, `</g>`);
     doc.body.push(...out);
     return doc;
   }
