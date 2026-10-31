@@ -8,7 +8,7 @@
 //  - Tres niveles de trazo: contorno (grueso), detalle (medio), vestido (fino: nervios, punteados).
 //  - Detalle "premium": stippling, nervaduras-cápsula, pétalo-dentro-pétalo, doble contorno en siluetas.
 import { mulberry32 } from "../core/prng.js";
-import { PathBuilder, coloringCullArea } from "../core/pathBuilder.js";
+import { PathBuilder, coloringCullArea, coloringMinCell } from "../core/pathBuilder.js";
 import { wantsComposition, composePage } from "./pageComposer.js";
 import { drawMedallionWeb } from "./figureFill.js";
 import { fitBandCount } from "../core/bandMetrics.js";
@@ -84,7 +84,10 @@ export function generateMandalaClassic(doc, opts) {
   const detailW = Math.max(MIN_LINE_MM, strokeWidthMm * 0.55);
   const vestW = Math.max(0.5, strokeWidthMm * 0.45);
   const cull = coloringCullArea(opts);
-  const minCell = Math.max(cull, 2.5 * (R / 90) ** 2, 2);
+  // Los detalles interiores (pétalo dentro de pétalo, brillos, nervios cerrados) respetan la
+  // celda mínima del nivel: antes sólo se aplicaba una fracción (1 mm² con «Adulto», que
+  // promete 5 mm²) y quedaban celdas que no se pueden colorear con lápiz
+  const minCell = Math.max(cull, coloringMinCell(opts), 2.5 * (R / 90) ** 2, 2);
 
   const P = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   const out = [];
@@ -112,8 +115,10 @@ export function generateMandalaClassic(doc, opts) {
   const weights = Array.from({ length: B }, (_, k) => {
     let w;
     if (ST.golden) {
-      // Proporción áurea: cada banda es 1.618× la anterior
-      w = Math.pow(phi, k - B + 1);
+      // Crecimiento áureo suavizado: cada banda es √φ ≈ 1,27× la anterior. Con φ entero
+      // (1,618×) la banda más interna de un disco de 6 bandas quedaba en un 4 % del radio:
+      // celdas de 2–3 mm imposibles de colorear (media 58 frente a 68 del resto)
+      w = Math.pow(phi, (k - B + 1) / 2);
     } else {
       w = 0.7 + rng() * 0.5;
       if (k === B - 1) w *= ST.sil;
@@ -153,7 +158,9 @@ export function generateMandalaClassic(doc, opts) {
       const drawn = SILHOUETTE[Math.floor(rng() * SILHOUETTE.length)];
       b.motif = opts.silhouette && MOTIFS_OK(opts.silhouette) ? opts.silhouette : drawn;
     }
-    else if (beadSlots.has(b.k) && h >= 3) b.motif = "beads";
+    // Cuentas sólo en bandas de 5 mm o más: en una más estrecha cada cuenta quedaba por
+    // debajo de 6 mm² y pegada a los anillos (26 % de las celdas de cuentas eran diminutas)
+    else if (beadSlots.has(b.k) && h >= 5) b.motif = "beads";
     else b.motif = pickMotif(prev);
     prev = b.motif;
     const minArc = Math.max(4.5 * (R / 90), 3.2);
@@ -466,7 +473,8 @@ export function generateMandalaClassic(doc, opts) {
       const step = TAU / b.n, h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
       const ring = mainPB(); circle(ring, cx, cy, b.r1);
       const m = mainPB(), d = detailPB(), v = detailPB();
-      const rad = Math.min(h * 0.36, rm * Math.sin(step / 2) * 0.82);
+      // Radio: holgura de ~0,18·h con cada anillo (antes 0,14·h: hueco < 1 mm en bandas finas)
+      const rad = Math.min(h * 0.32, rm * Math.sin(step / 2) * 0.8);
       for (let i = 0; i < b.n; i++) {
         const [x, y] = P(rm, b.off + i * step);
         circle(m, x, y, rad);
@@ -484,7 +492,8 @@ export function generateMandalaClassic(doc, opts) {
           }
         }
       }
-      emit(ring, mainW, "#fff"); emit(m, detailW, "#fff"); emit(d, detailW); emit(v, vestW);
+      // La cuenta es una celda que se colorea: contorno principal, no de detalle
+      emit(ring, mainW, "#fff"); emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
     },
 
     // ---------- Motivos nuevos ----------
@@ -660,7 +669,7 @@ export function generateMandalaClassic(doc, opts) {
   }
   if (doc?.meta) {
     doc.meta.bands = { total: B, drawn: kDraw };
-    (doc.meta.discs ??= []).push({ R, N, structure: opts.structure || "corona", motifs: bands.map(b => b.motif), counts: bands.map(b => b.n), radii: bands.map(b => +(b.r1 / R).toFixed(3)) });
+    (doc.meta.discs ??= []).push({ cx, cy, R, N, structure: opts.structure || "corona", motifs: bands.map(b => b.motif), counts: bands.map(b => b.n), radii: bands.map(b => +(b.r1 / R).toFixed(3)) });
   }
 
   // ---------- Núcleo: medallón con la imagen ----------
@@ -729,13 +738,28 @@ function drawCore(cx, cy, rCore, N, rng, opts) {
   const P = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   const Mf = (pb, rr, a) => pb.moveTo(...P(rr, a));
   const Lf = (pb, rr, a) => pb.lineTo(...P(rr, a));
+  // Número de pétalos del núcleo: el mayor divisor armónico de N (N, N/2, N/3… ≥ 4) cuya
+  // celda se pueda colorear. areaPerStep · paso ≈ área de una celda (aprox. medida sobre
+  // la forma de cada variante). Antes el conteo no dependía del tamaño del núcleo y los
+  // mandalas pequeños (núcleo de ~5 mm) salían con 41 % de celdas < 6 mm².
+  const coreCount = (areaPerStep, maxN = N) => {
+    const cands = [];
+    for (let k = 1; N / k >= 4; k++) if (N % k === 0 && N / k <= maxN) cands.push(N / k);
+    return cands.find(n => areaPerStep * (TAU / n) >= minCell * 1.3) ?? 0;
+  };
+  // Núcleo mínimo: un disco coloreable (y un anillo, si cabe)
+  const plainCore = () => {
+    const c = mainPB(); circle(c, cx, cy, rCore * 0.55); emit(c, mainW, "#fff");
+    return frags;
+  };
 
-  if (coreVariant === "flor_radiante") {
+  // La flor de la vida crea lentes entre círculos: con un núcleo chico son diminutas
+  const variant = coreVariant === "flor_vida" && rCore < 12 ? "flor_radiante" : coreVariant;
+
+  if (variant === "flor_radiante") {
     // Flor radiante: 2 filas de pétalos + estambres centrales
-    let nC = N >= 12 && N % 2 === 0 ? N / 2 : N;
-    const fits = (n) => TAU * rCore * 0.6 / n >= 2;
-    if (!fits(nC)) { const divs = []; for (let k = 2; N / k >= 4; k++) if (N % k === 0) divs.push(N / k); nC = divs.find(fits) ?? 0; }
-    if (!nC) { const c = mainPB(); circle(c, cx, cy, rCore * 0.55); emit(c, mainW, "#fff"); return frags; }
+    const nC = coreCount(0.12 * rCore * rCore, N >= 12 && N % 2 === 0 ? N / 2 : N);
+    if (!nC) return plainCore();
     const step = TAU / nC, w = (step / 2) * 0.9;
     const roundCore = rng() < 0.5;
     // Fila trasera
@@ -777,7 +801,7 @@ function drawCore(cx, cy, rCore, N, rng, opts) {
     const c = mainPB(); circle(c, cx, cy, coreDiskR); emit(c, mainW, "#fff");
     if (detail && rCore > 9) { const c2 = detailPB(); circle(c2, cx, cy, coreDiskR * 0.5); emit(c2, detailW); }
 
-  } else if (coreVariant === "flor_vida") {
+  } else if (variant === "flor_vida") {
     // Flor de la vida: N círculos entrelazados (respeta la simetría del mandala)
     const nPetals = N >= 6 ? (N % 2 === 0 ? N / 2 : N) : N;
     const rPet = rCore * (nPetals <= 6 ? 0.42 : 0.38);
@@ -795,7 +819,7 @@ function drawCore(cx, cy, rCore, N, rng, opts) {
     const c = mainPB(); circle(c, cx, cy, coreDiskR); emit(c, mainW, "#fff");
     if (detail && coreDiskR > 2) { const c2 = detailPB(); circle(c2, cx, cy, coreDiskR * 0.5); emit(c2, detailW); }
 
-  } else if (coreVariant === "espiral_aurea") {
+  } else if (variant === "espiral_aurea") {
     // Espiral áurea con celdas cerradas entre las vueltas
     const turns = 2.5 + rng() * 1.5;
     const m = mainPB(), d = detailPB();
@@ -835,8 +859,8 @@ function drawCore(cx, cy, rCore, N, rng, opts) {
 
   } else {
     // estrella_compuesta: estrella de N puntas con estrella interna + líneas radiales
-    let nC = N >= 8 ? (N % 2 === 0 ? N / 2 : N) : N;
-    if (nC < 5) nC = N >= 4 ? N : 6;
+    const nC = coreCount(0.09 * rCore * rCore, N >= 8 && N % 2 === 0 ? N / 2 : N);
+    if (!nC) return plainCore();
     const step = TAU / nC;
     const m = mainPB(), d = detailPB(), v = detailPB();
     const rOuter = rCore * 0.88, rInner = rCore * 0.45;

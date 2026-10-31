@@ -16,13 +16,19 @@ export function fitBandCount({ r0, r1, candidates, aspect = 0.8, minArea = 4, fi
   const pitch = TAU * rm;
   const ideal = pitch / (h * aspect);
   const ranked = [...new Set(candidates)].sort((a, b) => Math.abs(Math.log(a / ideal)) - Math.abs(Math.log(b / ideal)));
+  const areaOk = (n) => { const w = (pitch / n) * fill; return w * h * 0.55 >= minArea && pitch / n - w >= 0.8; };
   for (const n of ranked) {
     const w = (pitch / n) * fill;
     const ratio = (w / h) / aspect;
     if (ratio < 0.6 || ratio > 1.5) continue; // ni aguja ni tortuga
-    if (w * h * 0.55 < minArea) continue;     // área útil de una lente
-    if (pitch / n - w < 0.8) continue;        // separación mínima entre celdas
+    if (!areaOk(n)) continue;                 // área útil de una lente y separación mínima
     return n;
   }
-  return ranked[0];
+  // Ninguno cumple todo: primero que la celda se pueda colorear (aunque la proporción no
+  // sea la ideal); si ni así, el conteo con las celdas más grandes. Antes se devolvía el de
+  // mejor proporción aunque sus celdas fueran diminutas (14–23 % de celdas < 6 mm² en los
+  // mandalas pequeños de «constelación»).
+  const roomy = ranked.find(areaOk);
+  if (roomy != null) return roomy;
+  return Math.min(...ranked);
 }

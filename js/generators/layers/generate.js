@@ -1,6 +1,6 @@
 // js/generators/layers/generate.js
 import { mulberry32, rFloat } from "../../core/prng.js";
-import { PathBuilder, coloringCullArea } from "../../core/pathBuilder.js";
+import { PathBuilder, coloringMinCell } from "../../core/pathBuilder.js";
 import { lerp, clamp, polar } from "../../core/geometry.js";
 import {
   addCircle,
@@ -76,7 +76,7 @@ export function generateMandalaLayers(doc, opts) {
   const paths = [];
 
   // Perfil de coloreo: descarta formas cerradas demasiado pequeñas para colorear
-  const cullArea = coloringCullArea(opts);
+  const cullArea = coloringMinCell(opts);
   const newPB = () => new PathBuilder({ minClosedArea: cullArea });
 
   const style = styleMode === "hashiko" ? "sashiko" : styleMode;
@@ -84,10 +84,12 @@ export function generateMandalaLayers(doc, opts) {
   // Complexity factor: scales density of sub-elements (0..1 from range 20..320)
   const cFactor = _clamp((complexity - 20) / (320 - 20), 0, 1);
 
+  // Jerarquía de trazo con mínimos de imprenta: por debajo de ~0,5 mm la línea sale gris en
+  // el papel de KDP (antes el «pelo» medía 0,2 mm con trazo de 0,8)
   const mainW = strokeWidthMm;
-  const detailW = strokeWidthMm * 0.75;
-  const fineW = strokeWidthMm * 0.45;
-  const hairW = strokeWidthMm * 0.25;
+  const detailW = Math.max(0.55, strokeWidthMm * 0.75);
+  const fineW = Math.max(0.5, strokeWidthMm * 0.45);
+  const hairW = Math.max(0.45, strokeWidthMm * 0.25);
 
   // Structural Jitter: vary the base radii of rings based on seed
   const rJitter = (base, scale = 0.05) => base * (1 + (rng() - 0.5) * 2 * scale);

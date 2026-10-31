@@ -1,5 +1,5 @@
 import { mulberry32, rFloat } from "../core/prng.js";
-import { PathBuilder, coloringCullArea } from "../core/pathBuilder.js";
+import { PathBuilder, coloringMinCell } from "../core/pathBuilder.js";
 import { lerp, clamp, fmt, polar, polarW, getWobblePhases, trochoidTurns, harmonicTrochoid } from "../core/geometry.js";
 import { circleSegments } from "./layers/core.js";
 
@@ -71,7 +71,7 @@ export function generateMandalaRadial(doc, opts) {
   const rng = mulberry32((seed >>> 0) || 0);
 
   // Perfil de coloreo: descarta formas cerradas demasiado pequeñas para colorear
-  const cullArea = coloringCullArea(opts);
+  const cullArea = coloringMinCell(opts);
   const newPB = () => new PathBuilder({ minClosedArea: cullArea });
 
   // --- Helpers puros (declarados antes de cualquier uso) ---
@@ -148,10 +148,12 @@ export function generateMandalaRadial(doc, opts) {
     if (role === "frame") weight *= 1.4;
     else weight *= _lerp(0.85, 1.25, rFrac);
 
+    // Mínimos de imprenta (como el motor clásico): detalle ≥ 0,55 mm y fino ≥ 0,5 mm.
+    // Antes el fino bajaba a 0,3 mm y en el papel de KDP salía gris o se perdía.
     return {
       main: Math.max(minStrokeMm, weight),
-      detail: Math.max(minStrokeMm, weight * 0.6),
-      fine: Math.max(minStrokeMm * 0.8, weight * 0.4)
+      detail: Math.max(minStrokeMm, 0.55, weight * 0.6),
+      fine: Math.max(minStrokeMm * 0.8, 0.5, weight * 0.4)
     };
   }
 
@@ -1389,7 +1391,7 @@ if (pageBorder) {
   const b2m = borderMargin + 1.2;
   pbB2.moveTo(b2m, b2m).lineTo(wMm - b2m, b2m).lineTo(wMm - b2m, hMm - b2m).lineTo(b2m, hMm - b2m).close();
   doc.body.push(
-    pbB2.toPath({ stroke, strokeWidthMm: outerRingStrokes.fine * 0.7, fill: "none" })
+    pbB2.toPath({ stroke, strokeWidthMm: Math.max(0.5, outerRingStrokes.fine * 0.7), fill: "none" })
   );
 }
 
