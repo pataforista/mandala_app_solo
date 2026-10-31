@@ -1949,6 +1949,7 @@ function bindUI() {
       // Hoja vertical: el mandala centrado completa las franjas vacías con un fondo
       fillCentro: vary && isClassic && (({ wMm, hMm }) => hMm > wMm * 1.15 || wMm > hMm * 1.15)(getCurrentDoc().page),
       chapters: chaptersFor(regular),
+      patternOnly: prof?.patternOnly, // Adulto: solo tramas continuas, no confeti
     });
     // Páginas sorprendentes y, en modo progresivo, dificultad creciente en TODO el libro
     const plan = insertChapterDividers(addSpecialPages(regularPlan, {

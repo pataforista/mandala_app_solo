@@ -39,6 +39,53 @@ export const PATTERN_BACKGROUNDS = ["escamas", "flor_vida", "sol", "ondas", "mos
 // aparece como variación ocasional. Unificado para que el libro y los capítulos usen
 // el mismo reparto (antes había dos versiones con pesos diferentes).
 export const BESTSELLER_STYLE_W = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
+
+// Perfiles de producto: fijan estilo, fondo, trazo y extras para un público concreto.
+// Cada perfil define qué fondos usar (patternOnly = solo tramas continuas, no confeti).
+export const PRODUCT_PROFILES = {
+  // Adulto general: tramas continuas (teselados), sin confeti infantil
+  mindful_patterns: {
+    name: "Mindful Patterns",
+    description: "Adulto general — tramas continuas, jerarquía de trazo, floral + geométrico",
+    styles: ["floral", "geometric", "islamico", "yantra"],
+    styleWeights: [3, 2, 1, 1],
+    patternOnly: true, // Solo tramas continuas, no confeti
+    strokeBase: 0.7, // mm
+    complexity: 130,
+  },
+  // Seniors/principiantes: trazo grueso, celdas grandes, sin fondo
+  large_print_easy: {
+    name: "Large Print Easy",
+    description: "Seniors y principiantes — trazo 1.1 mm, celdas ≥ 7 mm², centrado, sin fondo",
+    styles: ["floral", "geometric"],
+    styleWeights: [2, 1],
+    patternOnly: false,
+    useBackground: false, // Sin fondo decorado
+    strokeBase: 1.1,
+    complexity: 80,
+  },
+  // Adulto experto: geometría sagrada intrincada, tramas
+  intricate_sacred: {
+    name: "Intricate Sacred Geometry",
+    description: "Adulto experto — geométrico, yantra, islámico; detalle alto; tramas",
+    styles: ["geometric", "yantra", "islamico"],
+    styleWeights: [3, 2, 2],
+    patternOnly: true,
+    strokeBase: 0.6,
+    complexity: 180,
+  },
+  // Infantil: trazo grueso, figuras amables, fondo de juego (confeti permitido)
+  kids_mandalas: {
+    name: "Kids Mandalas",
+    description: "Niños 6-10 — trazo grueso, figuras amables, fondo de juego",
+    styles: ["floral", "sashiko", "celtico"],
+    styleWeights: [2, 1, 1],
+    patternOnly: false, // Confeti permitido (infantil)
+    useBackground: true,
+    strokeBase: 1.0,
+    complexity: 60,
+  },
+};
 // Temas sueltos que no combinan con todos los estilos (corazones alrededor de un mandala
 // geométrico se ven fuera de lugar). Cielo, jardín (figuras del propio estilo) y las
 // tramas van con todos.
@@ -49,15 +96,18 @@ const BACKGROUND_STYLES = {
 // Composiciones con espacio libre que se decora (el resto no usa tema de fondo)
 const FILLED = new Set(["fondo", "constelacion", "esquinas", "medio"]);
 
-/** Tema de fondo equilibrado: el menos usado entre los posibles, distinto del anterior. */
-export function backgroundPicker(rng, { fillCentro = false } = {}) {
+/** Tema de fondo equilibrado: el menos usado entre los posibles, distinto del anterior.
+ *  Con patternOnly=true, usa solo tramas continuas (PATTERN_BACKGROUNDS), no confeti. */
+export function backgroundPicker(rng, { fillCentro = false, patternOnly = false } = {}) {
   const used = new Map();
   let last = null;
   return (composition, style = null) => {
     const centro = composition === "centro" && fillCentro;
     if (!FILLED.has(composition) && !centro) return null;
-    const allowed = (composition === "fondo" || centro ? [...SCATTER_BACKGROUNDS, ...PATTERN_BACKGROUNDS] : SCATTER_BACKGROUNDS)
-      .filter(b => !style || !BACKGROUND_STYLES[b] || BACKGROUND_STYLES[b].includes(style));
+    // Con patternOnly, usar solo tramas continuas (para perfiles de adulto)
+    const basePool = patternOnly ? PATTERN_BACKGROUNDS :
+      (composition === "fondo" || centro ? [...SCATTER_BACKGROUNDS, ...PATTERN_BACKGROUNDS] : SCATTER_BACKGROUNDS);
+    const allowed = basePool.filter(b => !style || !BACKGROUND_STYLES[b] || BACKGROUND_STYLES[b].includes(style));
     // Cuenta por encuadre: si no, los temas sueltos (que también usan constelación y
     // esquinas) parecían «muy usados» y el fondo decorado repetía siempre las tramas.
     // Primero el menos usado; entre empatados, distinto del de la página anterior
@@ -151,6 +201,7 @@ export function bestSellerProfile(preset = "KDP_8_5x8_5") {
     frames: ["ninguno", "redondeado"], frameWeights: [3, 1],
     petals: [12, 16, 18, 20, 24],
     fillCentro: !square,
+    patternOnly: true, // Adulto: solo tramas continuas, no confeti
   };
 }
 
@@ -334,7 +385,7 @@ export function planBook(opts) {
   // Generador propio: añadir la silueta no cambia los sorteos de las demás dimensiones
   const nextSilhouette = silhouettePicker(mulberry32(((seed >>> 0) ^ 0x51A0E77E) >>> 0));
   const nextStructure = shuffleBag(mulberry32(((seed >>> 0) ^ 0x57A0C7E5) >>> 0), BOOK_STRUCTURES, STRUCTURE_WEIGHTS);
-  const nextBackground = backgroundPicker(mulberry32(((seed >>> 0) ^ 0xBAC6A0D5) >>> 0), { fillCentro: opts.fillCentro });
+  const nextBackground = backgroundPicker(mulberry32(((seed >>> 0) ^ 0xBAC6A0D5) >>> 0), { fillCentro: opts.fillCentro, patternOnly: opts.patternOnly });
 
   // Páginas con imagen: espaciadas de forma uniforme (k + ½) · count / images
   const imageAt = new Map();

@@ -39,11 +39,14 @@ test("plan: estructura y fondo repartidos sin repetir en páginas seguidas", () 
     for (let i = 1; i < plan.length; i++) assert.notEqual(plan[i].structure, plan[i - 1].structure, `estructura, págs. ${i}-${i + 1}`);
     assert.ok(new Set(plan.map(p => p.structure)).size === BOOK_STRUCTURES.length);
     // Fondo sólo donde hay espacio que decorar; tramas sólo en «fondo decorado»
+    // Con patternOnly (bestSeller), las tramas pueden ir en cualquier composición decorada
+    const hasPatternOnly = bestSellerProfile("KDP_8_5x11").patternOnly;
     for (const p of plan) {
       if (p.composition === "gigante") assert.equal(p.background, null);
       else if (p.composition === "centro") assert.ok(p.background, "hoja vertical: el centrado completa la hoja");
       else assert.ok(BACKGROUNDS.includes(p.background));
-      if (PATTERN_BACKGROUNDS.includes(p.background)) assert.ok(["fondo", "centro"].includes(p.composition));
+      // Sin patternOnly, las tramas solo van en «fondo decorado» o «centro» con fillCentro
+      if (!hasPatternOnly && PATTERN_BACKGROUNDS.includes(p.background)) assert.ok(["fondo", "centro"].includes(p.composition));
     }
     if (seed === 1) {
       const sq = planBook({ count: 50, seed, ...bestSellerProfile("KDP_8_5x8_5") });
