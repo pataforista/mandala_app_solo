@@ -510,8 +510,10 @@ const FIGURE_USES = [
 // La vista previa usa la imagen seleccionada (borde morado) con su uso.
 function resolveUserImage(s, entry = userFigures[activeFigure]) {
   // Ilustraciones extra (huevos, huellas, palmeras…): no son la figura de la página sino decorado; van en el
-  // relleno de TODAS las páginas, tenga o no la página una figura elegida
-  const extraArt = userFigures.filter(m => m.use === "extra" && m.fig).map(m => ({ href: m.fig.stampHref || m.fig.href, w: m.fig.w, h: m.fig.h }));
+  // relleno de TODAS las páginas, tenga o no la página una figura elegida.
+  // Se usa el dibujo original y no el «sello»: el engrosado del sello cierra los huecos de
+  // hojas, ventanas y nidos y los deja como manchas negras macizas en el PDF.
+  const extraArt = userFigures.filter(m => m.use === "extra" && m.fig).map(m => ({ href: m.fig.href, w: m.fig.w, h: m.fig.h }));
   const out = { figure: null, centerArt: null, figureRing: null, extraArt: extraArt.length ? extraArt : null,
     figureDensity: s.figureDensity, figureFillInside: s.figureFillInside, figureFillOutside: s.figureFillOutside };
   const fig = entry?.fig;
