@@ -11,7 +11,8 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, alternateSilhouette, BOOK_STRUCTURES, BOOK_STYLES, chapterLayout, insertChapterDividers } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, BOOK_STYLES, chapterLayout, insertChapterDividers, applyPageOverride } from "./core/bookPlan.js";
+import { curateBook, attemptChoice, twinTargets as curatorTwinTargets, WEAK_SCORE, CURATE_TRIES } from "./core/bookCurator.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
 import { escapeXml } from "./core/svgText.js";
@@ -21,7 +22,7 @@ import { fitOf } from "./generators/pageComposer.js";
 import { packFigures, unpackFigures } from "./core/figurePack.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
-import { pageFingerprint, fingerprintSimilarity, similarPairs, TWIN_THRESHOLD } from "./core/variety.js";
+import { pageFingerprint, similarPairs } from "./core/variety.js";
 
 const historyMan = new StateHistory();
 const imgProc = new ImageProcessor();
@@ -1955,7 +1956,7 @@ function bindUI() {
     const overrides = currentOverrides();
     // Las páginas de un grupo (secuencia que crece, mural) cambian juntas
     const ovKey = (i) => (plan[i].special?.group != null ? `g:${plan[i].special.group}` : i);
-    const seedOf = (i) => { const ov = overrides.get(ovKey(i)); return ov?.bump ? ((plan[i].seed + 0x9E3779B1 * ov.bump) >>> 0) : plan[i].seed; };
+    const seedOf = (i) => applyPageOverride(plan[i], overrides.get(ovKey(i))).seed;
     // Soluciones: número de página real de cada mandala misterioso en el PDF
     const solutionEntries = () => {
       const lo = bookLayoutOpts();
@@ -1996,13 +1997,14 @@ function bindUI() {
           spiroR: 60, spiror: 25, spiroDistance: 30, spiroResolution: 500, spiroMode: "hypo" };
       }
       if (isClassic) {
-        o.composition = ov?.composition || pg.composition;
+        // «Borrar y crear otro» también cambia la silueta y la estructura (applyPageOverride):
+        // con las mismas, el reemplazo se parecería demasiado al dibujo descartado
+        const ap = applyPageOverride(pg, ov);
+        o.composition = ap.composition;
         o.frameStyle = pg.frameStyle;
-        // «Borrar y crear otro» también cambia la silueta: con la misma, el reemplazo
-        // se parecería demasiado al dibujo descartado
-        if (pg.structure) o.structure = ov?.bump ? BOOK_STRUCTURES[(BOOK_STRUCTURES.indexOf(pg.structure) + ov.bump) % BOOK_STRUCTURES.length] : pg.structure;
+        if (ap.structure) o.structure = ap.structure;
         if (pg.background) o.background = pg.background;
-        if (pg.silhouette) o.silhouette = ov?.bump ? alternateSilhouette(o.styleMode || pg.styleMode, pg.silhouette, ov.bump) : pg.silhouette;
+        if (ap.silhouette) o.silhouette = ap.silhouette;
         // Cada imagen elegida aparece una vez, con el uso que se le asignó a mano;
         // el resto de páginas son mandalas sin imagen
         const entry = pg.centerArt ? chosen[pg.centerArt.imageIndex] : null;
@@ -2024,10 +2026,16 @@ function bindUI() {
   const STYLE_NAMES = { sashiko: "Sashiko", floral: "Floral", geometric: "Geométrico", islamico: "Islámico", azteca: "Azteca", yantra: "Yantra", celtico: "Céltico" };
   let reviewToken = 0;
 
+  // Cambios hechos por el control de calidad automático (el resto son a mano)
+  const autoKeys = new Set();
   const updateReviewInfo = () => {
     if (!reviewInfo) return;
-    const n = currentOverrides().size;
-    reviewInfo.textContent = n ? `✏️ ${n} página(s) cambiada(s) a mano: se usarán al crear el libro.` : "";
+    const keys = [...currentOverrides().keys()];
+    const auto = keys.filter(k => autoKeys.has(k)).length, manual = keys.length - auto;
+    const parts = [];
+    if (manual) parts.push(`✏️ ${manual} página(s) cambiada(s) a mano`);
+    if (auto) parts.push(`✨ ${auto} rehecha(s) por el control de calidad automático`);
+    reviewInfo.textContent = parts.length ? `${parts.join(" · ")}: se usarán al crear el libro.` : "";
   };
 
   const pageSvg = (book, i) => {
@@ -2041,7 +2049,6 @@ function bindUI() {
   // La misma puntuación que la vista previa (commercialMetrics.js), medida sobre cada
   // página tal como irá al PDF. Sólo en páginas de mandala: el misterioso tiene celdas
   // pequeñas a propósito, la naturaleza lleva texto y las soluciones no se colorean.
-  const WEAK_SCORE = 60;
   const reviewScores = new Map(); // índice → puntuación (o null si no se mide)
   const scorable = (o) => !o.special || o.special.type === "grow" || o.special.type === "mural";
   const scoreSvg = (svg, o) => commercialScore(measureSvg(svg), { strokeWidthMm: o.strokeWidthMm, minCellAreaMm2: o.minCellAreaMm2 });
@@ -2055,8 +2062,6 @@ function bindUI() {
   const fpOf = (svg, o) => (o.special ? null : pageFingerprint(svg, getCurrentDoc().page));
   const fpList = (n) => Array.from({ length: n }, (_, k) => reviewFps.get(k) || null);
   const twinPairs = (n) => similarPairs(fpList(n));
-  // ¿Esta huella sería gemela de alguna otra página del libro?
-  const twinOfAny = (fp, i, n) => fp && fpList(n).some((g, k) => k !== i && g && fingerprintSimilarity(fp, g) >= TWIN_THRESHOLD);
   const weakPages = () => [...reviewScores].filter(([, sc]) => sc != null && sc < WEAK_SCORE).map(([i]) => i);
   const updateQualitySummary = (book) => {
     if (!reviewQualityEl) return;
@@ -2095,19 +2100,13 @@ function bindUI() {
       ? `<b style="color:#f57c00">${twins.length} par(es) de páginas gemelas</b> (se ven casi iguales al hojear): ` +
         twins.slice(0, 8).map(t => `págs. ${t.i + 1} y ${t.j + 1}`).join(" · ") + (twins.length > 8 ? "…" : "") + "."
       : "sin páginas gemelas ✅.");
-    const todo = new Set([...fixable, ...twinFix]).size;
+    // Una página floja de un grupo cuenta una vez por grupo (se rehace el grupo entero)
+    const weakGroups = new Set(weak.filter(i => !fixable.includes(i)).map(i => book.plan[i].special.group));
+    const todo = new Set([...fixable, ...twinFix]).size + weakGroups.size;
     if (reviewFixBtn) { reviewFixBtn.disabled = !todo; reviewFixBtn.textContent = todo ? `Rehacer flojas y gemelas (${todo})` : "Rehacer flojas y gemelas"; }
   };
   // De cada par gemelo se rehace la página posterior (si no es de un grupo; si lo es, la otra)
-  const twinTargets = (book, twins) => {
-    const out = new Set();
-    for (const { i, j } of twins) {
-      if (out.has(i) || out.has(j)) continue;
-      const free = (k) => book.plan[k].special?.group == null;
-      if (free(j)) out.add(j); else if (free(i)) out.add(i);
-    }
-    return [...out];
-  };
+  const twinTargets = (book, twins) => curatorTwinTargets(twins, (k) => book.plan[k].special?.group == null);
 
   const fillCard = (card, book, i) => {
     const { svg, opts } = pageSvg(book, i);
@@ -2141,43 +2140,95 @@ function bindUI() {
     } else meta.title = "Página especial: la puntuación no se aplica.";
   };
 
-  // Prueba hasta `tries` diseños nuevos por página floja o gemela y se queda con el mejor
-  // que no sea gemelo de otra página
-  const fixWeakPages = async (tries = 6) => {
+  // ---------- Curaduría automática (bookCurator.js) ----------
+  // Prueba hasta CURATE_TRIES diseños nuevos por página floja o gemela y se queda con el
+  // mejor que no repita otra página. Los primeros intentos cambian el diseño; los últimos,
+  // si hace falta, también el encuadre por uno más limpio de los permitidos.
+  // measured: [{ score, fp }] por página (de la revisión o medidas aquí mismo).
+  const curateOverrides = async (book0, measured, { onStep } = {}) => {
+    const pages = measured.map((m, i) => ({ ...m, fixable: book0.plan[i].special?.group == null,
+      // Secuencia que crece o mural: se rehace el grupo entero (misma semilla para todas sus páginas)
+      group: book0.plan[i].special?.group ?? null, groupFixable: true }));
+    return curateBook(pages, async (i, k) => {
+      const key = book0.ovKey(i);
+      const start = currentOverrides().get(key);
+      const pg = book0.plan[i];
+      const members = pg.special?.group != null ? book0.plan.map((_, j) => j).filter(j => book0.ovKey(j) === key) : null;
+      const choice = {
+        ...(start || {}),
+        ...attemptChoice(k, {
+          current: start?.composition || pg.composition, allowed: book0.comps, startBump: start?.bump || 0,
+          // Sólo mandalas normales del motor clásico; un medio mandala cortaría a la figura
+          canReframe: book0.isClassic && bookVaryEl.checked && !pg.special && !pg.centerArt,
+        }),
+      };
+      currentOverrides().set(key, choice);
+      try {
+        const nb = buildBook();
+        const measure = (j) => { const { svg, opts } = pageSvg(nb, j); return { i: j, score: scorable(opts) ? scoreSvg(svg, opts).score : null, fp: fpOf(svg, opts) }; };
+        if (members) return { members: members.map(measure), choice };
+        return { ...measure(i), choice };
+      } finally {
+        if (start) currentOverrides().set(key, start); else currentOverrides().delete(key);
+        await new Promise(r => setTimeout(r, 0)); // la ventana sigue respondiendo
+      }
+    }, { tries: CURATE_TRIES, onStep }).then(res => {
+      for (const [i, choice] of res.changes) { currentOverrides().set(book0.ovKey(i), choice); autoKeys.add(book0.ovKey(i)); }
+      return res;
+    });
+  };
+
+  // Firma del libro (sin los cambios por página): si no cambia, no hace falta volver a curarlo
+  const curatedSigs = new Set();
+  const bookSignature = (book) => {
+    const plain = Object.entries(buildOpts(state)).filter(([, v]) => v === null || typeof v !== "object");
+    return JSON.stringify([state.preset, state.generatorType, book.plan, plain, bookMargin(bookPageCount(bookLayoutOpts()))]);
+  };
+  const autoQualityEl = document.getElementById("bookAutoQuality");
+  const autoQuality = () => autoQualityEl ? autoQualityEl.checked : true;
+
+  const fixWeakPages = async () => {
     const book0 = buildBook();
-    const weak = weakPages().filter(i => book0.plan[i].special?.group == null);
-    const targets = [...new Set([...weak, ...twinTargets(book0, twinPairs(book0.count))])].sort((a, b) => a - b);
-    if (!targets.length) return;
+    const measured = Array.from({ length: book0.count }, (_, i) => ({ score: reviewScores.get(i) ?? null, fp: reviewFps.get(i) || null }));
     if (reviewFixBtn) reviewFixBtn.loading = true;
     const cards = [...reviewGrid.children];
     try {
-      for (const i of targets) {
-        const key = book0.ovKey(i);
-        const start = currentOverrides().get(key) || {};
-        // Valor de un diseño: su puntuación, y descartado si es gemelo de otra página
-        const value = (score, fp) => (twinOfAny(fp, i, book0.count) ? -1000 : 0) + (score ?? 70);
-        let best = { bump: start.bump || 0, v: value(reviewScores.get(i), reviewFps.get(i)) };
-        for (let t = 1; t <= tries && best.v < 80; t++) {
-          const bump = (start.bump || 0) + t;
-          currentOverrides().set(key, { ...start, bump });
-          const nb = buildBook();
-          const { svg, opts } = pageSvg(nb, i);
-          const v = value(scorable(opts) ? scoreSvg(svg, opts).score : null, fpOf(svg, opts));
-          if (v > best.v) best = { bump, v };
-          await new Promise(r => setTimeout(r, 0));
-        }
-        if (best.bump) currentOverrides().set(key, { ...start, bump: best.bump });
-        else if (Object.keys(start).length) currentOverrides().set(key, start);
-        else currentOverrides().delete(key);
-        const nb = buildBook();
-        fillCard(cards[i], nb, i);
-        cards[i].animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 350 });
-      }
+      const res = await curateOverrides(book0, measured);
+      const nb = buildBook();
+      const keys = new Set([...res.changes.keys()].map(i => nb.ovKey(i)));
+      nb.plan.forEach((_, k) => {
+        if (!keys.has(nb.ovKey(k))) return;
+        fillCard(cards[k], nb, k);
+        cards[k].animate([{ opacity: 0.2 }, { opacity: 1 }], { duration: 350 });
+      });
+      curatedSigs.add(bookSignature(nb));
+      return res;
     } finally {
       if (reviewFixBtn) reviewFixBtn.loading = false;
       updateQualitySummary(buildBook());
       updateReviewInfo();
     }
+  };
+
+  // Antes de crear el PDF sin pasar por la revisión: mide cada página y cura el libro.
+  // Devuelve el resumen (o null si no hizo falta).
+  const ensureCurated = async (onProgress) => {
+    const book0 = buildBook();
+    const sig = bookSignature(book0);
+    if (!autoQuality() || curatedSigs.has(sig)) return null;
+    const measured = [];
+    for (let i = 0; i < book0.count; i++) {
+      const { svg, opts } = pageSvg(book0, i);
+      measured.push({ score: scorable(opts) ? scoreSvg(svg, opts).score : null, fp: fpOf(svg, opts) });
+      onProgress?.(i + 1, book0.count, "Revisando la calidad de cada página");
+      await new Promise(r => setTimeout(r, 0));
+    }
+    const res = await curateOverrides(book0, measured, {
+      onStep: (n, tot) => onProgress?.(n, tot, "Rehaciendo páginas flojas o repetidas"),
+    });
+    curatedSigs.add(sig);
+    updateReviewInfo();
+    return res;
   };
 
   const openReview = async () => {
@@ -2199,6 +2250,7 @@ function bindUI() {
         if (!act) return;
         const key = book.ovKey(i);
         const ov = { ...(currentOverrides().get(key) || {}) };
+        autoKeys.delete(key); // a partir de aquí, la página es un cambio a mano
         if (act === "seed") ov.bump = (ov.bump || 0) + 1;
         if (act === "comp") {
           const b = buildBook();
@@ -2230,6 +2282,17 @@ function bindUI() {
       try { fillCard(cards[i], book, i); } catch (err) { console.error("Miniatura", i, err); }
     }
     updateQualitySummary(book);
+    // Control de calidad automático: rehace solo las flojas y gemelas (una vez por libro)
+    if (token !== reviewToken) return;
+    if (autoQuality() && !curatedSigs.has(bookSignature(book))) {
+      if (reviewQualityEl) reviewQualityEl.innerHTML += "<br>⏳ Rehaciendo automáticamente las páginas flojas y gemelas…";
+      const res = await fixWeakPages();
+      if (token !== reviewToken || !res || !reviewQualityEl) return;
+      if (!res.targets.length) { reviewQualityEl.innerHTML = reviewQualityEl.innerHTML.replace(/<br>⏳[^<]*$/, ""); return; }
+      const a = res.after;
+      reviewQualityEl.innerHTML += `<br>✨ Control automático: ${res.changes.size} página(s) rehecha(s)` +
+        (a.mean != null ? ` · media ${Math.round(res.before.mean)} → ${Math.round(a.mean)}` : "") + ".";
+    }
   };
 
   const reviewBtn = document.getElementById("reviewBook");
@@ -2238,6 +2301,8 @@ function bindUI() {
     document.getElementById("reviewClose")?.addEventListener("click", () => reviewDialog.hide());
     document.getElementById("reviewReset")?.addEventListener("click", () => {
       bookOverrides = new Map();
+      curatedSigs.clear();
+      autoKeys.clear();
       updateReviewInfo();
       openReview();
     });
@@ -2274,7 +2339,6 @@ function bindUI() {
     const total = bookPageCount(layoutOpts);
     if (total < 24 && !confirm(`El libro tendría ${total} páginas y KDP exige mínimo 24. ¿Crear de todos modos?`)) return;
     const marginMm = bookMargin(total);
-    const { count, baseSeed, makeOpts, sourceLog, generatorFn } = buildBook();
 
     bookBtn.loading = true;
     bookBtn.disabled = true;
@@ -2283,7 +2347,19 @@ function bindUI() {
       if (progressStatus) progressStatus.textContent = "Creando libro...";
       progressDialog.show();
     }
+    const progress = (done, tot, label) => {
+      if (progressBar && progressStatus) {
+        const percent = Math.round((done / tot) * 100);
+        progressBar.value = percent;
+        progressStatus.textContent = `${label} (${percent}%)`;
+      }
+    };
+    let curated = null;
     try {
+      // Control de calidad automático: las páginas flojas o repetidas se rehacen antes
+      // de dibujar el PDF (si ya se hizo en la revisión, no se repite)
+      curated = await ensureCurated(progress);
+      const { count, baseSeed, makeOpts, sourceLog, generatorFn } = buildBook();
       const filename = `libro_${state.preset}_${count}mandalas_semilla${baseSeed}.pdf`;
       await downloadBookPdf(filename, generatorFn, count, {
         preset: state.preset,
@@ -2296,13 +2372,7 @@ function bindUI() {
         blackBack: backMode() === "negro",
         marginMm,
         dpi: parseInt(bookDpiEl?.value, 10) || 300,
-        onProgress: (done, tot, label) => {
-          if (progressBar && progressStatus) {
-            const percent = Math.round((done / tot) * 100);
-            progressBar.value = percent;
-            progressStatus.textContent = `${label} (${percent}%)`;
-          }
-        },
+        onProgress: progress,
       });
       // Registro de fuentes (CSV) junto al PDF, si el libro lleva imágenes del usuario
       if (sourceLog.some(r => r && r.source)) { // sólo si alguna imagen trae fuente anotada
@@ -2317,7 +2387,13 @@ function bindUI() {
         });
         downloadTextFile(filename.replace(/\.pdf$/, "_registro_fuentes.csv"), rows.join("\n"));
       }
-      alert(`✅ Libro creado (${total} páginas, margen ${marginMm.toFixed(1)} mm). ` +
+      const qa = curated?.after;
+      const qaMsg = qa?.mean != null
+        ? ` Control de calidad: ${curated.changes.size} página(s) rehecha(s); media ${Math.round(qa.mean)}/100` +
+          (qa.weak.length ? `, ${qa.weak.length} aún floja(s): revísalas en «Revisar páginas».` : ", ninguna floja.") +
+          (qa.twins.length ? ` ${qa.twins.length} par(es) de páginas aún parecidas.` : "")
+        : "";
+      alert(`✅ Libro creado (${total} páginas, margen ${marginMm.toFixed(1)} mm).${qaMsg} ` +
         "En KDP elige: tinta negra, papel blanco, sin sangrado, y el mismo tamaño de corte.");
     } catch (error) {
       console.error("Book PDF error:", error);

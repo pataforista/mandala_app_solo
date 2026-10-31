@@ -44,8 +44,11 @@ No bajes el trazo de 0,8 mm en un libro para adultos: en papel de KDP una línea
 Pulsa **Revisar páginas antes de crear**. Cada miniatura muestra su puntuación:
 
 - Arriba aparece la **media del libro** y la lista de páginas flojas (< 60).
-- **Rehacer flojas y gemelas** prueba hasta 6 diseños nuevos para cada página roja o gemela y se queda
-  con el mejor que no repita otra página del libro.
+- **Control de calidad automático** (casilla activada por defecto): al abrir la revisión y al crear
+  el PDF, cada página roja o gemela se rehace sola. Se prueban hasta 8 diseños nuevos: los 4 primeros
+  cambian semilla, silueta y estructura; los 4 últimos además cambian el encuadre por uno más limpio
+  de los permitidos (centrado, fondo decorado, gigante). Gana el mejor que no repita otra página.
+  **Rehacer flojas y gemelas** lanza la misma búsqueda a mano.
 - Después mira las miniaturas con tus ojos. La puntuación mide celdas pequeñas, huecos estrechos y
   trazos finos; **no** mide belleza, equilibrio visual ni si dos páginas se parecen demasiado.
   Usa **Borrar y crear otro** u **Otro encuadre** en lo que no te guste.
@@ -57,6 +60,32 @@ al hojear, en cualquier lugar del libro. Se marcan con borde naranja punteado y 
 también la forma exterior y la estructura.
 
 **Criterio para continuar:** ninguna página roja, media ≥ 70 y sin páginas gemelas.
+
+### Qué consigue el control automático
+
+Medido con `node scripts/bench-book.mjs 3 50 <formato> <nivel>` (libros de 50 mandalas + secuencia
+que crece + mural de 2×2 + portadillas; perfil «los más vendidos», capítulos, dificultad creciente):
+
+| Libro | Antes de esta revisión | Sin control automático | Con control automático |
+|---|---|---|---|
+| Adulto · 8.5×11 · media | 65 | 71 | 73–75 |
+| Adulto · 8.5×11 · páginas flojas (< 60) | 23 % | 12 % | 0 |
+| Adulto · 8.5×8.5 · flojas / pares gemelos | — | 4–10 / 0–4 | 0 / 0 |
+| Trazo grueso · 8.5×11 · flojas | — | 7–10 | 0 |
+| Niños · 8.5×11 · media | — | 83 | 88–89 |
+
+«Antes de esta revisión» es el estado anterior a dos correcciones de raíz:
+
+- La estructura **áurea** crecía 1,618× por banda y dejaba la banda interior en un 4 % del radio
+  (celdas de 2–3 mm). Ahora crece √φ ≈ 1,27× por banda: sigue siendo progresiva y la media de esas
+  páginas pasó de 58 a 69.
+- La puntuación contaba los **puntos negros sólidos** del fondo como celdas diminutas. No se colorean;
+  ya no cuentan como celdas (siguen contando para los huecos entre trazos).
+
+Coste: unos 8 diseños extra por página floja; en un libro de 50 mandalas, ~10–20 s más al crear.
+Límite: cuando una página se cambia de encuadre, el reparto final se aparta un poco del plan
+(p. ej. 4–7 gigantes en vez de 5). La puntuación sigue sin medir belleza: la revisión a ojo y la
+copia impresa siguen siendo obligatorias.
 
 ### Cómo se mide la repetición
 

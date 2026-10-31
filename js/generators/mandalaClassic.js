@@ -112,8 +112,10 @@ export function generateMandalaClassic(doc, opts) {
   const weights = Array.from({ length: B }, (_, k) => {
     let w;
     if (ST.golden) {
-      // Proporción áurea: cada banda es 1.618× la anterior
-      w = Math.pow(phi, k - B + 1);
+      // Crecimiento áureo suavizado: cada banda es √φ ≈ 1,27× la anterior. Con φ entero
+      // (1,618×) la banda más interna de un disco de 6 bandas quedaba en un 4 % del radio:
+      // celdas de 2–3 mm imposibles de colorear (media 58 frente a 68 del resto)
+      w = Math.pow(phi, (k - B + 1) / 2);
     } else {
       w = 0.7 + rng() * 0.5;
       if (k === B - 1) w *= ST.sil;

@@ -502,3 +502,19 @@ export function addSpecialPages(plan, opts = {}) {
   }
   return pages;
 }
+
+/**
+ * Página del plan con un cambio aplicado (revisión a mano o curaduría automática).
+ * ov: { bump?, composition? }. «Otro diseño» (bump) desplaza la semilla y cambia también
+ * la estructura y la silueta: con la misma silueta, el reemplazo se parecería demasiado al
+ * dibujo descartado. Devuelve { seed, structure, silhouette, composition }.
+ */
+export function applyPageOverride(pg, ov = null) {
+  const bump = ov?.bump || 0;
+  const seed = bump ? ((pg.seed + 0x9E3779B1 * bump) >>> 0) : pg.seed;
+  const structure = pg.structure && bump
+    ? BOOK_STRUCTURES[(BOOK_STRUCTURES.indexOf(pg.structure) + bump) % BOOK_STRUCTURES.length]
+    : pg.structure;
+  const silhouette = pg.silhouette && bump ? alternateSilhouette(pg.styleMode, pg.silhouette, bump) : pg.silhouette;
+  return { seed, structure, silhouette, composition: ov?.composition || pg.composition };
+}

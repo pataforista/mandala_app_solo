@@ -2,7 +2,8 @@
 // Métricas de legibilidad para colorear, medidas sobre el SVG ya generado. Funciones puras:
 // sin DOM ni getBBox (el áreas se calculan con la fórmula del polígono), así que corren
 // igual en el navegador y en Node (scripts/bench-metrics.mjs).
-//  - regiones: celdas cerradas (subtrayectos con Z o de punto final coincidente)
+//  - regiones: celdas cerradas (subtrayectos con Z o de punto final coincidente); las
+//    formas de relleno sólido (puntos negros) no son celdas y no cuentan
 //  - pequenas: % de celdas con área < 6 mm²                  (objetivo < 5 %)
 //  - aspecto:  % de celdas con w/h fuera de [0,4; 2,5]       (objetivo 0)
 //  - huecos:   % de vértices con un trazo ajeno a < 1,2 mm   (proxy; ver nota)
@@ -46,7 +47,12 @@ function elementsOf(svg) {
     const d = /\sd="([^"]+)"/.exec(attrs);
     if (!d) continue;
     const sw = /stroke-width="([\d.]+)"/.exec(attrs);
-    els.push({ subs: flattenSubpaths(d[1]), width: sw ? parseFloat(sw[1]) : 0 });
+    // Relleno sólido (ni blanco ni vacío): puntos y adornos de tinta llena. No son celdas
+    // que se coloreen; antes contaban como «celdas diminutas» y hundían la puntuación de
+    // las páginas con fondo decorado (un punto de 1 mm² no es un defecto para colorear).
+    const fill = /\sfill="([^"]+)"/.exec(attrs)?.[1] ?? "none";
+    const solid = !/^(none|#fff|#ffffff|white|transparent)$/i.test(fill);
+    els.push({ subs: flattenSubpaths(d[1]), width: sw ? parseFloat(sw[1]) : 0, solid });
   }
   return els;
 }
@@ -134,7 +140,7 @@ function asymmetry(els, n, center, tol = 0.15) {
 export function measureSvg(svg, { petals = null, center = null } = {}) {
   const els = elementsOf(svg);
   const cells = [];
-  for (const el of els) for (const s of el.subs) if (s.closed && s.pts.length >= 3) {
+  for (const el of els) if (!el.solid) for (const s of el.subs) if (s.closed && s.pts.length >= 3) {
     const { w, h } = bbox(s.pts);
     cells.push({ area: shoelace(s.pts), aspect: h > 0 ? w / h : Infinity });
   }
