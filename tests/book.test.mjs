@@ -780,3 +780,20 @@ test("ilustración extra: se mezcla en el relleno de la página sin tocar la fig
     assert.ok(+m[3] > 0 && +m[4] > 0 && Math.hypot(+m[3], +m[4]) < 60, "tamaño razonable");
   }
 });
+
+test("paquetes de adornos (infantiles y naturaleza): todo es ilustración extra lista y entra en una página", async () => {
+  const fs = await import("node:fs");
+  for (const [file, theme] of [["assets/adornos-infantiles.json", "infantil"], ["assets/adornos-naturaleza.json", "naturaleza"]]) {
+    const figs = unpackFigures(JSON.parse(fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8")));
+    assert.ok(figs.length >= 60, `${file}: ${figs.length} adornos`);
+    for (const f of figs) {
+      assert.equal(f.use, "extra"); assert.equal(f.theme, theme); assert.ok(f.rightsConfirmed);
+      assert.ok(f.stampHref?.startsWith("data:image/png") && f.w > 0 && f.h > 0 && f.cls.length === f.w * f.h);
+    }
+    assert.equal(new Set(figs.map(f => f.name)).size, figs.length, "nombres únicos");
+    const extraArt = figs.map(f => ({ href: f.stampHref, w: f.w, h: f.h }));
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 3, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 3, composition: "fondo", extraArt });
+    assert.ok((renderDocToSvgString(doc).match(/<image href="data:image\/png/g) || []).length > 0, `${file}: aparecen en la página`);
+  }
+});
