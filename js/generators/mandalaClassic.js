@@ -83,6 +83,13 @@ export function generateMandalaClassic(doc, opts) {
   const mainW = Math.max(0.8, strokeWidthMm);
   const detailW = Math.max(MIN_LINE_MM, strokeWidthMm * 0.55);
   const vestW = Math.max(0.5, strokeWidthMm * 0.45);
+  // Jerarquía de trazo por nivel: bandas exteriores más gruesas, interiores más finas.
+  // Esto da profundidad y guía el ojo hacia el centro. El factor varía de 0.9 (interior) a 1.15 (exterior).
+  // Se respetan los mínimos para no caer en "trazos finos" (< 0.5 mm) que se pierden al imprimir.
+  const bandScale = (b) => 0.9 + 0.25 * (b.k / Math.max(1, B - 1));
+  const mainWFor = (b) => Math.max(0.8, mainW * bandScale(b));
+  const detailWFor = (b) => Math.max(MIN_LINE_MM, detailW * bandScale(b));
+  const vestWFor = (b) => Math.max(0.5, vestW * bandScale(b));
   const cull = coloringCullArea(opts);
   // Los detalles interiores (pétalo dentro de pétalo, brillos, nervios cerrados) respetan la
   // celda mínima del nivel: antes sólo se aplicaba una fracción (1 mm² con «Adulto», que
@@ -285,7 +292,7 @@ export function generateMandalaClassic(doc, opts) {
           }
         }
       }
-      emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.22); emit(d, detailW); emit(v, vestW);
+      emit(m, mainWFor(b), "#fff"); gapDots(d, b, b.r1 - h * 0.22); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     round(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.94);
@@ -302,7 +309,7 @@ export function generateMandalaClassic(doc, opts) {
           }
         }
       }
-      emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.2); emit(d, detailW); emit(v, vestW);
+      emit(m, mainWFor(b), "#fff"); gapDots(d, b, b.r1 - h * 0.2); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     lotus(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.98);
@@ -319,7 +326,7 @@ export function generateMandalaClassic(doc, opts) {
           }
         }
       }
-      emit(back, mainW, "#fff"); emit(front, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+      emit(back, mainWFor(b), "#fff"); emit(front, mainWFor(b), "#fff"); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     leaf(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.8);
@@ -342,7 +349,7 @@ export function generateMandalaClassic(doc, opts) {
           }
         }
       }
-      emit(m, mainW, "#fff"); gapDots(d, b, (b.r0 + b.r1) / 2, 0.8); emit(d, detailW); emit(v, vestW);
+      emit(m, mainWFor(b), "#fff"); gapDots(d, b, (b.r0 + b.r1) / 2, 0.8); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     scallop(b) {
       const step = TAU / b.n, h = b.r1 - b.r0;
@@ -379,7 +386,7 @@ export function generateMandalaClassic(doc, opts) {
         }
       }
       const disc = mainPB(); circle(disc, cx, cy, b.r0 + h * 0.15);
-      emit(m, mainW, "#fff"); emit(disc, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+      emit(m, mainWFor(b), "#fff"); emit(disc, mainWFor(b), "#fff"); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     heart(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.92);
@@ -398,7 +405,7 @@ export function generateMandalaClassic(doc, opts) {
           }
         }
       }
-      emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     ogee(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.95);
@@ -414,7 +421,7 @@ export function generateMandalaClassic(doc, opts) {
           }
         }
       }
-      emit(m, mainW, "#fff"); gapDots(d, b, b.r1 - h * 0.25); emit(d, detailW); emit(v, vestW);
+      emit(m, mainWFor(b), "#fff"); gapDots(d, b, b.r1 - h * 0.25); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     triangle(b) {
       const step = TAU / b.n, h = b.r1 - b.r0;
@@ -431,7 +438,7 @@ export function generateMandalaClassic(doc, opts) {
         }
       }
       const ring = mainPB(); circle(ring, cx, cy, b.r1);
-      emit(ring, mainW, "#fff"); emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+      emit(ring, mainWFor(b), "#fff"); emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     diamond(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
@@ -449,7 +456,7 @@ export function generateMandalaClassic(doc, opts) {
         }
       }
       const ring = mainPB(); circle(ring, cx, cy, b.r1);
-      emit(ring, mainW, "#fff"); emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+      emit(ring, mainWFor(b), "#fff"); emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     chevron(b) {
       const step = TAU / b.n, h = b.r1 - b.r0;
@@ -467,7 +474,7 @@ export function generateMandalaClassic(doc, opts) {
           for (let i = 0; i < b.n; i++) { const a = b.off + i * step; L(d, hi, a + step / 2); L(d, lo, a + step); }
         }
       }
-      emit(ring, mainW, "#fff"); emit(m, detailW); emit(d, vestW);
+      emit(ring, mainWFor(b), "#fff"); emit(m, detailWFor(b)); emit(d, vestWFor(b));
     },
     beads(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
@@ -493,7 +500,7 @@ export function generateMandalaClassic(doc, opts) {
         }
       }
       // La cuenta es una celda que se colorea: contorno principal, no de detalle
-      emit(ring, mainW, "#fff"); emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+      emit(ring, mainWFor(b), "#fff"); emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
 
     // ---------- Motivos nuevos ----------
@@ -523,7 +530,7 @@ export function generateMandalaClassic(doc, opts) {
           stipple(v, r0 + spiralH * 0.2, r1 - spiralH * 0.2, a - w * 0.1, 3, Math.min(h * 0.03, 0.5));
         }
       }
-      emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     antemia(b) {
       // Abanico con divisiones radiales (arte griego/egipcio)
@@ -551,7 +558,7 @@ export function generateMandalaClassic(doc, opts) {
           d.moveTo(lx, ly).quadTo(...P(midR + h * 0.05, a), rx, ry);
         }
       }
-      emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     roseta(b) {
       // Círculo con pétalos internos que no llegan al borde (flor vista desde arriba)
@@ -584,7 +591,7 @@ export function generateMandalaClassic(doc, opts) {
           if (richDetail) circle(v, ...P(rm, a), petR * 0.12);
         }
       }
-      emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b)); emit(v, vestWFor(b));
     },
     flame(b) {
       // Forma de llama simétrica con ondulaciones laterales
@@ -610,7 +617,7 @@ export function generateMandalaClassic(doc, opts) {
           d.close();
         }
       }
-      emit(m, mainW, "#fff"); emit(d, detailW);
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b));
     },
   };
 

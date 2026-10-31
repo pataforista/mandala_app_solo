@@ -34,6 +34,11 @@ export const BOOK_STRUCTURES = ["corona", "heroe", "equilibrio", "nucleo", "aure
 const STRUCTURE_WEIGHTS = [1.2, 1.1, 1.1, 1, 1, 0.9]; // muy equilibrado para evitar repeticiones
 export const SCATTER_BACKGROUNDS = ["jardin", "cielo", "hojas", "dulce", "estrellas", "vinas"];
 export const PATTERN_BACKGROUNDS = ["escamas", "flor_vida", "sol", "ondas", "mosaico"];
+
+// Pesos de estilos para el perfil "best seller": floral y geométrico dominan, el resto
+// aparece como variación ocasional. Unificado para que el libro y los capítulos usen
+// el mismo reparto (antes había dos versiones con pesos diferentes).
+export const BESTSELLER_STYLE_W = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
 // Temas sueltos que no combinan con todos los estilos (corazones alrededor de un mandala
 // geométrico se ven fuera de lugar). Cielo, jardín (figuras del propio estilo) y las
 // tramas van con todos.
@@ -140,10 +145,9 @@ export function bestSellerProfile(preset = "KDP_8_5x8_5") {
   const comps = square
     ? { centro: 6, fondo: 2, gigante: 1, constelacion: 1 }
     : { centro: 4, fondo: 2, constelacion: 2, esquinas: 2, gigante: 1 };
-  const styles = { floral: 3, geometric: 2, islamico: 2, yantra: 2, sashiko: 1, celtico: 1, azteca: 1 };
   return {
     compositions: Object.keys(comps), compositionWeights: Object.values(comps),
-    styles: Object.keys(styles), styleWeights: Object.values(styles),
+    styles: Object.keys(BESTSELLER_STYLE_W), styleWeights: Object.values(BESTSELLER_STYLE_W),
     frames: ["ninguno", "redondeado"], frameWeights: [3, 1],
     petals: [12, 16, 18, 20, 24],
     fillCentro: !square,

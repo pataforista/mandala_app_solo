@@ -11,7 +11,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, BOOK_STYLES, chapterLayout, insertChapterDividers, applyPageOverride } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, BOOK_STYLES, BESTSELLER_STYLE_W, chapterLayout, insertChapterDividers, applyPageOverride } from "./core/bookPlan.js";
 import { curateBook, attemptChoice, twinTargets as curatorTwinTargets, WEAK_SCORE, CURATE_TRIES } from "./core/bookCurator.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
@@ -1811,7 +1811,7 @@ function bindUI() {
     };
   };
   // Capítulos temáticos: estilos y pesos del libro (los mismos que usa el plan)
-  const BESTSELLER_STYLE_W = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
+  // BESTSELLER_STYLE_W se importa desde bookPlan.js (fuente única de verdad)
   const bookChaptersEl = document.getElementById("bookChapters");
   const chaptersFor = (regular) => {
     if (!bookChaptersEl?.checked || !bookVaryEl.checked || state.generatorType !== "classic") return [];
@@ -1920,8 +1920,8 @@ function bindUI() {
   const buildBook = () => {
     const regular = regularCount();
     const baseSeed = state.seed >>> 0;
-    const isClassic = state.generatorType === "classic";
-    const chosen = isClassic ? chosenFigures() : [];
+    const isClassic = true; // El libro siempre usa el motor clásico (mejor calidad: ≈84 vs 57-71)
+    const chosen = chosenFigures();
     const vary = bookVaryEl.checked;
     const base = buildOpts(state);
     const comps = allowedCompositions();
@@ -1997,11 +1997,8 @@ function bindUI() {
         // Página fácil ⇒ línea más gruesa; difícil ⇒ algo más fina (nunca < 0,35 mm)
         strokeWidthMm: pageStrokeMm(base.strokeWidthMm, pg.strokeScale ?? 1) };
       if (vary) o.styleMode = pg.styleMode;
-      if (state.generatorType === "radial") {
-        return { ...o, spiroEnabled: state.spiroEnabled, alternation: 0.3, harmony: 0.5, taper: 0.2,
-          spiroR: 60, spiror: 25, spiroDistance: 30, spiroResolution: 500, spiroMode: "hypo" };
-      }
-      if (isClassic) {
+      // El libro siempre usa el motor clásico (isClassic = true arriba)
+      {
         // «Borrar y crear otro» también cambia la silueta y la estructura (applyPageOverride):
         // con las mismas, el reemplazo se parecería demasiado al dibujo descartado
         const ap = applyPageOverride(pg, ov);
@@ -2017,10 +2014,8 @@ function bindUI() {
         sourceLog[i] = { mandala: i + 1, composition: entry ? entry.use : o.composition, style: o.styleMode, image: entry ? entry.name : "", source: entry ? entry.source : "" };
         return o;
       }
-      return { ...o, imagePoints: currentImagePoints, imageScale: state.imageScale,
-        imageIntensity: state.imageIntensity, imageMirror: state.imageMirror };
     };
-    return { count, baseSeed, plan, makeOpts, ovKey, sourceLog, isClassic, comps, generatorFn: withSpecialPages(getGeneratorFn(state.generatorType)) };
+    return { count, baseSeed, plan, makeOpts, ovKey, sourceLog, isClassic, comps, generatorFn: withSpecialPages(getGeneratorFn("classic")) };
   };
 
   // ---------- Revisión de páginas ----------
