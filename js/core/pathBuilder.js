@@ -81,6 +81,16 @@ export function coloringCullArea({ outlineMode = false, minCellAreaMm2 = 0, deta
   return minArea * Math.max(0, Math.min(1, (s - 0.5) * 2));
 }
 
+/**
+ * Celda cerrada más pequeña que se dibuja en un libro para colorear: la «celda mínima» del
+ * nivel completa (Adulto: 5 mm²). coloringCullArea sólo aplicaba una fracción de ella según
+ * la simplificación (1 mm² con Adulto) y quedaban celdas imposibles de colorear con lápiz.
+ */
+export function coloringMinCell(opts = {}) {
+  const promised = Number.isFinite(opts.minCellAreaMm2) ? Math.max(0, opts.minCellAreaMm2) : 0;
+  return Math.max(coloringCullArea(opts), promised);
+}
+
 function fmt(n) {
   // SVG con mm; 2 decimales es suficiente para 300dpi print (0.01mm = 0.12px)
   return (Math.round(n * 100) / 100).toString();

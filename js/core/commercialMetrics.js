@@ -39,11 +39,25 @@ export function flattenSubpaths(d) {
   return subs;
 }
 
-// Elementos <path>: cada uno con sus subtrayectos y su grosor de trazo
+// Elementos <path>: cada uno con sus subtrayectos, su grosor de trazo, su relleno y el
+// rectángulo que lo recorta (clip-path de un <g> o la hoja misma, según el viewBox)
 function elementsOf(svg) {
   const els = [];
-  for (const m of svg.matchAll(/<path\b([^>]*)>/g)) {
-    const attrs = m[1];
+  const vb = /viewBox="([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)"/.exec(svg);
+  const page = vb ? { x0: +vb[1], y0: +vb[2], x1: +vb[1] + +vb[3], y1: +vb[2] + +vb[4] } : null;
+  const clipRects = new Map();
+  for (const m of svg.matchAll(/<clipPath\s+id="([^"]+)"\s*>\s*<rect\s+x="([-\d.]+)"\s+y="([-\d.]+)"\s+width="([\d.]+)"\s+height="([\d.]+)"/g)) {
+    clipRects.set(m[1], { x0: +m[2], y0: +m[3], x1: +m[2] + +m[4], y1: +m[3] + +m[5] });
+  }
+  const stack = []; // recortes de los <g> abiertos
+  for (const m of svg.matchAll(/<g\b([^>]*)>|<\/g>|<path\b([^>]*)>/g)) {
+    if (m[0].startsWith("</g")) { stack.pop(); continue; }
+    if (m[0].startsWith("<g")) {
+      const id = /clip-path="url\(#([^)]+)\)"/.exec(m[1])?.[1];
+      stack.push(id ? clipRects.get(id) || null : null);
+      continue;
+    }
+    const attrs = m[2];
     const d = /\sd="([^"]+)"/.exec(attrs);
     if (!d) continue;
     const sw = /stroke-width="([\d.]+)"/.exec(attrs);
@@ -51,10 +65,68 @@ function elementsOf(svg) {
     // que se coloreen; antes contaban como «celdas diminutas» y hundían la puntuación de
     // las páginas con fondo decorado (un punto de 1 mm² no es un defecto para colorear).
     const fill = /\sfill="([^"]+)"/.exec(attrs)?.[1] ?? "none";
-    const solid = !/^(none|#fff|#ffffff|white|transparent)$/i.test(fill);
-    els.push({ subs: flattenSubpaths(d[1]), width: sw ? parseFloat(sw[1]) : 0, solid });
+    const solid = !/^(none|transparent)$/i.test(fill) && !/^(#fff|#ffffff|white)$/i.test(fill);
+    const white = /^(#fff|#ffffff|white)$/i.test(fill);
+    let clip = page;
+    for (const r of stack) if (r) clip = clip ? { x0: Math.max(clip.x0, r.x0), y0: Math.max(clip.y0, r.y0), x1: Math.min(clip.x1, r.x1), y1: Math.min(clip.y1, r.y1) } : r;
+    els.push({ subs: flattenSubpaths(d[1]), width: sw ? parseFloat(sw[1]) : 0, solid, white, clip });
   }
   return els;
+}
+
+// ---------- Lo que de verdad se imprime ----------
+// El motor clásico pinta de afuera hacia adentro: cada disco o pétalo con relleno blanco
+// tapa la base de lo dibujado antes. Además, «gigante» y las tramas se recortan al marco.
+// Las partes tapadas o recortadas no salen en papel: no cuentan como huecos ni celdas.
+function pointInPoly(x, y, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+const OCC_MARGIN = 0.3; // un punto sobre el borde de quien lo tapa (pared compartida) sigue visible
+
+/** Devuelve visible(e, x, y): ¿el vértice (x, y) del elemento e se ve en la página impresa? */
+function visibilityOf(els) {
+  const cell = 6, grid = new Map();
+  const occ = [];
+  els.forEach((el, e) => {
+    if (!el.white) return;
+    for (const s of el.subs) {
+      if (!s.closed || s.pts.length < 3) continue;
+      const b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+      for (const [x, y] of s.pts) { if (x < b.x0) b.x0 = x; if (x > b.x1) b.x1 = x; if (y < b.y0) b.y0 = y; if (y > b.y1) b.y1 = y; }
+      if (b.x1 - b.x0 < 2 * OCC_MARGIN || b.y1 - b.y0 < 2 * OCC_MARGIN) continue;
+      const o = { e, pts: s.pts, b, clip: el.clip };
+      occ.push(o);
+      for (let gx = Math.floor(b.x0 / cell); gx <= Math.floor(b.x1 / cell); gx++)
+        for (let gy = Math.floor(b.y0 / cell); gy <= Math.floor(b.y1 / cell); gy++) {
+          const k = `${gx},${gy}`;
+          if (!grid.has(k)) grid.set(k, []);
+          grid.get(k).push(o);
+        }
+    }
+  });
+  const inRect = (r, x, y) => !r || (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
+  return (e, x, y) => {
+    if (!inRect(els[e].clip, x, y)) return false;
+    for (const o of grid.get(`${Math.floor(x / cell)},${Math.floor(y / cell)}`) || []) {
+      if (o.e <= e) continue; // sólo tapa lo que se pintó antes
+      const { b } = o;
+      if (x <= b.x0 + OCC_MARGIN || x >= b.x1 - OCC_MARGIN || y <= b.y0 + OCC_MARGIN || y >= b.y1 - OCC_MARGIN) continue;
+      if (!inRect(o.clip, x, y) || !pointInPoly(x, y, o.pts)) continue;
+      // Lejos del borde de quien lo tapa: oculto
+      let near = Infinity;
+      for (let k = 0; k < o.pts.length && near > OCC_MARGIN; k++) {
+        const [ax, ay] = o.pts[k], [bx, by] = o.pts[(k + 1) % o.pts.length];
+        near = Math.min(near, distToSeg(x, y, ax, ay, bx, by));
+      }
+      if (near > OCC_MARGIN) return false;
+    }
+    return true;
+  };
 }
 
 const shoelace = pts => {
@@ -75,12 +147,13 @@ function distToSeg(px, py, ax, ay, bx, by) {
 
 // % de vértices cuyo trazo ajeno más cercano está a menos de 1,2 mm.
 // Distancias < 0,05 mm son paredes compartidas entre celdas vecinas, no huecos.
-function tightGapPct(els) {
+function tightGapPct(els, visible = () => true) {
   const cell = 2, grid = new Map();
   const key = (gx, gy) => `${gx},${gy}`;
   els.forEach((el, e) => el.subs.forEach(s => {
     for (let k = 0; k + 1 < s.pts.length; k++) {
       const [ax, ay] = s.pts[k], [bx, by] = s.pts[k + 1];
+      if (!visible(e, (ax + bx) / 2, (ay + by) / 2)) continue; // tramo tapado o recortado
       const x0 = Math.floor(Math.min(ax, bx) / cell), x1 = Math.floor(Math.max(ax, bx) / cell);
       const y0 = Math.floor(Math.min(ay, by) / cell), y1 = Math.floor(Math.max(ay, by) / cell);
       for (let gx = x0; gx <= x1; gx++) for (let gy = y0; gy <= y1; gy++) {
@@ -92,6 +165,7 @@ function tightGapPct(els) {
   }));
   let total = 0, tight = 0;
   els.forEach((el, e) => el.subs.forEach(s => s.pts.forEach(([x, y]) => {
+    if (!visible(e, x, y)) return;
     const gx = Math.floor(x / cell), gy = Math.floor(y / cell);
     let near = Infinity;
     for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++)
@@ -139,17 +213,20 @@ function asymmetry(els, n, center, tol = 0.15) {
  */
 export function measureSvg(svg, { petals = null, center = null } = {}) {
   const els = elementsOf(svg);
+  const visible = visibilityOf(els);
   const cells = [];
-  for (const el of els) if (!el.solid) for (const s of el.subs) if (s.closed && s.pts.length >= 3) {
+  els.forEach((el, e) => { if (!el.solid) for (const s of el.subs) if (s.closed && s.pts.length >= 3) {
+    // Una celda tapada o recortada por completo no se imprime
+    if (!s.pts.some(([x, y]) => visible(e, x, y))) continue;
     const { w, h } = bbox(s.pts);
     cells.push({ area: shoelace(s.pts), aspect: h > 0 ? w / h : Infinity });
-  }
+  } });
   const pct = (arr, f) => (arr.length ? (100 * arr.filter(f).length) / arr.length : 0);
   const out = {
     regiones: cells.length,
     pequenas: pct(cells, c => c.area < 6),
     aspecto: pct(cells, c => c.aspect < 0.4 || c.aspect > 2.5),
-    huecos: tightGapPct(els),
+    huecos: tightGapPct(els, visible),
     finas: pct(els, e => e.width > 0 && e.width < 0.7),
   };
   // Igual que las pruebas: en pétalos pares vale el orden N o N/2 (armónico)

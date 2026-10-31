@@ -1866,6 +1866,9 @@ function bindUI() {
       const sp0 = specialOpts();
       if (sp0.mural) tips.push(`⚠️ El mural se recorta: sus ${sp0.mural.cols * sp0.mural.rows} hojas conservan el reverso en blanco. Quita el mural si no quieres ninguna página en blanco.`);
     }
+    // Medido con el nivel Adulto (scripts/bench-book.mjs y la prueba de motores): clásico ≈ 82,
+    // capas ≈ 71, radial ≈ 57. Los otros motores no tienen capítulos ni encuadres variados.
+    if (state.generatorType !== "classic") tips.push("💡 Para libros, el motor «Clásico» da páginas más fáciles de colorear (≈ 82/100 frente a 57–71) y activa capítulos, encuadres y siluetas variadas.");
     if (state.strokeWidth < 0.45) tips.push("💡 Trazo fino (< 0,45 mm): bonito en pantalla, pero en papel de KDP se ve gris. Prueba «Adulto · Trazo grueso» o sube el grosor.");
     const sp = specialOpts(), extra = [];
     if (sp.growth) extra.push(`${sp.growth} mandala(s) que crece(n) (${sp.growth * GROWTH_STAGES} págs.)`);
@@ -2408,7 +2411,7 @@ function bindUI() {
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
     document.addEventListener("figures-changed", updateBookSummary);
-    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl, bookDpiEl, coloringPresetEl, strokeWidthEl].forEach(el =>
+    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl, bookDpiEl, coloringPresetEl, strokeWidthEl, generatorTypeEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     updateBookSummary();

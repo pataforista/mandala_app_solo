@@ -12,6 +12,10 @@ import { fingerprintSimilarity, TWIN_THRESHOLD } from "./variety.js";
 export const WEAK_SCORE = 60;   // por debajo, la página es floja (rojo en la revisión)
 export const GOOD_SCORE = 75;   // la búsqueda se detiene al llegar aquí
 export const CURATE_TRIES = 8;  // diseños alternativos por página, como máximo
+// Pulido: las páginas «naranja» (60–69) prueban unos pocos diseños más, sólo cambiando el
+// dibujo (no el encuadre). Cuesta poco: tras las correcciones de los motores son ~3 %.
+export const POLISH_SCORE = 70;
+export const POLISH_TRIES = 3;
 
 /** ¿La huella fp sería gemela de otra página (distinta de i)? */
 export function twinOfAny(fps, fp, i, threshold = TWIN_THRESHOLD) {
@@ -78,12 +82,19 @@ export function curationTargets(pages, { weak = WEAK_SCORE, threshold = TWIN_THR
  *           el valor del grupo es la peor puntuación de sus páginas.
  * Valor de un diseño: su puntuación (70 si no se mide), y descartado si es gemelo de otra
  * página. Se queda con el mejor; si ninguno mejora, la página se deja como estaba.
+ * Las páginas «naranja» (weak ≤ puntuación < polish) reciben además polishTries intentos.
  * Devuelve { changes: Map(i → choice), targets, before, after } (before/after: resumen).
  */
 export async function curateBook(pages, attempt, opts = {}) {
-  const { tries = CURATE_TRIES, weak = WEAK_SCORE, good = GOOD_SCORE, threshold = TWIN_THRESHOLD, onStep = null } = opts;
+  const { tries = CURATE_TRIES, weak = WEAK_SCORE, good = GOOD_SCORE, threshold = TWIN_THRESHOLD, onStep = null,
+    polish = POLISH_SCORE, polishTries = POLISH_TRIES } = opts;
   const before = summarize(pages, { weak, threshold });
-  const targets = curationTargets(pages, { weak, threshold });
+  const urgent = new Set(curationTargets(pages, { weak, threshold }));
+  // Pulido: páginas sueltas (no de un grupo) entre «floja» y «buena»
+  const polishing = polish > weak && polishTries > 0
+    ? pages.map((p, i) => (p.fixable && p.score != null && p.score >= weak && p.score < polish && !urgent.has(i) ? i : -1)).filter(i => i >= 0)
+    : [];
+  const targets = [...urgent, ...polishing].sort((a, b) => a - b);
   const changes = new Map();
   const fps = () => pages.map(p => p.fp || null);
   const value = (score, fp, i) => (twinOfAny(fps(), fp, i, threshold) ? -1000 : 0) + (score ?? 70);
@@ -94,7 +105,8 @@ export async function curateBook(pages, attempt, opts = {}) {
     const group = pages[i].group != null && !pages[i].fixable;
     const current = membersOf(pages, i).map(k => ({ i: k, score: pages[k].score, fp: pages[k].fp }));
     let best = { v: worst(current), k: 0 };
-    for (let k = 1; k <= tries && best.v < good; k++) {
+    const maxK = urgent.has(i) ? tries : polishTries;
+    for (let k = 1; k <= maxK && best.v < good; k++) {
       const r = await attempt(i, k);
       if (!r) continue;
       const ms = group ? r.members : [{ i, score: r.score, fp: r.fp }];

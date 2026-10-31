@@ -48,6 +48,7 @@ Pulsa **Revisar páginas antes de crear**. Cada miniatura muestra su puntuación
   el PDF, cada página roja o gemela se rehace sola. Se prueban hasta 8 diseños nuevos: los 4 primeros
   cambian semilla, silueta y estructura; los 4 últimos además cambian el encuadre por uno más limpio
   de los permitidos (centrado, fondo decorado, gigante). Gana el mejor que no repita otra página.
+  Las páginas naranja (60–69) se pulen con 3 diseños más.
   **Rehacer flojas y gemelas** lanza la misma búsqueda a mano.
 - Después mira las miniaturas con tus ojos. La puntuación mide celdas pequeñas, huecos estrechos y
   trazos finos; **no** mide belleza, equilibrio visual ni si dos páginas se parecen demasiado.
@@ -64,28 +65,47 @@ también la forma exterior y la estructura.
 ### Qué consigue el control automático
 
 Medido con `node scripts/bench-book.mjs 3 50 <formato> <nivel>` (libros de 50 mandalas + secuencia
-que crece + mural de 2×2 + portadillas; perfil «los más vendidos», capítulos, dificultad creciente):
+que crece + mural de 2×2 + portadillas; perfil «los más vendidos», capítulos, dificultad creciente).
+«Sin curar» es el libro tal como sale del plan; «curado», tras el control automático.
 
-| Libro | Antes de esta revisión | Sin control automático | Con control automático |
+| Libro | Al empezar la revisión | Ahora, sin curar | Ahora, curado |
 |---|---|---|---|
-| Adulto · 8.5×11 · media | 65 | 71 | 73–75 |
-| Adulto · 8.5×11 · páginas flojas (< 60) | 23 % | 12 % | 0 |
-| Adulto · 8.5×8.5 · flojas / pares gemelos | — | 4–10 / 0–4 | 0 / 0 |
-| Trazo grueso · 8.5×11 · flojas | — | 7–10 | 0 |
-| Niños · 8.5×11 · media | — | 83 | 88–89 |
+| Adulto · 8.5×11 · media | 65 | 83 | 83–84 (peor página ≥ 72) |
+| Adulto · 8.5×11 · páginas flojas (< 60) | 23 % | 0–1 por libro | 0 |
+| Adulto · 8.5×8.5 · media | — | 79–82 | 81–83 (peor ≥ 70) |
+| Adulto · 6×9 · media | — | 77–78 | 78–79 (peor ≥ 62) |
+| Trazo grueso · 8.5×11 · media | — | 83–84 | igual (nada que rehacer) |
+| Niños · 8.5×11 · media | 83 | 90–91 | igual |
 
-«Antes de esta revisión» es el estado anterior a dos correcciones de raíz:
+El control rehace las páginas flojas (< 60) y las gemelas con hasta 8 diseños; las «naranja»
+(60–69) se pulen con 3 diseños más, sin cambiar su encuadre.
 
-- La estructura **áurea** crecía 1,618× por banda y dejaba la banda interior en un 4 % del radio
-  (celdas de 2–3 mm). Ahora crece √φ ≈ 1,27× por banda: sigue siendo progresiva y la media de esas
-  páginas pasó de 58 a 69.
-- La puntuación contaba los **puntos negros sólidos** del fondo como celdas diminutas. No se colorean;
-  ya no cuentan como celdas (siguen contando para los huecos entre trazos).
+### Correcciones de raíz en los motores
 
-Coste: unos 8 diseños extra por página floja; en un libro de 50 mandalas, ~10–20 s más al crear.
-Límite: cuando una página se cambia de encuadre, el reparto final se aparta un poco del plan
-(p. ej. 4–7 gigantes en vez de 5). La puntuación sigue sin medir belleza: la revisión a ojo y la
-copia impresa siguen siendo obligatorias.
+La mayor parte de la mejora no viene de rehacer páginas sino de dibujarlas bien a la primera.
+Cada cambio se midió por separado sobre 8 libros sin curar (media del libro):
+
+| Cambio | Media |
+|---|---|
+| Punto de partida (con la estructura áurea ya corregida) | 70,0 |
+| Cuentas: sólo en bandas ≥ 5 mm, más holgura y contorno principal | 70,8 |
+| Los detalles interiores respetan la celda mínima del nivel completa (antes 1 mm² con Adulto, que promete 5 mm²) | 74,9 |
+| La puntuación mide lo impreso: no cuenta trazos tapados por un relleno blanco ni recortados por el marco | 78,0 |
+| Núcleo: nº de pétalos según el tamaño de cada celda; núcleo simple si no caben; mandalas chicos de «constelación» | 81,9 |
+
+Otras correcciones:
+
+- **Estructura áurea:** crecía 1,618× por banda y dejaba la banda interior en un 4 % del radio.
+  Ahora crece √φ ≈ 1,27× (media de esas páginas: 58 → 78).
+- **Conteo de motivos por banda:** si ningún conteo cumplía todas las reglas, se elegía el de mejor
+  proporción aunque sus celdas fueran diminutas. Ahora prima que la celda se pueda colorear.
+- **Puntos negros sólidos** del fondo: no son celdas para colorear y ya no cuentan como tales.
+- **Motores radial y de capas:** respetan la celda mínima y el grosor mínimo de imprenta
+  (0,5 mm; el de capas llegaba a 0,2 mm). Capas: 0 → 71; radial: 33 → 57. Siguen por debajo del
+  clásico (≈ 82); la app lo avisa al armar un libro con ellos.
+
+Límite de la medición «lo impreso»: una celda tapada sólo en parte cuenta con su área completa,
+así que su tamaño se sobrestima un poco. La puntuación sigue sin medir belleza.
 
 ### Cómo se mide la repetición
 

@@ -94,6 +94,8 @@ test("libro real: tras la curaduría no queda ninguna página floja ni gemela y 
   };
   const pages = plan.map(pg => ({ ...render(pg), fixable: true }));
   const before = summarize(pages);
+  // Los motores ya dibujan bien a la primera (antes de las correcciones de raíz: ~65)
+  assert.ok(before.mean >= 75, `media sin curar ${before.mean}`);
   const res = await curateBook(pages, (i, k) => {
     const choice = attemptChoice(k, { current: plan[i].composition, allowed: prof.compositions });
     return { ...render(plan[i], choice), choice };
@@ -101,7 +103,7 @@ test("libro real: tras la curaduría no queda ninguna página floja ni gemela y 
   assert.equal(res.after.weak.length, 0, `flojas: ${res.after.weak} (mín ${res.after.min})`);
   assert.equal(res.after.twins.length, 0);
   assert.ok(res.after.mean >= before.mean, `${before.mean} → ${res.after.mean}`);
-  assert.ok(res.after.min >= WEAK_SCORE);
+  assert.ok(res.after.min >= 65, `peor página ${res.after.min}`);
 });
 
 test("curateBook: una página floja de un grupo se rehace con todo el grupo (vale la peor de sus páginas)", async () => {
@@ -118,4 +120,13 @@ test("curateBook: una página floja de un grupo se rehace con todo el grupo (val
   }), { tries: 2 });
   assert.equal(res.changes.get(0).bump, 2);
   assert.deepEqual([pages[0].score, pages[1].score], [76, 78]);
+});
+
+test("curateBook: las páginas naranja (60–69) se pulen con pocos intentos y sin cambiar el encuadre", async () => {
+  const pages = [{ score: 65, fp: null, fixable: true }, { score: 90, fp: null, fixable: true }];
+  const seen = [];
+  const res = await curateBook(pages, (i, k) => { seen.push([i, k]); return { score: 70 + k, fp: null, choice: attemptChoice(k, { current: "constelacion", allowed: ["centro", "constelacion"] }) }; });
+  assert.deepEqual(seen.map(([i]) => i), [0, 0, 0], "sólo la naranja, 3 intentos");
+  assert.equal(res.changes.get(0).composition, undefined);
+  assert.equal(pages[0].score, 73);
 });
