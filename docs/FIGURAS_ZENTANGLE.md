@@ -115,6 +115,27 @@ del alto, ~0.5 mm a 20 mm de alto) porque con el normal quedarían con línea de
 No cuentan como figuras del libro ni se revisan como tales. Con `--extras nombre1,nombre2` el importador de
 láminas las marca. Una página sin extras queda exactamente igual que antes.
 
+### Paquetes de adornos (infantiles y naturaleza)
+
+`assets/adornos-infantiles.json` (78: animalitos, dinosaurios, juguetes, dulces, coronas, flores, moños…) y
+`assets/adornos-naturaleza.json` (72: árboles, hojas, hongos, estrellas, lunas, nubes, cactus, montañas…) salen de
+dos láminas propias de quien usa la app. Todo va con uso «extra» (decorado de fondo), tema `infantil` o
+`naturaleza`, nombres neutros (`adorno-01`…) y derechos marcados. Se cargan desde la app con «subir paquete .json».
+
+Se dejaron fuera las siluetas rellenas de negro, las espirales (sin zona cerrada que colorear), las tiras de
+banderines y zigzag, las constelaciones de línea fina, las piezas rotas al separarlas y las repetidas. Para
+rehacerlos con la misma selección:
+
+```
+C="--use extra --rights 1 --grow 5 --min 70 --outlong 600 --prefix adorno"
+node scripts/importSheet.mjs infantil.jpg $C --theme infantil --skip 9,10,24,26,27,28,29,30,32,54,56,57,59,76,78,79,80,94,97,98 --out assets/adornos-infantiles.json
+node scripts/importSheet.mjs naturaleza.jpg $C --theme naturaleza --skip 103,106,123,125,42,65,66,83,84,18,19,124,100,119,120,121,122,54,64,36,99,101,102,105,11,118,35,38,78,94,10,98,50,52,56,8,62,15,16,2,41,46,47,34,55,59,60,73,95,31,75,93,9,74,77,43,85 --out assets/adornos-naturaleza.json
+```
+
+Con láminas de dibujos pequeños y juntos conviene `--grow 5` (con 14 se pegan los vecinos). El importador devuelve
+a cada figura la tinta que su contorno encierra (ojos, bocas, puntos de un dado), que con poco engorde quedaba
+suelta y salía como pieza aparte.
+
 ## Íconos de un contorno y dibujos propios (SVG)
 
 `scripts/zenIcons.mjs` define cinco dinosaurios (braquiosaurio, estegosaurio, T. rex, triceratops, pterosaurio) como

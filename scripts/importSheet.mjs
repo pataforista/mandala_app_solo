@@ -3,9 +3,12 @@
 // junten), lo recorta y lo pasa por processFigure, la misma función que usa la app al subir una imagen.
 //
 //   node scripts/importSheet.mjs lamina.jpg --names trex,triceratops,... --out lamina.json
-//        [--theme prehistorico] [--use anillos|medallon|figura] [--source "Gemini (generada por el usuario)"]
+//        [--theme prehistorico] [--use anillos|medallon|figura|extra] [--source "Gemini (generada por el usuario)"]
 //        [--rights 1] [--grow 14] [--min 120] [--outlong 1500] [--hollow 1] [--stamp 0.002]
-//        [--extras nido-huevo,volcan,...]  figuras de «ilustración extra» (decorado de fondo): sello grueso, uso «extra» [--debug carpeta]
+//        [--extras nido-huevo,volcan,...]  figuras de «ilustración extra» (decorado de fondo): sello grueso, uso «extra»
+//        (--use extra marca así la lámina entera: adornos) [--debug carpeta]
+//        [--skip 3,9,10]  descarta piezas por su número de lectura (el que imprime el script); [--prefix adorno]
+//        nombra las que quedan adorno-01, adorno-02…
 //
 // Los nombres se asignan en orden de lectura (filas de arriba abajo, cada fila de izquierda a derecha). Sin --names se
 // usan fig-01, fig-02… Requiere Playwright (ya instalado en este entorno) sólo para decodificar la imagen.
@@ -25,7 +28,7 @@ const GROW = parseInt(args.grow, 10) || 14, MIN_BOX = parseInt(args.min, 10) || 
 const STAMP = Number.isFinite(parseFloat(args.stamp)) ? parseFloat(args.stamp) : 0.002;
 const EXTRAS = new Set((args.extras || "").split(",").filter(Boolean));
 const EXTRA_STAMP = 0.025; // a ~20 mm de alto, 0.025 × alto = 0.5 mm de línea (el mínimo imprimible es ~0.26 mm)
-const USE = ["anillos", "medallon", "figura"].includes(args.use) ? args.use : "anillos";
+const USE = ["anillos", "medallon", "figura", "extra"].includes(args.use) ? args.use : "anillos";
 const outFile = path.resolve(args.out || "figuras-lamina.json");
 
 // ---------- Decodificar la imagen a RGBA (el navegador sabe leer JPG/PNG/WebP) ----------
@@ -94,14 +97,41 @@ const names = (args.names || "").split(",").filter(Boolean);
 console.log(`${w}×${h}: ${found.length} figuras detectadas${names.length && names.length !== found.length ? ` (¡${names.length} nombres!)` : ""}`);
 if (args.debug) fs.mkdirSync(args.debug, { recursive: true });
 
-const figures = [];
-for (const [k, c] of found.entries()) {
+// Píxeles encerrados por el contorno de cada figura (ojos, bocas, puntos de un dado): con poco engorde quedan
+// como componentes sueltos; se devuelven a su figura y dejan de contarse como figuras propias.
+function enclosedBy(c, x0, y0, cw, ch) {
+  const out = new Uint8Array(cw * ch), st = new Int32Array(cw * ch); let top = 0;
+  const own = (i) => lab[(y0 + ((i / cw) | 0)) * w + x0 + (i % cw)] === c.id;
+  for (let x = 0; x < cw; x++) for (const y of [0, ch - 1]) { const i = y * cw + x; if (!own(i) && !out[i]) { out[i] = 1; st[top++] = i; } }
+  for (let y = 0; y < ch; y++) for (const x of [0, cw - 1]) { const i = y * cw + x; if (!own(i) && !out[i]) { out[i] = 1; st[top++] = i; } }
+  while (top) {
+    const i = st[--top], x = i % cw, y = (i / cw) | 0;
+    for (const j of [x > 0 ? i - 1 : -1, x < cw - 1 ? i + 1 : -1, y > 0 ? i - cw : -1, y < ch - 1 ? i + cw : -1])
+      if (j >= 0 && !out[j] && !own(j)) { out[j] = 1; st[top++] = j; }
+  }
+  return out; // 0 = de la figura (contorno o interior), 1 = fuera
+}
+const boxes = found.map((c) => {
   const m = 14, x0 = Math.max(0, c.x0 - m), y0 = Math.max(0, c.y0 - m), cw = Math.min(w, c.x1 + m) - x0, ch = Math.min(h, c.y1 + m) - y0;
-  // Sólo los píxeles de este animal (los vecinos que asomen en la caja se borran); tinta original, sin la dilatación
+  return { c, x0, y0, cw, ch, outside: enclosedBy(c, x0, y0, cw, ch) };
+});
+const absorbed = new Set();
+for (const b of boxes) for (const o of found) {
+  if (o === b.c || o.x0 < b.x0 || o.y0 < b.y0 || o.x1 >= b.x0 + b.cw || o.y1 >= b.y0 + b.ch) continue;
+  const cx = ((o.x0 + o.x1) >> 1) - b.x0, cy = ((o.y0 + o.y1) >> 1) - b.y0;
+  if (!b.outside[cy * b.cw + cx] && lab[(o.y0 + o.y1 >> 1) * w + (o.x0 + o.x1 >> 1)] !== b.c.id) absorbed.add(o);
+}
+if (absorbed.size) console.log(`  (${absorbed.size} piezas interiores devueltas a su figura)`);
+
+const SKIP = new Set((args.skip || "").split(",").filter(Boolean).map(Number));
+const figures = [];
+for (const [k, { c, x0, y0, cw, ch, outside }] of boxes.filter((b) => !absorbed.has(b.c)).entries()) {
+  if (SKIP.has(k + 1)) continue;
+  // Sólo los píxeles de este animal y lo que encierra (los vecinos que asomen en la caja se borran); tinta original
   const crop = new Uint8ClampedArray(cw * ch * 4).fill(255);
   for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
     const si = (y0 + y) * w + x0 + x;
-    if (lab[si] !== c.id) continue;
+    if (outside[y * cw + x] || (lab[si] !== c.id && !lab[si])) continue;
     for (let q = 0; q < 4; q++) crop[(y * cw + x) * 4 + q] = rgba[si * 4 + q];
   }
   const fig = processFigure(crop, cw, ch, { mode: "lineas", threshold: 110, removeBackground: true, keepMain: true, simplify: 0.3, outLong: OUT_LONG, hollow: args.hollow === "1" });
@@ -109,7 +139,7 @@ for (const [k, c] of found.entries()) {
   let interior = 0; for (const v of fig.cls) if (v === 1) interior++;
   // Sello (la versión que se repite en la corona): estos dibujos ya traen línea gruesa, así que se engorda poco
   // (la app, por defecto, la engorda un 1.6 % del lado largo y empasta ojos, dientes y dedos)
-  const name = names[k] || `fig-${String(k + 1).padStart(2, "0")}`, extra = EXTRAS.has(name);
+  const name = names[k] || (args.prefix ? `${args.prefix}-${String(figures.length + 1).padStart(2, "0")}` : `fig-${String(k + 1).padStart(2, "0")}`), extra = USE === "extra" || EXTRAS.has(name);
   const st = stampRaster(fig.cls, fig.w, fig.h, 720, extra ? EXTRA_STAMP : STAMP);
   const stampHref = bytesToDataUrl(await encodeGrayPng(st.gray, st.w, st.h));
   const entry = await withStamp({ href, cls: fig.cls, w: fig.w, h: fig.h, srcLong: Math.max(cw, ch), stampHref });

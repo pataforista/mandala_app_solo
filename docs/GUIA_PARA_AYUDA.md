@@ -88,6 +88,7 @@ dibujos con IA debe comprobar los términos de la herramienta para uso comercial
 | `js/generators/pageComposer.js` | Composición «anillos» y motivos de relleno (palmera, helecho, huevo, huella, pterosaurio) |
 | `js/core/geometry.js` | `enclosingCircle`: encaja una figura en un medallón |
 | `assets/figuras-zentangle.json` | Paquete actual (41 figuras) |
+| `assets/adornos-infantiles.json`, `assets/adornos-naturaleza.json` | Adornos de fondo (78 y 72 ilustraciones extra) |
 | `docs/FIGURAS_ZENTANGLE.md` | Cómo funciona todo, con sus límites |
 
 Pruebas: `npm test`.
