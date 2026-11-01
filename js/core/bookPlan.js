@@ -7,7 +7,7 @@
 import { mulberry32 } from "./prng.js";
 
 export const BOOK_STYLES = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
-export const BOOK_COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio"];
+export const BOOK_COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio", "trama"];
 export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno"];
 export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 

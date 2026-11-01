@@ -15,7 +15,7 @@ import { enclosingCircle } from "../core/geometry.js";
 
 const TAU = Math.PI * 2;
 
-export const COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio"];
+export const COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio", "trama"];
 // "figura" (imagen del usuario rellena de mandalas) sólo existe si opts.figure trae datos
 export const FRAME_STYLES = ["redondeado", "doble", "feston", "ninguno"];
 
@@ -320,6 +320,15 @@ export function composePage(doc, opts, drawMandala) {
       obstacles.push({ x: acx, y, r: R });
       clip = true;
       fill = { minis: true };
+      break;
+    }
+    case "trama": {
+      // Trama de página completa: un patrón continuo cubre toda la página sin centro focal.
+      // Usa los PATTERN_THEMES (escamas, flor_vida, sol, ondas, mosaico) para crear una
+      // textura uniforme tipo papel tapiz. Sin mandala central, solo el patrón.
+      const patternKind = PATTERN_THEMES[Math.floor(rng() * PATTERN_THEMES.length)];
+      fillPattern = { kind: patternKind, cx: acx, cy: acy, halo: Math.max(aw, ah), variant: rng() };
+      clip = true;
       break;
     }
     default: {
