@@ -40,6 +40,46 @@ export const PATTERN_BACKGROUNDS = ["escamas", "flor_vida", "sol", "ondas", "mos
 // el mismo reparto (antes había dos versiones con pesos diferentes).
 export const BESTSELLER_STYLE_W = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
 
+// Temas de libro: un tema dirige figuras, fondos y motivos para crear coherencia visual.
+// Cada tema define estilos permitidos, fondos, temas de relleno (scatter) y motivos especiales.
+export const BOOK_THEMES = {
+  // Tema por defecto: sin tema, usa los valores del perfil o del usuario
+  none: {
+    name: "Sin tema",
+    description: "Mezcla libre de estilos y fondos",
+    styles: null, // usa los del perfil
+    backgrounds: null, // usa los del perfil
+    scatterTheme: null, // usa el del perfil
+  },
+  // Tema océano: olas, peces, conchas, estrellas de mar
+  oceano: {
+    name: "Océano",
+    description: "Mandalas marinos: olas, peces, conchas, estrellas de mar, anclas",
+    styles: ["floral", "geometric"],
+    backgrounds: ["ondas", "escamas"],
+    scatterTheme: "oceano",
+    motifs: ["wave", "shell", "fish", "starfish", "anchor"],
+  },
+  // Tema navidad: estrellas, copos de nieve, árboles, regalos
+  navidad: {
+    name: "Navidad",
+    description: "Mandalas navideños: estrellas, copos de nieve, árboles, regalos, campanas",
+    styles: ["floral", "geometric", "celtico"],
+    backgrounds: ["estrellas", "sol"],
+    scatterTheme: "navidad",
+    motifs: ["star", "snowflake", "tree", "gift", "bell"],
+  },
+  // Tema bosque: hojas, hongos, árboles, animales del bosque
+  bosque: {
+    name: "Bosque",
+    description: "Mandalas del bosque: hojas, hongos, árboles, ardillas, búhos",
+    styles: ["floral", "celtico", "sashiko"],
+    backgrounds: ["hojas", "vinas"],
+    scatterTheme: "bosque",
+    motifs: ["leaf", "mushroom", "tree", "acorn", "fern"],
+  },
+};
+
 // Perfiles de producto: fijan estilo, fondo, trazo y extras para un público concreto.
 // Cada perfil define qué fondos usar (patternOnly = solo tramas continuas, no confeti).
 export const PRODUCT_PROFILES = {
