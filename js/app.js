@@ -1796,6 +1796,7 @@ function bindUI() {
   const bookColorTestEl = document.getElementById("bookColorTest");
   const bookPageNumbersEl = document.getElementById("bookPageNumbers");
   const bookDpiEl = document.getElementById("bookDpi");
+  const bookLanguageEl = document.getElementById("bookLanguage");
   const bookSummaryEl = document.getElementById("bookSummary");
 
   const bookCount = () => Math.min(120, Math.max(1, parseInt(bookPagesEl?.value, 10) || 1));
@@ -2379,6 +2380,7 @@ function bindUI() {
         blackBack: backMode() === "negro",
         marginMm,
         dpi: parseInt(bookDpiEl?.value, 10) || 300,
+        language: bookLanguageEl?.value || "es",
         onProgress: progress,
       });
       // Registro de fuentes (CSV) junto al PDF, si el libro lleva imágenes del usuario
@@ -2415,7 +2417,7 @@ function bindUI() {
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
     document.addEventListener("figures-changed", updateBookSummary);
-    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookBelongsPageEl, bookWelcomePageEl, bookReviewPageEl, bookColorTestEl, presetEl, bookDpiEl, coloringPresetEl, strokeWidthEl, generatorTypeEl].forEach(el =>
+    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookBelongsPageEl, bookWelcomePageEl, bookReviewPageEl, bookColorTestEl, presetEl, bookDpiEl, bookLanguageEl, coloringPresetEl, strokeWidthEl, generatorTypeEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     updateBookSummary();

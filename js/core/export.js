@@ -6,6 +6,30 @@ import { encodeGrayPng, rgbaToGray } from "./grayPng.js";
 
 const RENDER_PX_PER_MM = 300 / 25.4; // 300 DPI: estándar de imprenta para libros
 
+// Traducciones para las páginas internas del libro
+export const BOOK_TEXTS = {
+  es: {
+    belongsTitle: "Este libro pertenece a",
+    welcomeTitle: "Bienvenido",
+    welcomeText: "Este libro es una invitación a ralentizar el ritmo, soltar la prisa y dejarte llevar por el placer de colorear.\n\nCada página ha sido diseñada para ofrecerte un espacio de calma, con trazos claros y diseños que te guiarán sin exigirte.\n\nNo hay reglas. Colorea como quieras, cuando quieras. Lo importante es que disfrutes del proceso.\n\nQue estas páginas te traigan momentos de paz y creatividad.",
+    reviewTitle: "¿Te ha gustado este libro?",
+    reviewText: "Tu opinión nos ayuda a seguir creando.\n\nSi este libro te ha acompañado en momentos de calma y creatividad, te agradeceríamos que dejaras una reseña.\n\nCada reseña es un regalo para nosotros y una ayuda para otros amantes del coloreo que buscan su próximo libro.\n\n¡Gracias por colorear con nosotros!",
+    copyrightPrefix: "Copyright ©",
+    copyrightRights: "Todos los derechos reservados.",
+    copyrightNotice: "Ninguna parte de esta publicación puede reproducirse, almacenarse en un sistema de recuperación o transmitida en cualquier forma o por cualquier medio, sin el permiso previo por escrito del editor.",
+  },
+  en: {
+    belongsTitle: "This book belongs to",
+    welcomeTitle: "Welcome",
+    welcomeText: "This book is an invitation to slow down, let go of the rush, and lose yourself in the pleasure of coloring.\n\nEach page has been designed to offer you a space of calm, with clear lines and designs that will guide you without demanding.\n\nThere are no rules. Color however you like, whenever you like. What matters is that you enjoy the process.\n\nMay these pages bring you moments of peace and creativity.",
+    reviewTitle: "Did you enjoy this book?",
+    reviewText: "Your opinion helps us keep creating.\n\nIf this book has accompanied you in moments of calm and creativity, we would appreciate you leaving a review.\n\nEach review is a gift to us and a help to other coloring lovers looking for their next book.\n\nThank you for coloring with us!",
+    copyrightPrefix: "Copyright ©",
+    copyrightRights: "All rights reserved.",
+    copyrightNotice: "No part of this publication may be reproduced, stored in a retrieval system, or transmitted in any form or by any means, without the prior written permission of the publisher.",
+  },
+};
+
 export function downloadTextFile(filename, text) {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   saveBlob(blob, filename);
@@ -450,9 +474,10 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
   const {
     preset, genOpts, title = "Mandalas para Colorear", subtitle = "", author = "",
     titlePage = true, copyrightPage = false, belongsPage = false, welcomePage = false, reviewPage = false,
-    copyrightText = "", colorTest = false,
+    copyrightText = "", colorTest = false, language = "es",
     blankBack = true, blackBack = false, keepBack = [], pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
   } = opts;
+  const t = BOOK_TEXTS[language] || BOOK_TEXTS.es;
 
   const { wMm, hMm } = createDoc({ preset }).page;
   const { jsPDF } = window.jspdf;
@@ -506,9 +531,8 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
       const ctx = canvas.getContext("2d");
       const year = new Date().getFullYear();
       const text = copyrightText ||
-        `© ${year} ${author || title}. Todos los derechos reservados.\n` +
-        "Ninguna parte de este libro puede reproducirse ni distribuirse sin permiso del autor, " +
-        "salvo para colorear las páginas en uso personal.";
+        `${t.copyrightPrefix} ${year} ${author || title}. ${t.copyrightRights}\n` +
+        t.copyrightNotice;
       drawTextBlock(ctx, text, { x: wPx / 2, y: hPx * 0.7, maxW: (wMm - 2 * marginMm - 20) * pxPerMm, sizePx: 3.4 * pxPerMm, lineGap: 1.45 });
       label = "Página de derechos";
     } else if (page.kind === "belongs") {
@@ -516,7 +540,7 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
       const ctx = canvas.getContext("2d");
       const maxW = (wMm - 2 * marginMm - 20) * pxPerMm;
       // Título decorativo con línea debajo
-      drawTextBlock(ctx, "Este libro pertenece a", { x: wPx / 2, y: hPx * 0.35, maxW, sizePx: 7 * pxPerMm, weight: "bold" });
+      drawTextBlock(ctx, t.belongsTitle, { x: wPx / 2, y: hPx * 0.35, maxW, sizePx: 7 * pxPerMm, weight: "bold" });
       // Línea para escribir el nombre (centrada, con decoraciones en los extremos)
       const lineY = hPx * 0.48;
       const lineW = maxW * 0.6;
@@ -542,23 +566,15 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
       canvas = blankCanvas(wPx, hPx);
       const ctx = canvas.getContext("2d");
       const maxW = (wMm - 2 * marginMm - 20) * pxPerMm;
-      drawTextBlock(ctx, "Bienvenido", { x: wPx / 2, y: hPx * 0.2, maxW, sizePx: 9 * pxPerMm, weight: "bold" });
-      const welcomeText = "Este libro es una invitación a ralentizar el ritmo, soltar la prisa y dejarte llevar por el placer de colorear.\n\n" +
-        "Cada página ha sido diseñada para ofrecerte un espacio de calma, con trazos claros y diseños que te guiarán sin exigirte.\n\n" +
-        "No hay reglas. Colorea como quieras, cuando quieras. Lo importante es que disfrutes del proceso.\n\n" +
-        "Que estas páginas te traigan momentos de paz y creatividad.";
-      drawTextBlock(ctx, welcomeText, { x: wPx / 2, y: hPx * 0.35, maxW, sizePx: 4 * pxPerMm, lineGap: 1.6, color: "#333" });
+      drawTextBlock(ctx, t.welcomeTitle, { x: wPx / 2, y: hPx * 0.2, maxW, sizePx: 9 * pxPerMm, weight: "bold" });
+      drawTextBlock(ctx, t.welcomeText, { x: wPx / 2, y: hPx * 0.35, maxW, sizePx: 4 * pxPerMm, lineGap: 1.6, color: "#333" });
       label = "Página de bienvenida";
     } else if (page.kind === "review") {
       canvas = blankCanvas(wPx, hPx);
       const ctx = canvas.getContext("2d");
       const maxW = (wMm - 2 * marginMm - 20) * pxPerMm;
-      drawTextBlock(ctx, "¿Te ha gustado este libro?", { x: wPx / 2, y: hPx * 0.25, maxW, sizePx: 7 * pxPerMm, weight: "bold" });
-      const reviewText = "Tu opinión nos ayuda a seguir creando.\n\n" +
-        "Si este libro te ha acompañado en momentos de calma y creatividad, te agradeceríamos que dejaras una reseña.\n\n" +
-        "Cada reseña es un regalo para nosotros y una ayuda para otros amantes del coloreo que buscan su próximo libro.\n\n" +
-        "¡Gracias por colorear con nosotros!";
-      drawTextBlock(ctx, reviewText, { x: wPx / 2, y: hPx * 0.4, maxW, sizePx: 4 * pxPerMm, lineGap: 1.6, color: "#333" });
+      drawTextBlock(ctx, t.reviewTitle, { x: wPx / 2, y: hPx * 0.25, maxW, sizePx: 7 * pxPerMm, weight: "bold" });
+      drawTextBlock(ctx, t.reviewText, { x: wPx / 2, y: hPx * 0.4, maxW, sizePx: 4 * pxPerMm, lineGap: 1.6, color: "#333" });
       // Estrellas decorativas
       const starY = hPx * 0.72;
       const starSize = 5 * pxPerMm;
