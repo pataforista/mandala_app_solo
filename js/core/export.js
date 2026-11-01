@@ -427,7 +427,11 @@ async function canvasToGrayPng(canvas) {
 
 // Texto dibujado como imagen: KDP exige fuentes incrustadas y las fuentes estándar
 // de jsPDF (Helvetica, Times) no se incrustan. Rasterizado, no hay fuente que incrustar.
-function drawTextBlock(ctx, text, { x, y, maxW, sizePx, weight = "normal", font = "Georgia, 'Times New Roman', serif", color = "#000", lineGap = 1.25 }) {
+// Fuente por defecto para textos del libro: serif clásica para impresión
+// Georgia y Times New Roman están disponibles en todos los sistemas operativos
+export const BOOK_FONT = "Georgia, 'Times New Roman', serif";
+
+function drawTextBlock(ctx, text, { x, y, maxW, sizePx, weight = "normal", font = BOOK_FONT, color = "#000", lineGap = 1.25 }) {
   ctx.fillStyle = color;
   ctx.font = `${weight} ${Math.round(sizePx)}px ${font}`;
   ctx.textAlign = "center";
