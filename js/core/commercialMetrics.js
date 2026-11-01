@@ -267,6 +267,54 @@ export function measureSvg(svg, { petals = null, center = null } = {}) {
     // Riqueza de detalle: número de subtrayectos por mm²
     const totalSubpaths = els.reduce((sum, el) => sum + el.subs.length, 0);
     out.riquezaDetalle = totalArea > 0 ? totalSubpaths / (totalArea / 100) : 0;
+
+    // Balance por cuadrantes: distribución de tinta en 4 cuadrantes (N/S/E/W)
+    // Detecta si un lado del mandala tiene más tinta que otro (desequilibrio visual)
+    const quadAreas = [0, 0, 0, 0]; // NE, NW, SW, SE
+    for (const el of els) for (const s of el.subs) if (s.closed && s.pts.length >= 3) {
+      const cx = s.pts.reduce((sum, p) => sum + p[0], 0) / s.pts.length;
+      const cy = s.pts.reduce((sum, p) => sum + p[1], 0) / s.pts.length;
+      const area = shoelace(s.pts);
+      const q = (cx >= center.x ? 0 : 2) + (cy < center.y ? 0 : 1); // NE=0, NW=2, SE=1, SW=3
+      quadAreas[q] += area;
+    }
+    const totalQuad = quadAreas.reduce((a, b) => a + b, 0);
+    if (totalQuad > 0) {
+      const avgQuad = totalQuad / 4;
+      const devQuad = quadAreas.reduce((sum, a) => sum + Math.abs(a - avgQuad), 0) / (4 * avgQuad);
+      out.balanceCuadrantes = Math.max(0, Math.min(100, (1 - devQuad) * 100));
+    } else {
+      out.balanceCuadrantes = 0;
+    }
+
+    // Dispersión: uniformidad de la distribución de celdas en una rejilla 5×5
+    // Mide qué tan uniforme está el detalle en la página (evita "agujeros" vacíos)
+    const gridSize = 5;
+    const cellCounts = Array(gridSize * gridSize).fill(0);
+    const cellSize = (maxR * 2) / gridSize;
+    for (const c of cells) {
+      // Usar el centroide de la celda (aproximado por bbox)
+      // Como no tenemos el centroide exacto, usamos el centro del bbox
+      // Esto es una aproximación; para más precisión habría que calcular el centroide real
+    }
+    // Simplificación: contar celdas por cuadrante de la rejilla
+    for (const el of els) for (const s of el.subs) if (s.closed && s.pts.length >= 3) {
+      const cx = s.pts.reduce((sum, p) => sum + p[0], 0) / s.pts.length;
+      const cy = s.pts.reduce((sum, p) => sum + p[1], 0) / s.pts.length;
+      const gx = Math.floor((cx - (center.x - maxR)) / cellSize);
+      const gy = Math.floor((cy - (center.y - maxR)) / cellSize);
+      if (gx >= 0 && gx < gridSize && gy >= 0 && gy < gridSize) {
+        cellCounts[gy * gridSize + gx]++;
+      }
+    }
+    const totalCells = cellCounts.reduce((a, b) => a + b, 0);
+    if (totalCells > 0) {
+      const avgCell = totalCells / (gridSize * gridSize);
+      const devCell = cellCounts.reduce((sum, c) => sum + Math.abs(c - avgCell), 0) / (gridSize * gridSize * avgCell);
+      out.dispersion = Math.max(0, Math.min(100, (1 - devCell) * 100));
+    } else {
+      out.dispersion = 0;
+    }
   }
   
   return out;
