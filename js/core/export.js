@@ -349,8 +349,8 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
 /**
  * Páginas totales de un libro (incluye el relleno a número par que exige la imprenta).
  */
-export function bookPageCount({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, colorTest = false, keepBack = [] }) {
-  return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, keepBack }).length;
+export function bookPageCount({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, belongsPage = false, welcomePage = false, reviewPage = false, colorTest = false, keepBack = [] }) {
+  return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, belongsPage, welcomePage, reviewPage, keepBack }).length;
 }
 
 /** Rasteriza un SVG en un canvas con fondo blanco. */
@@ -421,6 +421,19 @@ function drawTextBlock(ctx, text, { x, y, maxW, sizePx, weight = "normal", font 
   return y + lines.length * sizePx * lineGap;
 }
 
+// Dibuja una estrella de 5 puntas centrada en (cx, cy) con el tamaño dado
+function drawStar(ctx, cx, cy, size) {
+  const spikes = 5, outerR = size, innerR = size * 0.45;
+  ctx.beginPath();
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+    const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
 /**
  * Libro completo para imprimir en Amazon KDP (tapa blanda, interior B/N, sin sangrado).
  * Orden: [título][copyright|blanco][prueba de color][blanco][m1][blanco][m2]…, siempre par.
@@ -436,7 +449,8 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
   }
   const {
     preset, genOpts, title = "Mandalas para Colorear", subtitle = "", author = "",
-    titlePage = true, copyrightPage = false, copyrightText = "", colorTest = false,
+    titlePage = true, copyrightPage = false, belongsPage = false, welcomePage = false, reviewPage = false,
+    copyrightText = "", colorTest = false,
     blankBack = true, blackBack = false, keepBack = [], pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
   } = opts;
 
@@ -462,7 +476,7 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
     throw new Error(`Este navegador no puede dibujar páginas de ${wPx}×${hPx} px (${dpi} DPI). Elige 300 DPI o usa un ordenador.`);
   }
   // La prueba de color ocupa el lugar de un mandala más (con su reverso)
-  const layout = bookLayout({ mandalas: count + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, keepBack });
+  const layout = bookLayout({ mandalas: count + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, belongsPage, welcomePage, reviewPage, keepBack });
   const total = layout.length;
   const yieldUI = () => new Promise(r => setTimeout(r, 0));
 
@@ -497,6 +511,63 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
         "salvo para colorear las páginas en uso personal.";
       drawTextBlock(ctx, text, { x: wPx / 2, y: hPx * 0.7, maxW: (wMm - 2 * marginMm - 20) * pxPerMm, sizePx: 3.4 * pxPerMm, lineGap: 1.45 });
       label = "Página de derechos";
+    } else if (page.kind === "belongs") {
+      canvas = blankCanvas(wPx, hPx);
+      const ctx = canvas.getContext("2d");
+      const maxW = (wMm - 2 * marginMm - 20) * pxPerMm;
+      // Título decorativo con línea debajo
+      drawTextBlock(ctx, "Este libro pertenece a", { x: wPx / 2, y: hPx * 0.35, maxW, sizePx: 7 * pxPerMm, weight: "bold" });
+      // Línea para escribir el nombre (centrada, con decoraciones en los extremos)
+      const lineY = hPx * 0.48;
+      const lineW = maxW * 0.6;
+      const lineX = (wPx - lineW) / 2;
+      ctx.strokeStyle = "#333"; ctx.lineWidth = 0.8 * pxPerMm;
+      ctx.beginPath(); ctx.moveTo(lineX, lineY); ctx.lineTo(lineX + lineW, lineY); ctx.stroke();
+      // Pequeñas decoraciones en los extremos de la línea
+      const dotR = 2 * pxPerMm;
+      ctx.fillStyle = "#333";
+      ctx.beginPath(); ctx.arc(lineX - dotR * 1.5, lineY, dotR, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(lineX + lineW + dotR * 1.5, lineY, dotR, 0, Math.PI * 2); ctx.fill();
+      // Pequeño mandala decorativo debajo
+      ctx.strokeStyle = "#999"; ctx.lineWidth = 0.4 * pxPerMm;
+      const cx = wPx / 2, cy = hPx * 0.62, r = 12 * pxPerMm;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5, r * 0.35, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.25, 0, Math.PI * 2); ctx.stroke();
+      label = "Página «Pertenece a»";
+    } else if (page.kind === "welcome") {
+      canvas = blankCanvas(wPx, hPx);
+      const ctx = canvas.getContext("2d");
+      const maxW = (wMm - 2 * marginMm - 20) * pxPerMm;
+      drawTextBlock(ctx, "Bienvenido", { x: wPx / 2, y: hPx * 0.2, maxW, sizePx: 9 * pxPerMm, weight: "bold" });
+      const welcomeText = "Este libro es una invitación a ralentizar el ritmo, soltar la prisa y dejarte llevar por el placer de colorear.\n\n" +
+        "Cada página ha sido diseñada para ofrecerte un espacio de calma, con trazos claros y diseños que te guiarán sin exigirte.\n\n" +
+        "No hay reglas. Colorea como quieras, cuando quieras. Lo importante es que disfrutes del proceso.\n\n" +
+        "Que estas páginas te traigan momentos de paz y creatividad.";
+      drawTextBlock(ctx, welcomeText, { x: wPx / 2, y: hPx * 0.35, maxW, sizePx: 4 * pxPerMm, lineGap: 1.6, color: "#333" });
+      label = "Página de bienvenida";
+    } else if (page.kind === "review") {
+      canvas = blankCanvas(wPx, hPx);
+      const ctx = canvas.getContext("2d");
+      const maxW = (wMm - 2 * marginMm - 20) * pxPerMm;
+      drawTextBlock(ctx, "¿Te ha gustado este libro?", { x: wPx / 2, y: hPx * 0.25, maxW, sizePx: 7 * pxPerMm, weight: "bold" });
+      const reviewText = "Tu opinión nos ayuda a seguir creando.\n\n" +
+        "Si este libro te ha acompañado en momentos de calma y creatividad, te agradeceríamos que dejaras una reseña.\n\n" +
+        "Cada reseña es un regalo para nosotros y una ayuda para otros amantes del coloreo que buscan su próximo libro.\n\n" +
+        "¡Gracias por colorear con nosotros!";
+      drawTextBlock(ctx, reviewText, { x: wPx / 2, y: hPx * 0.4, maxW, sizePx: 4 * pxPerMm, lineGap: 1.6, color: "#333" });
+      // Estrellas decorativas
+      const starY = hPx * 0.72;
+      const starSize = 5 * pxPerMm;
+      ctx.fillStyle = "#333";
+      for (let i = 0; i < 5; i++) {
+        const sx = wPx / 2 + (i - 2) * starSize * 2.5;
+        drawStar(ctx, sx, starY, starSize);
+      }
+      label = "Página de reseña";
     } else if (page.kind === "mandala" && colorTest && page.index === 0) {
       // Página para probar colores: 24 círculos en rejilla
       canvas = blankCanvas(wPx, hPx);

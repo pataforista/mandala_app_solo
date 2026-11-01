@@ -1790,6 +1790,9 @@ function bindUI() {
   const backMode = () => bookBackEl?.value || "blanco";
   const bookTitlePageEl = document.getElementById("bookTitlePage");
   const bookCopyrightEl = document.getElementById("bookCopyright");
+  const bookBelongsPageEl = document.getElementById("bookBelongsPage");
+  const bookWelcomePageEl = document.getElementById("bookWelcomePage");
+  const bookReviewPageEl = document.getElementById("bookReviewPage");
   const bookColorTestEl = document.getElementById("bookColorTest");
   const bookPageNumbersEl = document.getElementById("bookPageNumbers");
   const bookDpiEl = document.getElementById("bookDpi");
@@ -1831,6 +1834,9 @@ function bindUI() {
       keepBack: doubleSided ? muralTilePositions(total, specialOpts()).map(i => i + off) : [],
     titlePage: bookTitlePageEl.checked,
     copyrightPage: !!bookCopyrightEl?.checked,
+    belongsPage: !!bookBelongsPageEl?.checked,
+    welcomePage: !!bookWelcomePageEl?.checked,
+    reviewPage: !!bookReviewPageEl?.checked,
     colorTest: !!bookColorTestEl?.checked,
     };
   };
@@ -2409,7 +2415,7 @@ function bindUI() {
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
     document.addEventListener("figures-changed", updateBookSummary);
-    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookColorTestEl, presetEl, bookDpiEl, coloringPresetEl, strokeWidthEl, generatorTypeEl].forEach(el =>
+    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookBelongsPageEl, bookWelcomePageEl, bookReviewPageEl, bookColorTestEl, presetEl, bookDpiEl, coloringPresetEl, strokeWidthEl, generatorTypeEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     updateBookSummary();
