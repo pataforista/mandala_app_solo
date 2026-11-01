@@ -373,8 +373,8 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
 /**
  * Páginas totales de un libro (incluye el relleno a número par que exige la imprenta).
  */
-export function bookPageCount({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, belongsPage = false, welcomePage = false, reviewPage = false, colorTest = false, keepBack = [] }) {
-  return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, belongsPage, welcomePage, reviewPage, keepBack }).length;
+export function bookPageCount({ mandalas, blankBack = true, titlePage = true, copyrightPage = false, belongsPage = false, welcomePage = false, reviewPage = false, quotePage = false, colorTest = false, keepBack = [] }) {
+  return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, belongsPage, welcomePage, reviewPage, quotePage, keepBack }).length;
 }
 
 /** Rasteriza un SVG en un canvas con fondo blanco. */
@@ -462,6 +462,65 @@ function drawStar(ctx, cx, cy, size) {
   ctx.closePath(); ctx.fill();
 }
 
+// Dibuja un motivo decorativo pequeño (para rellenar letras en página de frase)
+function drawMotif(ctx, type, cx, cy, size, rng) {
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = size * 0.15;
+  ctx.fillStyle = "none";
+  const r = size * 0.4;
+  switch (type) {
+    case "flower": {
+      // Flor simple: 5 pétalos alrededor de un centro
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const px = cx + Math.cos(a) * r * 0.5;
+        const py = cy + Math.sin(a) * r * 0.5;
+        ctx.beginPath();
+        ctx.arc(px, py, r * 0.35, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.2, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "star":
+      drawStar(ctx, cx, cy, r);
+      break;
+    case "heart": {
+      // Corazón simple
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + r * 0.3);
+      ctx.bezierCurveTo(cx - r * 0.5, cy - r * 0.2, cx - r * 0.8, cy + r * 0.1, cx, cy + r * 0.6);
+      ctx.bezierCurveTo(cx + r * 0.8, cy + r * 0.1, cx + r * 0.5, cy - r * 0.2, cx, cy + r * 0.3);
+      ctx.stroke();
+      break;
+    }
+    case "leaf": {
+      // Hoja simple
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r * 0.3, r * 0.6, Math.PI / 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - r * 0.2, cy + r * 0.2);
+      ctx.lineTo(cx + r * 0.2, cy - r * 0.2);
+      ctx.stroke();
+      break;
+    }
+    case "circle":
+    default: {
+      // Círculo con punto central
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+  }
+}
+
 /**
  * Libro completo para imprimir en Amazon KDP (tapa blanda, interior B/N, sin sangrado).
  * Orden: [título][copyright|blanco][prueba de color][blanco][m1][blanco][m2]…, siempre par.
@@ -478,7 +537,7 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
   const {
     preset, genOpts, title = "Mandalas para Colorear", subtitle = "", author = "",
     titlePage = true, copyrightPage = false, belongsPage = false, welcomePage = false, reviewPage = false,
-    copyrightText = "", colorTest = false, language = "es",
+    copyrightText = "", colorTest = false, language = "es", quotePage = false, quoteText = "",
     blankBack = true, blackBack = false, keepBack = [], pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
   } = opts;
   const t = BOOK_TEXTS[language] || BOOK_TEXTS.es;
@@ -505,7 +564,7 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
     throw new Error(`Este navegador no puede dibujar páginas de ${wPx}×${hPx} px (${dpi} DPI). Elige 300 DPI o usa un ordenador.`);
   }
   // La prueba de color ocupa el lugar de un mandala más (con su reverso)
-  const layout = bookLayout({ mandalas: count + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, belongsPage, welcomePage, reviewPage, keepBack });
+  const layout = bookLayout({ mandalas: count + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, belongsPage, welcomePage, reviewPage, quotePage, keepBack });
   const total = layout.length;
   const yieldUI = () => new Promise(r => setTimeout(r, 0));
 
@@ -588,6 +647,74 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
         drawStar(ctx, sx, starY, starSize);
       }
       label = "Página de reseña";
+    } else if (page.kind === "quote") {
+      // Página de frase: letras grandes de contorno rellenas con motivos decorativos
+      canvas = blankCanvas(wPx, hPx);
+      const ctx = canvas.getContext("2d");
+      const phrase = quoteText || t.defaultQuote || "Respira y sonríe";
+      const maxTextW = (wMm - 2 * marginMm - 10) * pxPerMm;
+      // Calcular tamaño de fuente para que la frase quepa
+      let fontSize = Math.min(28 * pxPerMm, maxTextW / (phrase.length * 0.55));
+      ctx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
+      const metrics = ctx.measureText(phrase);
+      // Si es muy ancha, reducir
+      if (metrics.width > maxTextW) {
+        fontSize *= maxTextW / metrics.width;
+        ctx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
+      }
+      const textY = hPx * 0.5;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      // Dibujar las letras con contorno (sin relleno, para colorear)
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 1.2 * pxPerMm;
+      ctx.lineJoin = "round";
+      ctx.strokeText(phrase, wPx / 2, textY);
+      // Rellenar las letras con motivos decorativos usando clip
+      ctx.save();
+      ctx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
+      // Crear clip con la forma de las letras
+      ctx.beginPath();
+      // Usar un canvas temporal para obtener el path de las letras
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = wPx;
+      tempCanvas.height = hPx;
+      const tempCtx = tempCanvas.getContext("2d");
+      tempCtx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
+      tempCtx.textAlign = "center";
+      tempCtx.textBaseline = "middle";
+      tempCtx.fillText(phrase, wPx / 2, textY);
+      // Obtener los píxeos de las letras y crear un path aproximado
+      const imageData = tempCtx.getImageData(0, 0, wPx, hPx);
+      const step = Math.max(4, Math.round(pxPerMm)); // cada N píxeles
+      for (let y = 0; y < hPx; y += step) {
+        for (let x = 0; x < wPx; x += step) {
+          const idx = (y * wPx + x) * 4;
+          if (imageData.data[idx + 3] > 128) { // píxel alfa > 50%
+            ctx.rect(x, y, step * 0.8, step * 0.8);
+          }
+        }
+      }
+      ctx.clip();
+      // Dibujar motivos decorativos dentro del clip
+      const motifSize = fontSize * 0.15;
+      const motifs = ["flower", "star", "heart", "leaf", "circle"];
+      const rng = mulberry32(phrase.length * 12345);
+      for (let y = 0; y < hPx; y += motifSize * 2.5) {
+        for (let x = 0; x < wPx; x += motifSize * 2.5) {
+          const jx = x + (rng() - 0.5) * motifSize;
+          const jy = y + (rng() - 0.5) * motifSize;
+          const motif = motifs[Math.floor(rng() * motifs.length)];
+          drawMotif(ctx, motif, jx, jy, motifSize, rng);
+        }
+      }
+      ctx.restore();
+      // Volver a dibujar el contorno por encima para que quede limpio
+      ctx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 1.2 * pxPerMm;
+      ctx.strokeText(phrase, wPx / 2, textY);
+      label = "Página de frase";
     } else if (page.kind === "mandala" && colorTest && page.index === 0) {
       // Página para probar colores: 24 círculos en rejilla
       canvas = blankCanvas(wPx, hPx);

@@ -1793,6 +1793,8 @@ function bindUI() {
   const bookBelongsPageEl = document.getElementById("bookBelongsPage");
   const bookWelcomePageEl = document.getElementById("bookWelcomePage");
   const bookReviewPageEl = document.getElementById("bookReviewPage");
+  const bookQuotePageEl = document.getElementById("bookQuotePage");
+  const bookQuoteTextEl = document.getElementById("bookQuoteText");
   const bookColorTestEl = document.getElementById("bookColorTest");
   const bookPageNumbersEl = document.getElementById("bookPageNumbers");
   const bookDpiEl = document.getElementById("bookDpi");
@@ -1838,6 +1840,7 @@ function bindUI() {
     belongsPage: !!bookBelongsPageEl?.checked,
     welcomePage: !!bookWelcomePageEl?.checked,
     reviewPage: !!bookReviewPageEl?.checked,
+    quotePage: !!bookQuotePageEl?.checked,
     colorTest: !!bookColorTestEl?.checked,
     };
   };
@@ -2381,6 +2384,7 @@ function bindUI() {
         marginMm,
         dpi: parseInt(bookDpiEl?.value, 10) || 300,
         language: bookLanguageEl?.value || "es",
+        quoteText: bookQuoteTextEl?.value || "",
         onProgress: progress,
       });
       // Registro de fuentes (CSV) junto al PDF, si el libro lleva imágenes del usuario
@@ -2417,9 +2421,15 @@ function bindUI() {
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
     document.addEventListener("figures-changed", updateBookSummary);
-    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookBelongsPageEl, bookWelcomePageEl, bookReviewPageEl, bookColorTestEl, presetEl, bookDpiEl, bookLanguageEl, coloringPresetEl, strokeWidthEl, generatorTypeEl].forEach(el =>
+    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookBelongsPageEl, bookWelcomePageEl, bookReviewPageEl, bookQuotePageEl, bookColorTestEl, presetEl, bookDpiEl, bookLanguageEl, coloringPresetEl, strokeWidthEl, generatorTypeEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
+    // Mostrar/ocultar el input de texto cuando se marca el checkbox de página de frase
+    if (bookQuotePageEl && bookQuoteTextEl) {
+      bookQuotePageEl.addEventListener("sl-change", () => {
+        bookQuoteTextEl.style.display = bookQuotePageEl.checked ? "inline-block" : "none";
+      });
+    }
     updateBookSummary();
   }
 
