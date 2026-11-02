@@ -57,6 +57,20 @@ let currentProjectName = "Sin guardar";
 let listenersBound = false;
 
 const stage = document.getElementById("stage");
+  // Controles de zoom interactivo para inspección de trazos
+  let stageZoom = 1.0;
+  const zoomLevelText = document.getElementById("zoomLevelText");
+  const btnZoomIn = document.getElementById("btnZoomIn");
+  const btnZoomOut = document.getElementById("btnZoomOut");
+  const btnZoomReset = document.getElementById("btnZoomReset");
+  const applyStageZoom = (val) => {
+    stageZoom = Math.min(3.0, Math.max(0.5, Math.round(val * 100) / 100));
+    if (stage) stage.style.transform = stageZoom === 1.0 ? "none" : `scale(${stageZoom})`;
+    if (zoomLevelText) zoomLevelText.textContent = `${Math.round(stageZoom * 100)}%`;
+  };
+  btnZoomIn?.addEventListener("click", () => applyStageZoom(stageZoom + 0.25));
+  btnZoomOut?.addEventListener("click", () => applyStageZoom(stageZoom - 0.25));
+  btnZoomReset?.addEventListener("click", () => applyStageZoom(1.0));
 const presetEl = document.getElementById("preset");
 const petalsEl = document.getElementById("petals");
 
@@ -3022,6 +3036,12 @@ function bindUI() {
   }
 
   if (btnCreateNewProject && newProjectNameInput) {
+    newProjectNameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        btnCreateNewProject.click();
+      }
+    });
     btnCreateNewProject.addEventListener("click", async () => {
       const name = (newProjectNameInput.value || "").trim() || (bookTitleEl?.value || "").trim() || "Nuevo Proyecto";
       try {
@@ -3110,6 +3130,8 @@ function bindUI() {
   window.addEventListener("keydown", (e) => {
     // Ignore if typing in an input
     if (isTyping(e)) return;
+    // Ignorar atajos si hay algún diálogo modal abierto
+    if (document.querySelector("sl-dialog[open]")) return;
 
     const key = e.key.toLowerCase();
 

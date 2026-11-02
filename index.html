@@ -23,7 +23,7 @@
     }
 
     :root {
-      /* M3 Tonal Palettes (Approximate) */
+      /* M3 Tonal Palettes (Harmonized) */
       --m3-primary: #6750A4;
       --m3-on-primary: #FFFFFF;
       --m3-primary-container: #EADDFF;
@@ -42,6 +42,21 @@
       
       --app-font-heading: 'Rubik', sans-serif;
       --app-font-body: 'DM Sans', sans-serif;
+
+      /* Shoelace Theme Harmonization with M3 */
+      --sl-color-primary-50: #fbf8fd;
+      --sl-color-primary-100: #f2ebfc;
+      --sl-color-primary-200: #eaddff;
+      --sl-color-primary-300: #d0bcff;
+      --sl-color-primary-400: #b69df8;
+      --sl-color-primary-500: #8f72c7;
+      --sl-color-primary-600: #6750A4;
+      --sl-color-primary-700: #513b8a;
+      --sl-color-primary-800: #3c2671;
+      --sl-color-primary-900: #21005d;
+      --sl-color-primary-950: #140038;
+      --sl-focus-ring-color: rgba(103, 80, 164, 0.35);
+      --sl-input-focus-ring-color: #6750A4;
     }
 
     body {
@@ -113,15 +128,13 @@
 
     #stage {
       background-color: white;
-      border-radius: 28px;
-      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
       max-width: 100%;
+      max-height: calc(100vh - 140px);
       height: auto;
-      transition: transform 0.3s ease;
-    }
-
-    #stage:hover {
-      transform: scale(1.02);
+      transition: transform 0.25s ease-out;
+      transform-origin: center center;
     }
 
     #stage svg {
@@ -230,21 +243,64 @@
 
     .meta-footer {
       position: absolute;
-      bottom: 24px;
-      right: 24px;
+      bottom: 20px;
+      right: 20px;
       display: flex;
-      gap: 20px;
+      gap: 16px;
       background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(12px);
-      padding: 12px 20px;
+      padding: 8px 18px;
       border-radius: 100px;
       font-size: 0.8rem;
       color: var(--m3-on-surface-variant);
-      border: 1px solid rgba(231, 224, 236, 0.7);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      border: 1px solid rgba(231, 224, 236, 0.8);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
       font-family: var(--app-font-body);
       letter-spacing: 0.01em;
       line-height: 1.4;
+      z-index: 5;
+    }
+
+    #stage-zoom-controls {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 4px 6px;
+      border-radius: 10px;
+      border: 1px solid rgba(231, 224, 236, 0.8);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      z-index: 5;
+    }
+
+    #zoomLevelText {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--m3-primary);
+      min-width: 44px;
+      text-align: center;
+      user-select: none;
+    }
+
+    @media (max-width: 768px) {
+      .meta-footer {
+        left: 16px;
+        right: 16px;
+        bottom: 12px;
+        justify-content: space-around;
+        padding: 6px 12px;
+        font-size: 0.72rem;
+        gap: 8px;
+      }
+      #stage-zoom-controls {
+        top: 8px;
+        right: 8px;
+        padding: 2px 4px;
+      }
     }
 
     .meta-footer span {
@@ -313,11 +369,17 @@
 <body>
   <header>
     <div class="brand">
-      <sl-icon-button id="openGallery" name="grid" label="Galería" style="font-size: 1.5rem;"></sl-icon-button>
+      <sl-tooltip content="Mis favoritos y galería">
+        <sl-icon-button id="openGallery" name="grid" label="Galería" style="font-size: 1.5rem;"></sl-icon-button>
+      </sl-tooltip>
       <h1>Mandala Studio</h1>
-      <div style="display:flex; gap:4px; margin-left: 8px;">
-        <sl-icon-button id="undo" name="arrow-counterclockwise" label="Deshacer"></sl-icon-button>
-        <sl-icon-button id="redo" name="arrow-clockwise" label="Rehacer"></sl-icon-button>
+      <div style="display:flex; gap:2px; margin-left: 6px;">
+        <sl-tooltip content="Deshacer diseño (Ctrl+Z)">
+          <sl-icon-button id="undo" name="arrow-counterclockwise" label="Deshacer"></sl-icon-button>
+        </sl-tooltip>
+        <sl-tooltip content="Rehacer diseño (Ctrl+Y)">
+          <sl-icon-button id="redo" name="arrow-clockwise" label="Rehacer"></sl-icon-button>
+        </sl-tooltip>
       </div>
     </div>
     <div style="display:flex; gap:8px;">
@@ -365,9 +427,15 @@
             <div style="display:flex; gap:12px; align-items: flex-end;">
               <sl-input id="seed" type="number" label="Semilla" size="small" style="flex:1; min-width:0;" value="1"></sl-input>
               <div style="display:flex; gap:2px;">
-                <sl-icon-button id="prevSeed" name="chevron-left" label="Anterior"></sl-icon-button>
-                <sl-icon-button id="nextSeed" name="chevron-right" label="Siguiente"></sl-icon-button>
-                <sl-icon-button id="regen" name="dice-5" label="Aleatorio" style="font-size: 1.5rem; color: var(--m3-primary);"></sl-icon-button>
+                <sl-tooltip content="Semilla anterior (←)">
+                  <sl-icon-button id="prevSeed" name="chevron-left" label="Anterior"></sl-icon-button>
+                </sl-tooltip>
+                <sl-tooltip content="Semilla siguiente (→)">
+                  <sl-icon-button id="nextSeed" name="chevron-right" label="Siguiente"></sl-icon-button>
+                </sl-tooltip>
+                <sl-tooltip content="Diseño aleatorio (R o Espacio)">
+                  <sl-icon-button id="regen" name="dice-5" label="Aleatorio" style="font-size: 1.5rem; color: var(--m3-primary);"></sl-icon-button>
+                </sl-tooltip>
               </div>
             </div>
             <sl-button id="magicShuffle" variant="primary" size="medium" pill style="width: 100%; --sl-color-primary-600: #d81b60; --sl-color-primary-500: #e91e63;">
@@ -821,6 +889,19 @@
     </div>
 
     <div id="stage-container">
+      <div id="stage-zoom-controls">
+        <sl-tooltip content="Alejar vista">
+          <sl-icon-button id="btnZoomOut" name="dash" label="Alejar" style="font-size: 1rem;"></sl-icon-button>
+        </sl-tooltip>
+        <span id="zoomLevelText">100%</span>
+        <sl-tooltip content="Acercar vista (inspeccionar líneas)">
+          <sl-icon-button id="btnZoomIn" name="plus" label="Acercar" style="font-size: 1rem;"></sl-icon-button>
+        </sl-tooltip>
+        <sl-tooltip content="Restablecer tamaño normal">
+          <sl-icon-button id="btnZoomReset" name="arrows-fullscreen" label="Ajustar" style="font-size: 0.9rem;"></sl-icon-button>
+        </sl-tooltip>
+      </div>
+
       <div id="stage"></div>
       
       <div class="meta-footer">
