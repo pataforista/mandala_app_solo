@@ -7,8 +7,10 @@ import { createDoc } from "../js/core/svgDoc.js";
 import { renderDocToSvgString } from "../js/core/svgRender.js";
 import { generateMandalaClassic } from "../js/generators/mandalaClassic.js";
 import { COMPOSITIONS, FRAME_STYLES, fitOf } from "../js/generators/pageComposer.js";
-import { planBook, shuffleBag, BOOK_STYLES, bestSellerProfile } from "../js/core/bookPlan.js";
-import { kdpGutterMm, kdpSafeMarginMm, bookLayout, kdpChecklist } from "../js/core/kdp.js";
+import { planBook, shuffleBag, BOOK_STYLES, bestSellerProfile, BOOK_THEMES, PRODUCT_PROFILES, BESTSELLER_STYLE_W } from "../js/core/bookPlan.js";
+import { kdpGutterMm, kdpSafeMarginMm, bookLayout, kdpChecklist, kdpCoverDimensions } from "../js/core/kdp.js";
+import { BOOK_TEXTS, BOOK_FONT } from "../js/core/export.js";
+import { PATTERN_THEMES } from "../js/generators/pageComposer.js";
 import { encodeGrayPng, rgbaToGray } from "../js/core/grayPng.js";
 import { stampRaster } from "../js/core/lineArt.js";
 import { imageToLineArt, processFigure } from "../js/core/lineArt.js";
@@ -796,4 +798,88 @@ test("paquetes de adornos (infantiles y naturaleza): todo es ilustración extra 
     generateMandalaClassic(doc, { ...BASE, seed: 3, composition: "fondo", extraArt });
     assert.ok((renderDocToSvgString(doc).match(/<image href="data:image\/png/g) || []).length > 0, `${file}: aparecen en la página`);
   }
+});
+
+test("bookLayout: páginas de cortesía conservan la paridad KDP y mandalas en páginas impares", () => {
+  // Con reverso en blanco (estándar KDP para colorear)
+  const allOpts = {
+    mandalas: 20,
+    blankBack: true,
+    titlePage: true,
+    copyrightPage: true,
+    belongsPage: true,
+    welcomePage: true,
+    quotePage: true,
+    reviewPage: true,
+  };
+  const L = bookLayout(allOpts);
+  assert.equal(L.length % 2, 0, "total par");
+  // Todos los mandalas caen en índice par (página impar de lectura / derecha)
+  L.forEach((p, i) => {
+    if (p.kind === "mandala") {
+      assert.equal(i % 2, 0, `mandala ${p.index} en índice impar ${i}`);
+    }
+  });
+
+  // Con doble cara (blankBack = false)
+  const double = bookLayout({ ...allOpts, blankBack: false });
+  assert.equal(double.length % 2, 0, "total par a doble cara");
+  assert.equal(double.filter(p => p.kind === "mandala").length, 20);
+});
+
+test("trama: cubre la página con un patrón continuo para todos los PATTERN_THEMES", () => {
+  for (const theme of PATTERN_THEMES) {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 42, marginMm: 10 });
+    generateMandalaClassic(doc, { ...BASE, seed: 42, composition: "trama", background: theme });
+    const svg = renderDocToSvgString(doc);
+    assert.doesNotMatch(svg, /NaN|undefined/);
+    assert.ok(svg.length > 5000, `el patrón ${theme} debe generar contenido sustancial (longitud: ${svg.length})`);
+    assert.ok(svg.includes("<clipPath"), "debe tener clip-path para contener la trama en el margen");
+  }
+});
+
+test("temas y perfiles: estructuras completas y fuentes", () => {
+  // Temas
+  assert.ok(BOOK_THEMES.none && BOOK_THEMES.oceano && BOOK_THEMES.navidad && BOOK_THEMES.bosque);
+  for (const [k, t] of Object.entries(BOOK_THEMES)) {
+    assert.ok(t.name && t.description, `tema ${k} tiene nombre y descripción`);
+    if (t.styles) assert.ok(Array.isArray(t.styles) && t.styles.length > 0);
+  }
+
+  // Perfiles de producto
+  assert.ok(PRODUCT_PROFILES.mindful_patterns && PRODUCT_PROFILES.large_print_easy);
+  for (const [k, p] of Object.entries(PRODUCT_PROFILES)) {
+    assert.ok(p.name && p.description, `perfil ${k} tiene nombre y descripción`);
+    assert.ok(p.strokeBase >= 0.5, `perfil ${k} trazo base comercial`);
+  }
+
+  // Traducciones
+  assert.ok(BOOK_TEXTS.es && BOOK_TEXTS.en);
+  for (const lang of ["es", "en"]) {
+    const t = BOOK_TEXTS[lang];
+    assert.ok(t.belongsTitle && t.welcomeTitle && t.welcomeText && t.reviewTitle && t.reviewText && t.defaultQuote && t.colorTestTitle);
+  }
+  assert.ok(BOOK_FONT.includes("Georgia"));
+});
+
+test("kdpCoverDimensions: calcula dimensiones exactas para Canva y KDP", () => {
+  // Libro típico 8.5 x 11 in, 62 páginas, papel blanco
+  const dims = kdpCoverDimensions({ pages: 62, trimWidthMm: 215.9, trimHeightMm: 279.4, paperType: "white" });
+  assert.equal(dims.pages, 62);
+  // Lomo = 62 * 0.002252 = 0.139624 in ≈ 3.55 mm
+  assert.ok(Math.abs(dims.spineIn - 0.139624) < 1e-5);
+  assert.ok(Math.abs(dims.spineMm - 3.546) < 0.01);
+  // Ancho total = 2 * 8.5 + 0.139624 + 0.25 = 17.389624 in
+  assert.ok(Math.abs(dims.totalWidthIn - 17.389624) < 1e-5);
+  // Alto total = 11 + 0.25 = 11.25 in
+  assert.equal(dims.totalHeightIn, 11.25);
+  // Píxeles a 300 DPI
+  assert.equal(dims.widthPx300, 5217);
+  assert.equal(dims.heightPx300, 3375);
+  // Texto en lomo no permitido con < 80 páginas
+  assert.equal(dims.spineTextAllowed, false);
+
+  // Con 100 páginas (>= 80): texto en lomo permitido
+  const big = kdpCoverDimensions({ pages: 100, trimWidthMm: 215.9, trimHeightMm: 279.4 });
+  assert.equal(big.spineTextAllowed, true);
 });

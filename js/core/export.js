@@ -3,6 +3,7 @@ import { createDoc } from "./svgDoc.js";
 import { renderDocToSvgString } from "./svgRender.js";
 import { bookLayout } from "./kdp.js";
 import { encodeGrayPng, rgbaToGray } from "./grayPng.js";
+import { mulberry32 } from "./prng.js";
 
 const RENDER_PX_PER_MM = 300 / 25.4; // 300 DPI: estándar de imprenta para libros
 
@@ -17,6 +18,8 @@ export const BOOK_TEXTS = {
     copyrightPrefix: "Copyright ©",
     copyrightRights: "Todos los derechos reservados.",
     copyrightNotice: "Ninguna parte de esta publicación puede reproducirse, almacenarse en un sistema de recuperación o transmitida en cualquier forma o por cualquier medio, sin el permiso previo por escrito del editor.",
+    defaultQuote: "Respira y sonríe",
+    colorTestTitle: "Prueba tus colores",
   },
   en: {
     belongsTitle: "This book belongs to",
@@ -27,6 +30,8 @@ export const BOOK_TEXTS = {
     copyrightPrefix: "Copyright ©",
     copyrightRights: "All rights reserved.",
     copyrightNotice: "No part of this publication may be reproduced, stored in a retrieval system, or transmitted in any form or by any means, without the prior written permission of the publisher.",
+    defaultQuote: "Breathe and smile",
+    colorTestTitle: "Color Test",
   },
 };
 
@@ -466,7 +471,7 @@ function drawStar(ctx, cx, cy, size) {
 function drawMotif(ctx, type, cx, cy, size, rng) {
   ctx.strokeStyle = "#333";
   ctx.lineWidth = size * 0.15;
-  ctx.fillStyle = "none";
+  ctx.fillStyle = "#333";
   const r = size * 0.4;
   switch (type) {
     case "flower": {
@@ -670,49 +675,46 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
       ctx.lineWidth = 1.2 * pxPerMm;
       ctx.lineJoin = "round";
       ctx.strokeText(phrase, wPx / 2, textY);
-      // Rellenar las letras con motivos decorativos usando clip
-      ctx.save();
-      ctx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
-      // Crear clip con la forma de las letras
-      ctx.beginPath();
-      // Usar un canvas temporal para obtener el path de las letras
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = wPx;
-      tempCanvas.height = hPx;
+      // Usar un canvas temporal para rellenar los motivos dentro de las letras (source-in)
+      const tempCanvas = blankCanvas(wPx, hPx);
       const tempCtx = tempCanvas.getContext("2d");
       tempCtx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
       tempCtx.textAlign = "center";
       tempCtx.textBaseline = "middle";
+      tempCtx.fillStyle = "#000";
       tempCtx.fillText(phrase, wPx / 2, textY);
-      // Obtener los píxeos de las letras y crear un path aproximado
-      const imageData = tempCtx.getImageData(0, 0, wPx, hPx);
-      const step = Math.max(4, Math.round(pxPerMm)); // cada N píxeles
-      for (let y = 0; y < hPx; y += step) {
-        for (let x = 0; x < wPx; x += step) {
-          const idx = (y * wPx + x) * 4;
-          if (imageData.data[idx + 3] > 128) { // píxel alfa > 50%
-            ctx.rect(x, y, step * 0.8, step * 0.8);
-          }
-        }
-      }
-      ctx.clip();
-      // Dibujar motivos decorativos dentro del clip
-      const motifSize = fontSize * 0.15;
+      tempCtx.globalCompositeOperation = "source-in";
+
+      // Dibujar motivos decorativos dentro de la máscara de letras
+      const motifSize = fontSize * 0.18;
       const motifs = ["flower", "star", "heart", "leaf", "circle"];
       const rng = mulberry32(phrase.length * 12345);
-      for (let y = 0; y < hPx; y += motifSize * 2.5) {
-        for (let x = 0; x < wPx; x += motifSize * 2.5) {
-          const jx = x + (rng() - 0.5) * motifSize;
-          const jy = y + (rng() - 0.5) * motifSize;
+      const halfW = (metrics.width > maxTextW ? maxTextW : metrics.width) / 2 + motifSize;
+      const startX = wPx / 2 - halfW;
+      const endX = wPx / 2 + halfW;
+      const startY = textY - fontSize * 0.8;
+      const endY = textY + fontSize * 0.8;
+      const step = motifSize * 1.5;
+
+      for (let y = startY; y <= endY; y += step) {
+        for (let x = startX; x <= endX; x += step) {
+          const jx = x + (rng() - 0.5) * motifSize * 0.4;
+          const jy = y + (rng() - 0.5) * motifSize * 0.4;
           const motif = motifs[Math.floor(rng() * motifs.length)];
-          drawMotif(ctx, motif, jx, jy, motifSize, rng);
+          drawMotif(tempCtx, motif, jx, jy, motifSize, rng);
         }
       }
-      ctx.restore();
-      // Volver a dibujar el contorno por encima para que quede limpio
+
+      // Dibujar el contenido decorado en el canvas principal
+      ctx.drawImage(tempCanvas, 0, 0);
+
+      // Dibujar las letras con contorno exterior nítido (para colorear)
       ctx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       ctx.strokeStyle = "#000";
       ctx.lineWidth = 1.2 * pxPerMm;
+      ctx.lineJoin = "round";
       ctx.strokeText(phrase, wPx / 2, textY);
       label = "Página de frase";
     } else if (page.kind === "mandala" && colorTest && page.index === 0) {
@@ -722,7 +724,7 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
       const usableW = wMm - 2 * marginMm - 10, cols = 4, rows = 6;
       const cell = Math.min(usableW / cols, (hMm - 2 * marginMm - 40) / rows);
       const x0 = (wMm - cell * cols) / 2, y0 = marginMm + 30;
-      drawTextBlock(ctx, "Prueba tus colores", { x: wPx / 2, y: (marginMm + 18) * pxPerMm, maxW: usableW * pxPerMm, sizePx: 7 * pxPerMm, weight: "bold" });
+      drawTextBlock(ctx, t.colorTestTitle || "Prueba tus colores", { x: wPx / 2, y: (marginMm + 18) * pxPerMm, maxW: usableW * pxPerMm, sizePx: 7 * pxPerMm, weight: "bold" });
       ctx.strokeStyle = "#000"; ctx.lineWidth = 0.5 * pxPerMm;
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
         ctx.beginPath();

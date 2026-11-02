@@ -31,21 +31,47 @@ const EXTRA_STAMP = 0.025; // a ~20 mm de alto, 0.025 × alto = 0.5 mm de línea
 const USE = ["anillos", "medallon", "figura", "extra"].includes(args.use) ? args.use : "anillos";
 const outFile = path.resolve(args.out || "figuras-lamina.json");
 
-// ---------- Decodificar la imagen a RGBA (el navegador sabe leer JPG/PNG/WebP) ----------
+// ---------- Decodificar la imagen a RGBA (Pillow o Playwright) ----------
 async function decode(imgPath) {
-  const { chromium } = createRequire(import.meta.url)("playwright");
-  const b = await chromium.launch(), p = await b.newPage();
-  const b64 = fs.readFileSync(imgPath).toString("base64"), ext = path.extname(imgPath).slice(1).toLowerCase().replace("jpg", "jpeg");
-  const r = await p.evaluate(async ([data, type]) => {
-    const img = new Image(); img.src = `data:image/${type};base64,${data}`; await img.decode();
-    const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
-    const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0);
-    const d = x.getImageData(0, 0, c.width, c.height).data; let s = "";
-    for (let i = 0; i < d.length; i += 0x8000) s += String.fromCharCode.apply(null, d.subarray(i, i + 0x8000));
-    return { w: c.width, h: c.height, b64: btoa(s) };
-  }, [b64, ext]);
-  await b.close();
-  return { w: r.w, h: r.h, rgba: new Uint8ClampedArray(Buffer.from(r.b64, "base64")) };
+  try {
+    const { chromium } = createRequire(import.meta.url)("playwright");
+    const b = await chromium.launch(), p = await b.newPage();
+    const b64 = fs.readFileSync(imgPath).toString("base64"), ext = path.extname(imgPath).slice(1).toLowerCase().replace("jpg", "jpeg");
+    const r = await p.evaluate(async ([data, type]) => {
+      const img = new Image(); img.src = `data:image/${type};base64,${data}`; await img.decode();
+      const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height).data; let s = "";
+      for (let i = 0; i < d.length; i += 0x8000) s += String.fromCharCode.apply(null, d.subarray(i, i + 0x8000));
+      return { w: c.width, h: c.height, b64: btoa(s) };
+    }, [b64, ext]);
+    await b.close();
+    return { w: r.w, h: r.h, rgba: new Uint8ClampedArray(Buffer.from(r.b64, "base64")) };
+  } catch {
+    const { execFileSync } = await import("node:child_process");
+    const os = await import("node:os");
+    const tmpPy = path.join(os.tmpdir(), `decode_${Date.now()}_${Math.random().toString(36).slice(2)}.py`);
+    const tmpRaw = path.join(os.tmpdir(), `sheet_${Date.now()}_${Math.random().toString(36).slice(2)}.raw`);
+    const pyCode = [
+      "import sys, json",
+      "from PIL import Image",
+      "img = Image.open(sys.argv[1]).convert('RGBA')",
+      "bg = Image.new('RGBA', img.size, (255, 255, 255, 255))",
+      "bg.paste(img, (0, 0), img)",
+      "with open(sys.argv[2], 'wb') as f: f.write(bg.tobytes())",
+      "print(json.dumps({'w': img.width, 'h': img.height}))"
+    ].join("\n");
+    fs.writeFileSync(tmpPy, pyCode, "utf-8");
+    try {
+      const out = execFileSync("python", [tmpPy, path.resolve(imgPath), tmpRaw], { encoding: "utf-8" });
+      const { w, h } = JSON.parse(out.trim().split("\n").pop());
+      const buf = fs.readFileSync(tmpRaw);
+      return { w, h, rgba: new Uint8ClampedArray(buf) };
+    } finally {
+      try { fs.unlinkSync(tmpPy); } catch {}
+      try { fs.unlinkSync(tmpRaw); } catch {}
+    }
+  }
 }
 
 // ---------- Segmentación ----------

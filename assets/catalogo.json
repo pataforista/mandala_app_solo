@@ -1,0 +1,92 @@
+[
+  {
+    "id": "animales",
+    "file": "assets/figuras-animales.json",
+    "name": "Animales del Bosque y Safari",
+    "count": 40,
+    "theme": "naturaleza",
+    "icon": "🦊",
+    "defaultUse": "figura",
+    "description": "40 animales de línea nítida (oso, ciervo, zorro, búho, koala, tigre, capibara, camello, rinoceronte, camaleón, etc.) listos para mandalas con figura rellena o medallón."
+  },
+  {
+    "id": "marinas",
+    "file": "assets/figuras-marinas.json",
+    "name": "Criaturas y Arrecifes del Océano",
+    "count": 64,
+    "theme": "oceano",
+    "icon": "🌊",
+    "defaultUse": "figura",
+    "description": "48 criaturas marinas (delfín, pulpo, ballenas, tiburones, mantarraya, tortuga, caballito, etc.) + 16 corales y fondos submarinos."
+  },
+  {
+    "id": "espacio",
+    "file": "assets/figuras-espacio.json",
+    "name": "Exploración Espacial y Cosmos",
+    "count": 48,
+    "theme": "espacio",
+    "icon": "🚀",
+    "defaultUse": "figura",
+    "description": "32 iconos espaciales (planetas, astronautas, naves, telescopios, satélites, rovers) + 16 fenómenos cósmicos y galaxias de fondo."
+  },
+  {
+    "id": "misticas",
+    "file": "assets/figuras-misticas.json",
+    "name": "Místico, Tarot y Alquimia",
+    "count": 48,
+    "theme": "mistico",
+    "icon": "🔮",
+    "defaultUse": "figura",
+    "description": "48 símbolos esotéricos y arcanos (árbol de la vida, tarot, unicornio, ojos sagrados, alquimia, runas, pentáculos, lunas)."
+  },
+  {
+    "id": "mitologia",
+    "file": "assets/figuras-mitologia.json",
+    "name": "Criaturas y Leyendas Mitológicas",
+    "count": 64,
+    "theme": "mitologia",
+    "icon": "🐉",
+    "defaultUse": "figura",
+    "description": "64 monstruos y seres de leyenda (grifo, hidra, minotauro, fénix, pegaso, medusa, esfinge, cíclope, wendigo, etc.)."
+  },
+  {
+    "id": "dinosaurios",
+    "file": "assets/figuras-dinosaurios.json",
+    "name": "Dinosaurios y Prehistoria",
+    "count": 32,
+    "theme": "prehistorico",
+    "icon": "🦕",
+    "defaultUse": "anillos",
+    "description": "26 dinosaurios y 6 elementos prehistóricos. Ideales para coronas de anillos y medallón."
+  },
+  {
+    "id": "zentangle",
+    "file": "assets/figuras-zentangle.json",
+    "name": "Animales Zentangle & Místicos",
+    "count": 41,
+    "theme": "naturaleza",
+    "icon": "✨",
+    "defaultUse": "anillos",
+    "description": "41 animales y siluetas con textura zentangle para colorear en coronas y medallones."
+  },
+  {
+    "id": "naturaleza",
+    "file": "assets/adornos-naturaleza.json",
+    "name": "Adornos de Naturaleza",
+    "count": 104,
+    "theme": "naturaleza",
+    "icon": "🌿",
+    "defaultUse": "extra",
+    "description": "104 hojas, flores, setas, piñas, bellotas y ramas para enriquecer los fondos de páginas para adultos y botánica."
+  },
+  {
+    "id": "infantiles",
+    "file": "assets/adornos-infantiles.json",
+    "name": "Adornos Infantiles",
+    "count": 78,
+    "theme": "infantil",
+    "icon": "🎈",
+    "defaultUse": "extra",
+    "description": "78 motivos divertidos y sencillos para decorar fondos en libros para niños."
+  }
+]

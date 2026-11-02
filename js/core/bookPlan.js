@@ -78,6 +78,33 @@ export const BOOK_THEMES = {
     scatterTheme: "bosque",
     motifs: ["leaf", "mushroom", "tree", "acorn", "fern"],
   },
+  // Tema espacio: estrellas, planetas, galaxias, astronautas
+  espacio: {
+    name: "Espacio",
+    description: "Mandalas espaciales: planetas, estrellas, galaxias, astronautas, naves",
+    styles: ["geometric", "islamico", "yantra"],
+    backgrounds: ["sol", "mosaico"],
+    scatterTheme: "espacio",
+    motifs: ["star", "planet", "rocket", "astronaut", "comet"],
+  },
+  // Tema místico y magia: tarot, alquimia, astros, símbolos sagrados
+  mistico: {
+    name: "Místico y Tarot",
+    description: "Mandalas esotéricos: tarot, alquimia, lunas, sol radiante, geometría sagrada",
+    styles: ["islamico", "yantra", "celtico", "geometric"],
+    backgrounds: ["sol", "mosaico", "flor_vida"],
+    scatterTheme: "mistico",
+    motifs: ["moon", "sun", "star", "crystal", "eye"],
+  },
+  // Tema mitología y leyendas: bestias míticas, monstruos clásicos, leyendas
+  mitologia: {
+    name: "Mitología y Leyendas",
+    description: "Mandalas de criaturas mitológicas: dragones, grifos, pegasos, fénix, leyendas",
+    styles: ["celtico", "geometric", "yantra", "islamico"],
+    backgrounds: ["escamas", "sol", "mosaico"],
+    scatterTheme: "mitologia",
+    motifs: ["dragon", "wing", "feather", "claw", "fire"],
+  },
 };
 
 // Perfiles de producto: fijan estilo, fondo, trazo y extras para un público concreto.

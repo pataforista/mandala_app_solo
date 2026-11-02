@@ -50,17 +50,29 @@ export function bookLayout({ mandalas, blankBack = true, titlePage = true, copyr
   // Si sólo hay copyright (sin título), el primer mandala debe caer en página impar
   if (!titlePage && copyrightPage && blankBack) pages.push({ kind: "blank" });
   // Página "Este libro pertenece a" (después de título/derechos, antes del contenido)
-  if (belongsPage) pages.push({ kind: "belongs" });
+  if (belongsPage) {
+    pages.push({ kind: "belongs" });
+    if (blankBack) pages.push({ kind: "blank" });
+  }
   // Página de bienvenida/introducción (antes del primer mandala)
-  if (welcomePage) pages.push({ kind: "welcome" });
+  if (welcomePage) {
+    pages.push({ kind: "welcome" });
+    if (blankBack) pages.push({ kind: "blank" });
+  }
   // Página de frase (afirmación o cita con letras decoradas)
-  if (quotePage) pages.push({ kind: "quote" });
+  if (quotePage) {
+    pages.push({ kind: "quote" });
+    if (blankBack) pages.push({ kind: "blank" });
+  }
   for (let i = 0; i < mandalas; i++) {
     pages.push({ kind: "mandala", index: i });
     if (blankBack || keep.has(i)) pages.push({ kind: "blank" });
   }
   // Página de reseña/invitación al final (antes de la página de relleno)
-  if (reviewPage) pages.push({ kind: "review" });
+  if (reviewPage) {
+    pages.push({ kind: "review" });
+    if (blankBack) pages.push({ kind: "blank" });
+  }
   // pad = false: sin la página de relleno, para saber si el total natural es impar
   if (pad && pages.length % 2) pages.push({ kind: "blank" });
   return pages;
@@ -81,4 +93,42 @@ export function kdpChecklist({ pages, marginMm, dpi = 300, consecutiveBlanks = 1
   add(dpi >= KDP_MIN_DPI, "error", `Resolución ${dpi} DPI (mínimo ${KDP_MIN_DPI}).`);
   add(consecutiveBlanks <= 2, "warn", "Como máximo 2 páginas en blanco seguidas en el cuerpo del libro.");
   return out;
+}
+
+/**
+ * Dimensiones exactas de la portada completa para Canva o Photoshop según KDP.
+ * pages: total de páginas del libro (número par)
+ * trimWidthMm, trimHeightMm: tamaño de corte del libro (ej. 215.9 x 279.4 mm para 8.5x11 in)
+ * paperType: "white" (0.002252 in/pág) o "cream" (0.0025 in/pág)
+ */
+export function kdpCoverDimensions({ pages, trimWidthMm, trimHeightMm, paperType = "white" }) {
+  const bleedIn = 0.125;
+  const spineMultiplierIn = paperType === "cream" ? 0.0025 : 0.002252;
+  const spineIn = pages * spineMultiplierIn;
+  const trimWidthIn = trimWidthMm / IN;
+  const trimHeightIn = trimHeightMm / IN;
+
+  const totalWidthIn = 2 * trimWidthIn + spineIn + 2 * bleedIn;
+  const totalHeightIn = trimHeightIn + 2 * bleedIn;
+
+  const spineMm = spineIn * IN;
+  const totalWidthMm = totalWidthIn * IN;
+  const totalHeightMm = totalHeightIn * IN;
+
+  const spineTextAllowed = pages >= 80;
+
+  return {
+    pages,
+    spineIn,
+    spineMm,
+    totalWidthIn,
+    totalHeightIn,
+    totalWidthMm,
+    totalHeightMm,
+    bleedIn,
+    bleedMm: bleedIn * IN,
+    spineTextAllowed,
+    widthPx300: Math.round(totalWidthIn * 300),
+    heightPx300: Math.round(totalHeightIn * 300),
+  };
 }

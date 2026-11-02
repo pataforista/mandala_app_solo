@@ -326,8 +326,10 @@ export function composePage(doc, opts, drawMandala) {
       // Trama de página completa: un patrón continuo cubre toda la página sin centro focal.
       // Usa los PATTERN_THEMES (escamas, flor_vida, sol, ondas, mosaico) para crear una
       // textura uniforme tipo papel tapiz. Sin mandala central, solo el patrón.
-      const patternKind = PATTERN_THEMES[Math.floor(rng() * PATTERN_THEMES.length)];
-      fillPattern = { kind: patternKind, cx: acx, cy: acy, halo: Math.max(aw, ah), variant: rng() };
+      const patternKind = opts.background && PATTERN_THEMES.includes(opts.background)
+        ? opts.background
+        : PATTERN_THEMES[Math.floor(rng() * PATTERN_THEMES.length)];
+      fillPattern = { kind: patternKind, cx: acx, cy: acy, halo: 0, variant: rng() };
       clip = true;
       break;
     }
@@ -817,8 +819,10 @@ function drawPattern({ kind, cx, cy, halo, variant = 0.5, A, gap, stroke, mainW,
   const p = pb.toPath({ stroke, strokeWidthMm: detailW, fill: "none" });
   if (p) out.push(p);
   // Halo: tapa la trama alrededor del mandala y cierra sus celdas
-  const hc = new PathBuilder(); circle(hc, cx, cy, halo);
-  const hp = hc.toPath({ stroke, strokeWidthMm: mainW, fill: "#fff" });
-  if (hp) out.push(hp);
+  if (halo > 0) {
+    const hc = new PathBuilder(); circle(hc, cx, cy, halo);
+    const hp = hc.toPath({ stroke, strokeWidthMm: mainW, fill: "#fff" });
+    if (hp) out.push(hp);
+  }
   return out;
 }

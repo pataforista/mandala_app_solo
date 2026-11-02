@@ -292,11 +292,7 @@ export function measureSvg(svg, { petals = null, center = null } = {}) {
     const gridSize = 5;
     const cellCounts = Array(gridSize * gridSize).fill(0);
     const cellSize = (maxR * 2) / gridSize;
-    for (const c of cells) {
-      // Usar el centroide de la celda (aproximado por bbox)
-      // Como no tenemos el centroide exacto, usamos el centro del bbox
-      // Esto es una aproximación; para más precisión habría que calcular el centroide real
-    }
+
     // Simplificación: contar celdas por cuadrante de la rejilla
     for (const el of els) for (const s of el.subs) if (s.closed && s.pts.length >= 3) {
       const cx = s.pts.reduce((sum, p) => sum + p[0], 0) / s.pts.length;

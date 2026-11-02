@@ -357,7 +357,7 @@
       <sl-tab-group id="sideTabs" no-scroll-controls>
         <sl-tab slot="nav" panel="disenar"><sl-icon name="brush" style="margin-right:6px;"></sl-icon>Diseñar</sl-tab>
         <sl-tab slot="nav" panel="libro"><sl-icon name="book" style="margin-right:6px;"></sl-icon>Libro KDP</sl-tab>
-        <sl-tab slot="nav" panel="imagenes"><sl-icon name="image" style="margin-right:6px;"></sl-icon>Imágenes</sl-tab>
+        <sl-tab slot="nav" panel="imagenes"><sl-icon name="image" style="margin-right:6px;"></sl-icon>Imágenes <sl-badge id="figuresCountBadge" variant="primary" pill style="display:none; margin-left:6px; font-size:0.65rem;">0</sl-badge></sl-tab>
 
         <!-- ===== Diseñar ===== -->
         <sl-tab-panel name="disenar">
@@ -543,6 +543,22 @@
               márgenes, páginas pares y textos se ajustan solos a las reglas de KDP.
             </p>
             <div class="section-title" style="margin:8px 0 0;"><sl-icon name="collection"></sl-icon> 1 · Contenido</div>
+            <sl-select id="bookProductProfile" label="Perfil de producto (público objetivo)" size="small" value="none">
+              <sl-option value="none">Personalizado (libre)</sl-option>
+              <sl-option value="mindful_patterns">Mindful Patterns · Adulto (Florales + Tramas continuas)</sl-option>
+              <sl-option value="large_print_easy">Large Print Easy · Seniors (Trazo 1.1 mm, celdas grandes)</sl-option>
+              <sl-option value="intricate_sacred">Intricate Sacred Geometry · Experto (Geom. sagrada, detalle alto)</sl-option>
+              <sl-option value="kids_mandalas">Kids Mandalas · Niños (Trazo grueso, amigable)</sl-option>
+            </sl-select>
+            <sl-select id="bookTheme" label="Tema visual del libro" size="small" value="none">
+              <sl-option value="none">Sin tema específico (Variado)</sl-option>
+              <sl-option value="oceano">Océano y Vida Marina (Olas, conchas, escamas)</sl-option>
+              <sl-option value="navidad">Navidad y Fiestas (Estrellas, copos, invierno)</sl-option>
+              <sl-option value="bosque">Bosque y Naturaleza (Hojas, viñas)</sl-option>
+              <sl-option value="espacio">Espacio y Cosmos (Planetas, galaxias, constelaciones)</sl-option>
+              <sl-option value="mistico">Místico, Tarot y Alquimia (Lunas, arcanos, geometría sagrada)</sl-option>
+              <sl-option value="mitologia">Mitología y Leyendas (Bestias míticas, escamas, fuego)</sl-option>
+            </sl-select>
             <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="50"></sl-input>
             <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="progresiva">
               <sl-option value="progresiva">Creciente: de fácil a difícil (recomendado)</sl-option>
@@ -615,6 +631,20 @@
             <p id="bookImagesInfo" class="hint"></p>
             <div class="section-title" style="margin:8px 0 0;"><sl-icon name="check2-circle"></sl-icon> 3 · Revisar y crear</div>
             <div id="bookSummary" class="hint"></div>
+            <div id="canvaCoverCard" style="margin:8px 0; padding:10px; border-radius:8px; background:var(--m3-surface-variant); border-left:4px solid var(--m3-primary); font-size:0.75rem; line-height:1.4;">
+              <div style="font-weight:600; display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:0.8rem;">
+                <sl-icon name="palette"></sl-icon> Medidas para tu portada en Canva
+              </div>
+              <div id="canvaCoverDetails">Calculando medidas según páginas...</div>
+              <div style="display:flex; gap:6px; margin-top:6px;">
+                <sl-button id="btnCopyCanva" size="small" variant="default" style="flex:1;">
+                  <sl-icon slot="prefix" name="clipboard"></sl-icon> Copiar medidas
+                </sl-button>
+                <sl-button id="btnDownloadCoverArt" size="small" variant="primary" outline style="flex:1;">
+                  <sl-icon slot="prefix" name="image"></sl-icon> PNG para portada
+                </sl-button>
+              </div>
+            </div>
             <sl-button id="reviewBook" variant="primary" outline size="medium" pill style="width: 100%;">
               <sl-icon slot="prefix" name="grid-3x3-gap"></sl-icon>
               Revisar páginas antes de crear
@@ -637,6 +667,74 @@
               Para lotes grandes, recortes y ajustes por imagen usa <a href="preprocesar.html" target="_blank">preprocesar.html</a>
               e importa aquí el paquete.
             </p>
+            <!-- Biblioteca de paquetes prediseñados -->
+            <sl-details summary="📚 Biblioteca de paquetes incluidos (1 clic)" open style="font-size:0.8rem; margin-bottom:8px;">
+              <div id="libraryContainer" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+                <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600;">🦊 Animales del Bosque y Safari <small style="color:var(--m3-on-surface-variant);">(40 figuras)</small></div>
+                    <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">Ideales para mandalas con figura rellena o medallón</div>
+                  </div>
+                  <sl-button size="small" variant="primary" class="btn-load-pkg" data-id="animales" data-use="figura">Cargar</sl-button>
+                </div>
+                <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600;">🌊 Criaturas y Arrecifes del Océano <small style="color:var(--m3-on-surface-variant);">(64 figuras)</small></div>
+                    <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">48 animales marinos + 16 corales y fondos de arrecife</div>
+                  </div>
+                  <sl-button size="small" variant="primary" class="btn-load-pkg" data-id="marinas" data-use="figura">Cargar</sl-button>
+                </div>
+                <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600;">🚀 Exploración Espacial y Cosmos <small style="color:var(--m3-on-surface-variant);">(48 figuras)</small></div>
+                    <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">32 planetas, naves y astronautas + 16 fenómenos cósmicos</div>
+                  </div>
+                  <sl-button size="small" variant="primary" class="btn-load-pkg" data-id="espacio" data-use="figura">Cargar</sl-button>
+                </div>
+                <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600;">🔮 Místico, Tarot y Alquimia <small style="color:var(--m3-on-surface-variant);">(48 figuras)</small></div>
+                    <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">Árbol de la vida, tarot, unicornio, alquimia, runas y lunas</div>
+                  </div>
+                  <sl-button size="small" variant="primary" class="btn-load-pkg" data-id="misticas" data-use="figura">Cargar</sl-button>
+                </div>
+                <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600;">🐉 Criaturas y Leyendas Mitológicas <small style="color:var(--m3-on-surface-variant);">(64 figuras)</small></div>
+                    <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">Grifos, hidras, minotauro, fénix, pegaso, medusa, esfinge y críptidos</div>
+                  </div>
+                  <sl-button size="small" variant="primary" class="btn-load-pkg" data-id="mitologia" data-use="figura">Cargar</sl-button>
+                </div>
+                <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600;">🦕 Dinosaurios y Prehistoria <small style="color:var(--m3-on-surface-variant);">(32 figuras)</small></div>
+                    <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">Para coronas de anillos y medallón</div>
+                  </div>
+                  <sl-button size="small" variant="neutral" class="btn-load-pkg" data-id="dinosaurios" data-use="anillos">Cargar</sl-button>
+                </div>
+                <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600;">✨ Animales Zentangle & Místicos <small style="color:var(--m3-on-surface-variant);">(41 figuras)</small></div>
+                    <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">Animales detallados para colorear</div>
+                  </div>
+                  <sl-button size="small" variant="neutral" class="btn-load-pkg" data-id="zentangle" data-use="anillos">Cargar</sl-button>
+                </div>
+                <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600;">🌿 Adornos de Naturaleza <small style="color:var(--m3-on-surface-variant);">(104 adornos)</small></div>
+                    <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">Hojas y flores para decorar fondos</div>
+                  </div>
+                  <sl-button size="small" variant="neutral" class="btn-load-pkg" data-id="naturaleza" data-use="extra">Cargar</sl-button>
+                </div>
+                <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-weight:600;">🎈 Adornos Infantiles <small style="color:var(--m3-on-surface-variant);">(78 adornos)</small></div>
+                    <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">Motivos alegres para libros de niños</div>
+                  </div>
+                  <sl-button size="small" variant="neutral" class="btn-load-pkg" data-id="infantiles" data-use="extra">Cargar</sl-button>
+                </div>
+              </div>
+            </sl-details>
             <input type="file" id="medallionUpload" accept="image/*" multiple style="display: none;">
             <input type="file" id="figurePackUpload" accept=".json,application/json" style="display: none;">
             <div style="display:flex; gap:8px;">
@@ -648,6 +746,12 @@
               </sl-button>
             </div>
             <div id="medallionList" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0;">
+              <sl-button id="btnSetAllFigura" size="small" variant="text" style="font-size:0.72rem; font-weight:600;">Usar todas en Figura</sl-button>
+              <sl-button id="btnSetAllAnillos" size="small" variant="text" style="font-size:0.72rem;">Usar todas en Anillos</sl-button>
+              <sl-button id="btnSetAllExtra" size="small" variant="text" style="font-size:0.72rem;">Usar todas en Fondo</sl-button>
+              <sl-button id="btnClearFigures" size="small" variant="text" style="font-size:0.72rem; color:var(--sl-color-danger-600);">Vaciar lista</sl-button>
+            </div>
             <div id="figureChecks" style="font-size:0.78rem;"></div>
             <details style="font-size:0.8rem;">
               <summary style="cursor:pointer;"><b>Requisitos y herramientas alternativas</b></summary>
