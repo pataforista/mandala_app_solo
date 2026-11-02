@@ -87,7 +87,7 @@ export function curationTargets(pages, { weak = WEAK_SCORE, threshold = TWIN_THR
  */
 export async function curateBook(pages, attempt, opts = {}) {
   const { tries = CURATE_TRIES, weak = WEAK_SCORE, good = GOOD_SCORE, threshold = TWIN_THRESHOLD, onStep = null,
-    polish = POLISH_SCORE, polishTries = POLISH_TRIES } = opts;
+    polish = POLISH_SCORE, polishTries = POLISH_TRIES, signal = null } = opts;
   const before = summarize(pages, { weak, threshold });
   const urgent = new Set(curationTargets(pages, { weak, threshold }));
   // Pulido: páginas sueltas (no de un grupo) entre «floja» y «buena»
@@ -101,12 +101,22 @@ export async function curateBook(pages, attempt, opts = {}) {
   // Un diseño (de una página o de un grupo entero): [{ i, score, fp }]
   const worst = (ms) => Math.min(...ms.map(m => value(m.score, m.fp, m.i)));
   for (let n = 0; n < targets.length; n++) {
+    if (signal?.aborted) {
+      const err = new Error("Curaduría cancelada");
+      err.name = "AbortError";
+      throw err;
+    }
     const i = targets[n];
     const group = pages[i].group != null && !pages[i].fixable;
     const current = membersOf(pages, i).map(k => ({ i: k, score: pages[k].score, fp: pages[k].fp }));
     let best = { v: worst(current), k: 0 };
     const maxK = urgent.has(i) ? tries : polishTries;
     for (let k = 1; k <= maxK && best.v < good; k++) {
+      if (signal?.aborted) {
+        const err = new Error("Curaduría cancelada");
+        err.name = "AbortError";
+        throw err;
+      }
       const r = await attempt(i, k);
       if (!r) continue;
       const ms = group ? r.members : [{ i, score: r.score, fp: r.fp }];

@@ -53,57 +53,100 @@ export const BOOK_THEMES = {
   },
   // Tema océano: olas, peces, conchas, estrellas de mar
   oceano: {
-    name: "Océano",
-    description: "Mandalas marinos: olas, peces, conchas, estrellas de mar, anclas",
-    styles: ["floral", "geometric"],
+    name: "Océano y Vida Marina",
+    description: "Mandalas marinos: olas, criaturas oceánicas, arrecifes y conchas",
+    packageId: "marinas",
+    styles: ["floral", "geometric", "sashiko"],
+    styleWeights: [2, 1.5, 2],
     backgrounds: ["ondas", "escamas"],
     scatterTheme: "oceano",
     motifs: ["wave", "shell", "fish", "starfish", "anchor"],
+    titlePreset: {
+      title: "Mándalas del Océano",
+      subtitle: "Criaturas Marinas, Arrecifes y Serenidad",
+      quote: "El mar, una vez que lanza su hechizo, mantiene a uno en su red de maravillas para siempre. — Jacques Cousteau"
+    }
   },
   // Tema navidad: estrellas, copos de nieve, árboles, regalos
   navidad: {
-    name: "Navidad",
-    description: "Mandalas navideños: estrellas, copos de nieve, árboles, regalos, campanas",
-    styles: ["floral", "geometric", "celtico"],
+    name: "Navidad y Fiestas",
+    description: "Mandalas invernales: estrellas radiantes, copos de nieve y símbolos festivos",
+    packageId: "zentangle",
+    styles: ["geometric", "celtico", "floral"],
+    styleWeights: [2.5, 1.5, 1],
     backgrounds: ["estrellas", "sol"],
     scatterTheme: "navidad",
     motifs: ["star", "snowflake", "tree", "gift", "bell"],
+    titlePreset: {
+      title: "Mándalas de Invierno y Navidad",
+      subtitle: "Diseños Festivos de Copos de Nieve, Estrellas y Magia Invernal",
+      quote: "La paz y la serenidad se hacen presentes en cada pequeño destello invernal."
+    }
   },
   // Tema bosque: hojas, hongos, árboles, animales del bosque
   bosque: {
-    name: "Bosque",
-    description: "Mandalas del bosque: hojas, hongos, árboles, ardillas, búhos",
+    name: "Bosque y Vida Silvestre",
+    description: "Mandalas del bosque: animales de safari y bosque, hojas botánicas y naturaleza",
+    packageId: "animales",
+    secondaryPackageId: "naturaleza",
     styles: ["floral", "celtico", "sashiko"],
+    styleWeights: [3, 1, 1],
     backgrounds: ["hojas", "vinas"],
     scatterTheme: "bosque",
     motifs: ["leaf", "mushroom", "tree", "acorn", "fern"],
+    titlePreset: {
+      title: "Mándalas del Bosque Encantado",
+      subtitle: "Fauna Silvestre, Hojas Botánicas y Paz Natural",
+      quote: "En cada paseo por la naturaleza uno recibe mucho más de lo que busca. — John Muir"
+    }
   },
   // Tema espacio: estrellas, planetas, galaxias, astronautas
   espacio: {
-    name: "Espacio",
-    description: "Mandalas espaciales: planetas, estrellas, galaxias, astronautas, naves",
-    styles: ["geometric", "islamico", "yantra"],
+    name: "Espacio y Cosmos",
+    description: "Mandalas cósmicos: planetas, estrellas, galaxias, astronautas, naves",
+    packageId: "espacio",
+    styles: ["geometric", "yantra", "islamico"],
+    styleWeights: [2.5, 2, 1.5],
     backgrounds: ["sol", "mosaico"],
     scatterTheme: "espacio",
     motifs: ["star", "planet", "rocket", "astronaut", "comet"],
+    titlePreset: {
+      title: "Mándalas del Cosmos",
+      subtitle: "Viaje Geométrico a Través de las Estrellas y Galaxias",
+      quote: "El cosmos está dentro de nosotros. Estamos hechos de materia estelar. — Carl Sagan"
+    }
   },
   // Tema místico y magia: tarot, alquimia, astros, símbolos sagrados
   mistico: {
     name: "Místico y Tarot",
     description: "Mandalas esotéricos: tarot, alquimia, lunas, sol radiante, geometría sagrada",
-    styles: ["islamico", "yantra", "celtico", "geometric"],
-    backgrounds: ["sol", "mosaico", "flor_vida"],
+    packageId: "misticas",
+    styles: ["yantra", "islamico", "celtico", "geometric"],
+    styleWeights: [3, 2, 1.5, 1],
+    backgrounds: ["sol", "flor_vida", "mosaico"],
     scatterTheme: "mistico",
     motifs: ["moon", "sun", "star", "crystal", "eye"],
+    titlePreset: {
+      title: "Mándalas Místicos y Sagrados",
+      subtitle: "Símbolos Alquímicos, Tarot y Geometría Secreta",
+      quote: "Como es arriba, es abajo; como es adentro, es afuera. — Hermes Trismegisto"
+    }
   },
   // Tema mitología y leyendas: bestias míticas, monstruos clásicos, leyendas
   mitologia: {
     name: "Mitología y Leyendas",
     description: "Mandalas de criaturas mitológicas: dragones, grifos, pegasos, fénix, leyendas",
+    packageId: "mitologia",
     styles: ["celtico", "geometric", "yantra", "islamico"],
+    styleWeights: [2.5, 2, 1.5, 1],
     backgrounds: ["escamas", "sol", "mosaico"],
     scatterTheme: "mitologia",
     motifs: ["dragon", "wing", "feather", "claw", "fire"],
+    titlePreset: {
+      title: "Mándalas Mitológicos y Criaturas Legendarias",
+      subtitle: "Bestias Fantásticas, Dragones y Símbolos Ancestrales",
+      quote: "Los mitos son sueños públicos, los sueños son mitos privados. — Joseph Campbell"
+    }
   },
 };
 

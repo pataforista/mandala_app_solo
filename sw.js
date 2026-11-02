@@ -12,7 +12,8 @@ if (workbox) {
     { url: 'favicon.ico', revision: '1.0.1' },
     { url: 'assets/sekaiwo/SekaiwoRegular.ttf', revision: '1.0.1' },
     { url: 'assets/icons/icon-192.png', revision: '1.0.1' },
-    { url: 'assets/icons/icon-512.png', revision: '1.0.1' }
+    { url: 'assets/icons/icon-512.png', revision: '1.0.1' },
+    { url: 'assets/catalogo.json', revision: '1.0.0' }
   ]);
 
   // Cache CDN assets (Shoelace, jsPDF, Resvg, Web Fonts) with CacheFirst strategy
@@ -43,6 +44,24 @@ if (workbox) {
                    request.destination === 'image',
     new workbox.strategies.StaleWhileRevalidate({
       cacheName: 'static-resources',
+    })
+  );
+
+
+  // Precache perezoso de paquetes de figuras y adornos al primer uso
+  workbox.routing.registerRoute(
+    ({url}) => url.pathname.includes('/assets/') && url.pathname.endsWith('.json'),
+    new workbox.strategies.CacheFirst({
+      cacheName: 'figure-packages',
+      plugins: [
+        new workbox.expiration.ExpirationPlugin({
+          maxEntries: 30,
+          maxAgeSeconds: 90 * 24 * 60 * 60, // 90 días
+        }),
+        new workbox.cacheableResponse.CacheableResponsePlugin({
+          statuses: [0, 200],
+        }),
+      ],
     })
   );
 

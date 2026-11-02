@@ -538,6 +538,28 @@
         <!-- ===== Libro KDP ===== -->
         <sl-tab-panel name="libro">
           <div class="control-group">
+            <!-- Barra de gestión de proyectos -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:6px 10px; background:var(--m3-surface); border:1px solid var(--m3-outline); border-radius:8px;">
+              <div style="font-size:0.75rem; font-weight:600; display:flex; align-items:center; gap:6px;">
+                <sl-icon name="folder2-open" style="color:var(--m3-primary); font-size:1rem;"></sl-icon>
+                <span>Proyecto: <b id="currentProjectName">Sin guardar</b></span>
+              </div>
+              <div style="display:flex; gap:2px;">
+                <sl-tooltip content="Guardar proyecto en el navegador">
+                  <sl-icon-button id="btnSaveProject" name="save" label="Guardar"></sl-icon-button>
+                </sl-tooltip>
+                <sl-tooltip content="Mis proyectos guardados">
+                  <sl-icon-button id="btnOpenProjects" name="folder" label="Proyectos"></sl-icon-button>
+                </sl-tooltip>
+                <sl-tooltip content="Descargar archivo .json del proyecto">
+                  <sl-icon-button id="btnExportProject" name="download" label="Exportar"></sl-icon-button>
+                </sl-tooltip>
+                <sl-tooltip content="Abrir archivo .json de proyecto">
+                  <sl-icon-button id="btnImportProject" name="upload" label="Importar"></sl-icon-button>
+                </sl-tooltip>
+              </div>
+            </div>
+            <input type="file" id="projectFileInput" accept=".json,application/json" style="display:none;">
             <p class="hint">
               Interior completo para KDP (sin sangrado, B/N). Parte de la semilla y el nivel de «Diseñar»;
               márgenes, páginas pares y textos se ajustan solos a las reglas de KDP.
@@ -559,6 +581,12 @@
               <sl-option value="mistico">Místico, Tarot y Alquimia (Lunas, arcanos, geometría sagrada)</sl-option>
               <sl-option value="mitologia">Mitología y Leyendas (Bestias míticas, escamas, fuego)</sl-option>
             </sl-select>
+            <div id="themeActionBox" style="display:none; margin: 6px 0 10px; padding: 10px; border-radius: 8px; background: var(--m3-surface); border: 1px solid var(--sl-color-primary-300);">
+              <div id="themeDescText" style="font-size: 0.76rem; color: var(--m3-on-surface); margin-bottom: 6px; line-height: 1.35;"></div>
+              <sl-button id="btnApplyThemePackage" size="small" variant="primary" style="width: 100%;">
+                <sl-icon slot="prefix" name="stars"></sl-icon> Configurar libro con este tema (1 clic)
+              </sl-button>
+            </div>
             <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="50"></sl-input>
             <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="progresiva">
               <sl-option value="progresiva">Creciente: de fácil a difícil (recomendado)</sl-option>
@@ -840,12 +868,36 @@
     <sl-button slot="footer" id="reviewClose" variant="primary">Listo</sl-button>
   </sl-dialog>
 
+  <!-- Modal de Proyectos de Libro -->
+  <sl-dialog id="projectsDialog" label="Mis Proyectos de Libro" style="--width: 520px;">
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div style="display:flex; gap:8px;">
+        <sl-input id="newProjectNameInput" placeholder="Nombre para guardar este proyecto..." size="small" style="flex:1;"></sl-input>
+        <sl-button id="btnCreateNewProject" size="small" variant="primary">Guardar</sl-button>
+      </div>
+      <sl-divider style="margin: 4px 0;"></sl-divider>
+      <div style="font-size:0.75rem; font-weight:600; color:var(--m3-on-surface-variant);">Proyectos guardados en este navegador:</div>
+      <div id="projectsListContainer" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto; padding-right:4px;">
+        <!-- Se llena dinámicamente con proyectos -->
+      </div>
+    </div>
+    <sl-button slot="footer" variant="default" id="btnCloseProjectsDialog">Cerrar</sl-button>
+  </sl-dialog>
+
+  <!-- Modal de Confirmación Moderno -->
+  <sl-dialog id="confirmDialog" label="Confirmar acción" style="--width: 400px;">
+    <div id="confirmDialogMessage" style="font-size: 0.9rem; line-height: 1.5; color: var(--m3-on-surface); padding: 8px 0;"></div>
+    <sl-button slot="footer" variant="default" id="confirmDialogCancel">Cancelar</sl-button>
+    <sl-button slot="footer" variant="primary" id="confirmDialogOk">Aceptar</sl-button>
+  </sl-dialog>
+
   <!-- Progress Dialog for Exports -->
   <sl-dialog id="progressDialog" label="Exportando PDF..." no-header style="--width: 320px;">
     <div style="display: flex; flex-direction: column; gap: 16px; align-items: center; padding: 16px 0;">
       <sl-spinner style="font-size: 2.5rem; --track-width: 4px;"></sl-spinner>
       <div id="progressStatus" style="font-weight: 500; font-family: var(--app-font-body); text-align: center;">Procesando páginas...</div>
       <sl-progress-bar id="progressBar" value="0" style="width: 100%;"></sl-progress-bar>
+      <sl-button id="btnCancelProgress" variant="danger" outline size="small" style="margin-top: 4px;">Cancelar</sl-button>
     </div>
   </sl-dialog>
 

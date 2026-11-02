@@ -130,3 +130,28 @@ test("curateBook: las páginas naranja (60–69) se pulen con pocos intentos y s
   assert.equal(res.changes.get(0).composition, undefined);
   assert.equal(pages[0].score, 73);
 });
+
+test("curateBook: cancelable con AbortSignal previo", async () => {
+  const pages = [{ score: 40, fp: null, fixable: true }];
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    () => curateBook(pages, () => ({ score: 80 }), { signal: controller.signal }),
+    { name: "AbortError" }
+  );
+});
+
+test("curateBook: aborta inmediatamente a mitad de intentos", async () => {
+  const pages = [{ score: 40, fp: null, fixable: true }];
+  const controller = new AbortController();
+  let attempts = 0;
+  await assert.rejects(
+    () => curateBook(pages, async () => {
+      attempts++;
+      if (attempts === 2) controller.abort();
+      return { score: 50 };
+    }, { tries: 6, signal: controller.signal }),
+    { name: "AbortError" }
+  );
+  assert.equal(attempts, 2);
+});

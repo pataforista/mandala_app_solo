@@ -115,7 +115,6 @@ export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 
     saveBlob(blob, filename);
   } catch (error) {
     console.error("PNG download failed:", error);
-    alert("❌ Error: No se pudo descargar PNG.\n\nIntenta de nuevo o usa SVG como alternativa.");
     throw error;
   }
 }
@@ -162,7 +161,7 @@ export async function downloadBatchPdf(filename, states, generateFn, widthMm, he
       throw new Error("jsPDF no está cargado correctamente");
     }
 
-    const { onProgress = null, coverPage = null, pageNumbers = false } = options;
+    const { onProgress = null, coverPage = null, pageNumbers = false, signal = null } = options;
     const dpi = options.dpi ?? 300; // 150 DPI deja bordes dentados en impresión
 
     const { jsPDF } = window.jspdf;
@@ -543,7 +542,7 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
     preset, genOpts, title = "Mandalas para Colorear", subtitle = "", author = "",
     titlePage = true, copyrightPage = false, belongsPage = false, welcomePage = false, reviewPage = false,
     copyrightText = "", colorTest = false, language = "es", quotePage = false, quoteText = "",
-    blankBack = true, blackBack = false, keepBack = [], pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10,
+    blankBack = true, blackBack = false, keepBack = [], pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10, signal = null,
   } = opts;
   const t = BOOK_TEXTS[language] || BOOK_TEXTS.es;
 
@@ -582,6 +581,11 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
   };
 
   for (let p = 0; p < layout.length; p++) {
+    if (signal?.aborted) {
+      const err = new Error("Generación cancelada por el usuario");
+      err.name = "AbortError";
+      throw err;
+    }
     const page = layout[p];
     const pageNo = p + 1;
     let canvas;
@@ -758,7 +762,15 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
 
     if (p > 0) pdf.addPage([wMm, hMm]);
     if (canvas) pdf.addImage(await canvasToGrayPng(canvas), "PNG", 0, 0, wMm, hMm, undefined, "NONE");
-    if (onProgress) { onProgress(pageNo, total, label); await yieldUI(); }
+    if (onProgress) {
+      onProgress(pageNo, total, label);
+      await yieldUI();
+      if (signal?.aborted) {
+        const err = new Error("Generación cancelada por el usuario");
+        err.name = "AbortError";
+        throw err;
+      }
+    }
   }
 
   pdf.save(filename);

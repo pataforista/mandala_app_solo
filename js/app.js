@@ -19,7 +19,8 @@ import { escapeXml } from "./core/svgText.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
 import { fitOf } from "./generators/pageComposer.js";
-import { packFigures, unpackFigures } from "./core/figurePack.js";
+import { packFigures, unpackFigures, encodeCls, decodeCls } from "./core/figurePack.js";
+import { autoSaveProject, loadAutoSave, saveNamedProject, listProjects, loadProject, deleteProject, duplicateProject, serializeProject, deserializeProject } from "./core/projects.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
 import { pageFingerprint, similarPairs } from "./core/variety.js";
@@ -51,6 +52,8 @@ let currentImagePoints = [];
 // fig: { href, cls, w, h } }]. La activa es la que se ve en la vista previa.
 let userFigures = [];
 let activeFigure = 0;
+let currentProjectId = null;
+let currentProjectName = "Sin guardar";
 let listenersBound = false;
 
 const stage = document.getElementById("stage");
@@ -94,6 +97,18 @@ const imageAccordionItem = document.getElementById("imageAccordionItem");
 const imageSpinner = document.getElementById("imageSpinner");
 
 const progressDialog = document.getElementById("progressDialog");
+let activeExportAbortController = null;
+const btnCancelProgress = document.getElementById("btnCancelProgress");
+if (btnCancelProgress) {
+  btnCancelProgress.addEventListener("click", () => {
+    if (activeExportAbortController) {
+      activeExportAbortController.abort();
+      const ps = document.getElementById("progressStatus");
+      if (ps) ps.textContent = "Cancelando...";
+      btnCancelProgress.disabled = true;
+    }
+  });
+}
 const progressStatus = document.getElementById("progressStatus");
 const progressBar = document.getElementById("progressBar");
 
@@ -1559,9 +1574,14 @@ function bindUI() {
 
   const btnClearFigures = document.getElementById("btnClearFigures");
   if (btnClearFigures) {
-    btnClearFigures.addEventListener("click", () => {
+    btnClearFigures.addEventListener("click", async () => {
       if (!userFigures.length) return;
-      if (confirm(`¿Vaciar las ${userFigures.length} imágenes de la lista?`)) {
+      const ok = await showConfirm(`¿Vaciar las ${userFigures.length} imágenes de la lista?`, {
+        title: "Vaciar lista de imágenes",
+        confirmLabel: "Vaciar lista",
+        variant: "danger"
+      });
+      if (ok) {
         userFigures.length = 0;
         activeFigure = -1;
         useFigures();
@@ -1846,6 +1866,11 @@ function bindUI() {
       downloadPdfSidebar.disabled = true;
     }
 
+    activeExportAbortController = new AbortController();
+    if (btnCancelProgress) {
+      btnCancelProgress.disabled = false;
+      btnCancelProgress.style.display = "inline-block";
+    }
     if (progressDialog) {
       if (progressBar) progressBar.value = 0;
       if (progressStatus) progressStatus.textContent = "Iniciando descarga...";
@@ -1863,6 +1888,7 @@ function bindUI() {
         layout,
         quotes,
         {
+          signal: activeExportAbortController.signal,
           onProgress: (rendered, total, label) => {
             if (progressDialog && progressBar && progressStatus) {
               const percent = Math.round((rendered / total) * 100);
@@ -1874,9 +1900,14 @@ function bindUI() {
       );
       showToast("PDF descargado correctamente", "success", "file-earmark-pdf");
     } catch (error) {
-      console.error("PDF download error:", error);
-      showToast("Error al descargar PDF: " + (error.message || "Intenta de nuevo"), "danger", "x-circle");
+      if (error.name === "AbortError") {
+        showToast("Descarga de PDF cancelada.", "neutral", "slash-circle");
+      } else {
+        console.error("PDF download error:", error);
+        showToast("Error al descargar PDF: " + (error.message || "Intenta de nuevo"), "danger", "x-circle");
+      }
     } finally {
+      activeExportAbortController = null;
       if (downloadPdfSidebar) {
         downloadPdfSidebar.loading = false;
         downloadPdfSidebar.disabled = false;
@@ -1884,7 +1915,7 @@ function bindUI() {
       if (progressDialog) {
         setTimeout(() => {
           progressDialog.hide();
-        }, 500);
+        }, 400);
       }
     }
   };
@@ -1921,6 +1952,9 @@ function bindUI() {
   const bookLanguageEl = document.getElementById("bookLanguage");
   const bookProductProfileEl = document.getElementById("bookProductProfile");
   const bookThemeEl = document.getElementById("bookTheme");
+  const themeActionBox = document.getElementById("themeActionBox");
+  const themeDescText = document.getElementById("themeDescText");
+  const btnApplyThemePackage = document.getElementById("btnApplyThemePackage");
   const bookSummaryEl = document.getElementById("bookSummary");
 
   const bookCount = () => Math.min(120, Math.max(1, parseInt(bookPagesEl?.value, 10) || 1));
@@ -2068,7 +2102,7 @@ function bindUI() {
         btnCopyCanva.variant = "success";
         setTimeout(() => { btnCopyCanva.variant = "default"; }, 2000);
       }).catch(() => {
-        alert(text);
+        showToast("No se pudo copiar al portapapeles", "warning", "clipboard");
       });
     });
   }
@@ -2423,7 +2457,7 @@ function bindUI() {
   // mejor que no repita otra página. Los primeros intentos cambian el diseño; los últimos,
   // si hace falta, también el encuadre por uno más limpio de los permitidos.
   // measured: [{ score, fp }] por página (de la revisión o medidas aquí mismo).
-  const curateOverrides = async (book0, measured, { onStep } = {}) => {
+  const curateOverrides = async (book0, measured, { onStep, signal = null } = {}) => {
     const pages = measured.map((m, i) => ({ ...m, fixable: book0.plan[i].special?.group == null,
       // Secuencia que crece o mural: se rehace el grupo entero (misma semilla para todas sus páginas)
       group: book0.plan[i].special?.group ?? null, groupFixable: true }));
@@ -2450,7 +2484,7 @@ function bindUI() {
         if (start) currentOverrides().set(key, start); else currentOverrides().delete(key);
         await new Promise(r => setTimeout(r, 0)); // la ventana sigue respondiendo
       }
-    }, { tries: CURATE_TRIES, onStep }).then(res => {
+    }, { tries: CURATE_TRIES, onStep, signal }).then(res => {
       for (const [i, choice] of res.changes) { currentOverrides().set(book0.ovKey(i), choice); autoKeys.add(book0.ovKey(i)); }
       return res;
     });
@@ -2490,19 +2524,25 @@ function bindUI() {
 
   // Antes de crear el PDF sin pasar por la revisión: mide cada página y cura el libro.
   // Devuelve el resumen (o null si no hizo falta).
-  const ensureCurated = async (onProgress) => {
+  const ensureCurated = async (onProgress, signal = null) => {
     const book0 = buildBook();
     const sig = bookSignature(book0);
     if (!autoQuality() || curatedSigs.has(sig)) return null;
     const measured = [];
     for (let i = 0; i < book0.count; i++) {
+      if (signal?.aborted) {
+        const err = new Error("Curaduría cancelada");
+        err.name = "AbortError";
+        throw err;
+      }
       const { svg, opts } = pageSvg(book0, i);
       measured.push({ score: scorable(opts) ? scoreSvg(svg, opts).score : null, fp: fpOf(svg, opts) });
-      onProgress?.(i + 1, book0.count, "Revisando la calidad de cada página");
+      onProgress?.(i + 1, book0.count, "Revisando calidad de páginas");
       await new Promise(r => setTimeout(r, 0));
     }
     const res = await curateOverrides(book0, measured, {
       onStep: (n, tot) => onProgress?.(n, tot, "Rehaciendo páginas flojas o repetidas"),
+      signal,
     });
     curatedSigs.add(sig);
     updateReviewInfo();
@@ -2615,11 +2655,24 @@ function bindUI() {
   const downloadBook = async () => {
     const layoutOpts = bookLayoutOpts();
     const total = bookPageCount(layoutOpts);
-    if (total < 24 && !confirm(`El libro tendría ${total} páginas y KDP exige mínimo 24. ¿Crear de todos modos?`)) return;
+    if (total < 24) {
+      const ok = await showConfirm(`El libro tendría ${total} páginas y KDP exige un mínimo de 24. ¿Crear de todos modos?`, {
+        title: "Aviso de KDP (páginas mínimas)",
+        confirmLabel: "Crear de todos modos",
+        variant: "warning"
+      });
+      if (!ok) return;
+    }
     const marginMm = bookMargin(total);
 
     bookBtn.loading = true;
     bookBtn.disabled = true;
+    activeExportAbortController = new AbortController();
+    const signal = activeExportAbortController.signal;
+    if (btnCancelProgress) {
+      btnCancelProgress.disabled = false;
+      btnCancelProgress.style.display = "inline-block";
+    }
     if (progressDialog) {
       if (progressBar) progressBar.value = 0;
       if (progressStatus) progressStatus.textContent = "Creando libro...";
@@ -2629,14 +2682,14 @@ function bindUI() {
       if (progressBar && progressStatus) {
         const percent = Math.round((done / tot) * 100);
         progressBar.value = percent;
-        progressStatus.textContent = `${label} (${percent}%)`;
+        progressStatus.textContent = `Página ${done}/${tot}: ${label} (${percent}%)`;
       }
     };
     let curated = null;
     try {
       // Control de calidad automático: las páginas flojas o repetidas se rehacen antes
       // de dibujar el PDF (si ya se hizo en la revisión, no se repite)
-      curated = await ensureCurated(progress);
+      curated = await ensureCurated(progress, signal);
       const { count, baseSeed, makeOpts, sourceLog, generatorFn } = buildBook();
       const filename = `libro_${state.preset}_${count}mandalas_semilla${baseSeed}.pdf`;
       await downloadBookPdf(filename, generatorFn, count, {
@@ -2653,6 +2706,7 @@ function bindUI() {
         language: bookLanguageEl?.value || "es",
         quoteText: bookQuoteTextEl?.value || "",
         onProgress: progress,
+        signal,
       });
       // Registro de fuentes (CSV) junto al PDF, si el libro lleva imágenes del usuario
       if (sourceLog.some(r => r && r.source)) { // sólo si alguna imagen trae fuente anotada
@@ -2675,12 +2729,17 @@ function bindUI() {
         : "";
       showToast(`✅ Libro creado (${total} páginas). Listo para KDP.`, "success", "check-circle", 5000);
     } catch (error) {
-      console.error("Book PDF error:", error);
-      showToast("Error al crear el libro: " + (error.message || "Intenta de nuevo"), "danger", "x-circle");
+      if (error.name === "AbortError") {
+        showToast("Generación de libro cancelada.", "neutral", "slash-circle");
+      } else {
+        console.error("Book PDF error:", error);
+        showToast("Error al crear el libro: " + (error.message || "Intenta de nuevo"), "danger", "x-circle");
+      }
     } finally {
+      activeExportAbortController = null;
       bookBtn.loading = false;
       bookBtn.disabled = false;
-      if (progressDialog) setTimeout(() => progressDialog.hide(), 500);
+      if (progressDialog) setTimeout(() => progressDialog.hide(), 400);
     }
   };
 
@@ -2692,6 +2751,7 @@ function bindUI() {
     [bookTitleEl, bookSubtitleEl, bookAuthorEl, bookQuoteTextEl].forEach(el =>
       el && el.addEventListener("sl-input", saveBookSettings));
     restoreBookSettings();
+    updateThemeActionUI();
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
     // Mostrar/ocultar el input de texto cuando se marca el checkbox de página de frase
     if (bookQuotePageEl && bookQuoteTextEl) {
@@ -2706,7 +2766,329 @@ function bindUI() {
     shareBtn.addEventListener("click", shareBtnHandler);
   }
 
-  // Helper to detect if user is typing in any text control (including Shoelace web components)
+  // ===== GESTIÓN DE PROYECTOS DE LIBRO (IndexedDB) =====
+  const currentProjectNameEl = document.getElementById("currentProjectName");
+  const btnSaveProject = document.getElementById("btnSaveProject");
+  const btnOpenProjects = document.getElementById("btnOpenProjects");
+  const btnExportProject = document.getElementById("btnExportProject");
+  const btnImportProject = document.getElementById("btnImportProject");
+  const projectFileInput = document.getElementById("projectFileInput");
+  const projectsDialog = document.getElementById("projectsDialog");
+  const btnCloseProjectsDialog = document.getElementById("btnCloseProjectsDialog");
+  const newProjectNameInput = document.getElementById("newProjectNameInput");
+  const btnCreateNewProject = document.getElementById("btnCreateNewProject");
+  const projectsListContainer = document.getElementById("projectsListContainer");
+
+  function getProjectPayload() {
+    const figuresData = userFigures.map(m => ({
+      name: m.name,
+      use: m.use,
+      source: m.source,
+      rightsConfirmed: m.rightsConfirmed,
+      theme: m.fig?.theme || "",
+      w: m.fig?.w || 0,
+      h: m.fig?.h || 0,
+      srcLong: m.fig?.srcLong || 0,
+      href: m.fig?.href || "",
+      stampHref: m.fig?.stampHref || "",
+      cls: m.fig?.cls ? encodeCls(m.fig.cls) : ""
+    }));
+
+    return {
+      id: currentProjectId,
+      name: currentProjectName,
+      state: JSON.parse(JSON.stringify(state)),
+      bookSettings: {
+        title: bookTitleEl?.value || "",
+        subtitle: bookSubtitleEl?.value || "",
+        author: bookAuthorEl?.value || "",
+        pages: bookPagesEl?.value || 50,
+        difficulty: bookDifficultyEl?.value || "progresiva",
+        productProfile: bookProductProfileEl?.value || "none",
+        theme: bookThemeEl?.value || "none",
+        back: bookBackEl?.value || "blanco",
+        dpi: bookDpiEl?.value || "300",
+        language: bookLanguageEl?.value || "es",
+        titlePage: !!bookTitlePageEl?.checked,
+        copyright: !!bookCopyrightEl?.checked,
+        belongsPage: !!bookBelongsPageEl?.checked,
+        welcomePage: !!bookWelcomePageEl?.checked,
+        reviewPage: !!bookReviewPageEl?.checked,
+        quotePage: !!bookQuotePageEl?.checked,
+        quoteText: bookQuoteTextEl?.value || "",
+        colorTest: !!bookColorTestEl?.checked,
+        pageNumbers: !!bookPageNumbersEl?.checked,
+        growth: bookGrowthEl?.value || "0",
+        mystery: bookMysteryEl?.value || "0",
+        nature: !!bookNatureEl?.checked,
+        mural: bookMuralEl?.value || "0",
+        vary: !!bookVaryEl?.checked,
+        chapters: !!bookChaptersEl?.checked,
+      },
+      userFigures: figuresData,
+      activeFigure,
+      bookOverrides: Array.from(bookOverrides.entries()),
+    };
+  }
+
+  let autoSaveTimer = null;
+  function triggerAutoSave() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(async () => {
+      try {
+        await autoSaveProject(getProjectPayload());
+      } catch (e) {
+        console.warn("Autosave notice:", e);
+      }
+    }, 1000);
+  }
+
+  async function applyProjectPayload(data, projName = null) {
+    if (!data) return;
+    if (data.state) {
+      Object.assign(state, data.state);
+      updateFormFromState();
+    }
+    if (data.bookSettings) {
+      const bs = data.bookSettings;
+      if (bs.title !== undefined && bookTitleEl) bookTitleEl.value = bs.title;
+      if (bs.subtitle !== undefined && bookSubtitleEl) bookSubtitleEl.value = bs.subtitle;
+      if (bs.author !== undefined && bookAuthorEl) bookAuthorEl.value = bs.author;
+      if (bs.pages !== undefined && bookPagesEl) bookPagesEl.value = bs.pages;
+      if (bs.difficulty !== undefined && bookDifficultyEl) bookDifficultyEl.value = bs.difficulty;
+      if (bs.productProfile !== undefined && bookProductProfileEl) bookProductProfileEl.value = bs.productProfile;
+      if (bs.theme !== undefined && bookThemeEl) bookThemeEl.value = bs.theme;
+      if (bs.back !== undefined && bookBackEl) bookBackEl.value = bs.back;
+      if (bs.dpi !== undefined && bookDpiEl) bookDpiEl.value = bs.dpi;
+      if (bs.language !== undefined && bookLanguageEl) bookLanguageEl.value = bs.language;
+      if (bs.titlePage !== undefined && bookTitlePageEl) bookTitlePageEl.checked = bs.titlePage;
+      if (bs.copyright !== undefined && bookCopyrightEl) bookCopyrightEl.checked = bs.copyright;
+      if (bs.belongsPage !== undefined && bookBelongsPageEl) bookBelongsPageEl.checked = bs.belongsPage;
+      if (bs.welcomePage !== undefined && bookWelcomePageEl) bookWelcomePageEl.checked = bs.welcomePage;
+      if (bs.reviewPage !== undefined && bookReviewPageEl) bookReviewPageEl.checked = bs.reviewPage;
+      if (bs.quotePage !== undefined && bookQuotePageEl) {
+        bookQuotePageEl.checked = bs.quotePage;
+        if (bookQuoteTextEl) bookQuoteTextEl.style.display = bs.quotePage ? "inline-block" : "none";
+      }
+      if (bs.quoteText !== undefined && bookQuoteTextEl) bookQuoteTextEl.value = bs.quoteText;
+      if (bs.colorTest !== undefined && bookColorTestEl) bookColorTestEl.checked = bs.colorTest;
+      if (bs.pageNumbers !== undefined && bookPageNumbersEl) bookPageNumbersEl.checked = bs.pageNumbers;
+      if (bs.growth !== undefined && bookGrowthEl) bookGrowthEl.value = bs.growth;
+      if (bs.mystery !== undefined && bookMysteryEl) bookMysteryEl.value = bs.mystery;
+      if (bs.nature !== undefined && bookNatureEl) bookNatureEl.checked = bs.nature;
+      if (bs.mural !== undefined && bookMuralEl) bookMuralEl.value = bs.mural;
+      if (bs.vary !== undefined && bookVaryEl) bookVaryEl.checked = bs.vary;
+      if (bs.chapters !== undefined && bookChaptersEl) bookChaptersEl.checked = bs.chapters;
+      saveBookSettings();
+    }
+    if (Array.isArray(data.userFigures) && data.userFigures.length > 0) {
+      userFigures.length = 0;
+      for (const f of data.userFigures) {
+        let cls = null;
+        if (f.cls && f.w && f.h) {
+          try { cls = decodeCls(f.cls, f.w * f.h); } catch(e){}
+        }
+        userFigures.push({
+          name: f.name,
+          img: null,
+          use: f.use || "ninguno",
+          source: f.source || "",
+          rightsConfirmed: f.rightsConfirmed ?? true,
+          fig: {
+            href: f.href,
+            stampHref: f.stampHref || f.href,
+            cls: cls || new Uint8Array((f.w || 100) * (f.h || 100)),
+            w: f.w || 100,
+            h: f.h || 100,
+            srcLong: f.srcLong,
+            theme: f.theme || ""
+          }
+        });
+      }
+      activeFigure = typeof data.activeFigure === "number" ? data.activeFigure : 0;
+      useFigures();
+    }
+    if (Array.isArray(data.bookOverrides)) {
+      bookOverrides = new Map(data.bookOverrides);
+      updateReviewInfo();
+    }
+    currentProjectId = data.id || null;
+    currentProjectName = projName || data.name || (data.bookSettings?.title) || "Sin guardar";
+    if (currentProjectNameEl) currentProjectNameEl.textContent = currentProjectName;
+    updateImmediate();
+    updateBookSummary();
+  }
+
+  async function renderProjectsList() {
+    if (!projectsListContainer) return;
+    projectsListContainer.innerHTML = "<div style='text-align:center; padding:12px; color:var(--m3-on-surface-variant);'>Cargando proyectos...</div>";
+    try {
+      const list = await listProjects();
+      if (!list.length) {
+        projectsListContainer.innerHTML = "<div style='text-align:center; padding:16px; color:var(--m3-on-surface-variant); font-size:0.8rem;'>No hay proyectos guardados todavía. Usa el botón de arriba para guardar el libro actual.</div>";
+        return;
+      }
+      projectsListContainer.innerHTML = "";
+      for (const item of list) {
+        const p = item.project || {};
+        const bs = p.bookSettings || {};
+        const card = document.createElement("div");
+        card.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border:1px solid var(--m3-outline); border-radius:8px; background:var(--m3-surface);";
+        const dateStr = new Date(item.updatedAt || Date.now()).toLocaleDateString();
+        card.innerHTML = `
+          <div style="flex:1; min-width:0; margin-right:8px;">
+            <div style="font-weight:600; font-size:0.82rem; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${item.name || "Sin título"}</div>
+            <div style="font-size:0.7rem; color:var(--m3-on-surface-variant);">${bs.pages || 50} págs · Tema: ${bs.theme || "Libre"} · ${dateStr}</div>
+          </div>
+          <div style="display:flex; gap:4px;">
+            <sl-button size="small" variant="primary" class="btn-load-proj" data-id="${item.id}">Abrir</sl-button>
+            <sl-icon-button name="files" label="Duplicar" class="btn-dup-proj" data-id="${item.id}"></sl-icon-button>
+            <sl-icon-button name="trash" label="Eliminar" class="btn-del-proj" data-id="${item.id}" style="color:var(--sl-color-danger-600);"></sl-icon-button>
+          </div>
+        `;
+        projectsListContainer.appendChild(card);
+      }
+
+      // Event delegation inside container
+      projectsListContainer.querySelectorAll(".btn-load-proj").forEach(b => {
+        b.addEventListener("click", async () => {
+          const id = b.dataset.id;
+          const p = await loadProject(id);
+          if (p) {
+            await applyProjectPayload(p, p.name);
+            projectsDialog.hide();
+            showToast(`✓ Proyecto «${p.name}» cargado`, "success", "folder2-open");
+          }
+        });
+      });
+
+      projectsListContainer.querySelectorAll(".btn-dup-proj").forEach(b => {
+        b.addEventListener("click", async () => {
+          const id = b.dataset.id;
+          await duplicateProject(id);
+          await renderProjectsList();
+          showToast("✓ Proyecto duplicado", "success", "files");
+        });
+      });
+
+      projectsListContainer.querySelectorAll(".btn-del-proj").forEach(b => {
+        b.addEventListener("click", async () => {
+          const id = b.dataset.id;
+          const ok = await showConfirm("¿Eliminar este proyecto guardado?", {
+            title: "Eliminar proyecto",
+            confirmLabel: "Eliminar",
+            variant: "danger"
+          });
+          if (ok) {
+            await deleteProject(id);
+            await renderProjectsList();
+            showToast("Proyecto eliminado", "neutral", "trash");
+          }
+        });
+      });
+    } catch (err) {
+      console.error("Error al listar proyectos:", err);
+      projectsListContainer.innerHTML = "<div style='color:var(--sl-color-danger-600);'>Error al cargar proyectos.</div>";
+    }
+  }
+
+  if (btnSaveProject) {
+    btnSaveProject.addEventListener("click", async () => {
+      const defaultName = (bookTitleEl?.value || "").trim() || currentProjectName || "Mi Libro de Mandalas";
+      const name = prompt("Nombre para guardar este proyecto:", defaultName);
+      if (name && name.trim()) {
+        try {
+          const entry = await saveNamedProject(name.trim(), getProjectPayload(), currentProjectId);
+          currentProjectId = entry.id;
+          currentProjectName = entry.name;
+          if (currentProjectNameEl) currentProjectNameEl.textContent = entry.name;
+          showToast(`✓ Proyecto «${entry.name}» guardado con éxito`, "success", "check-circle");
+        } catch (e) {
+          showToast("Error al guardar: " + e.message, "danger", "exclamation-triangle");
+        }
+      }
+    });
+  }
+
+  if (btnOpenProjects && projectsDialog) {
+    btnOpenProjects.addEventListener("click", () => {
+      renderProjectsList();
+      projectsDialog.show();
+    });
+  }
+
+  if (btnCloseProjectsDialog && projectsDialog) {
+    btnCloseProjectsDialog.addEventListener("click", () => projectsDialog.hide());
+  }
+
+  if (btnCreateNewProject && newProjectNameInput) {
+    btnCreateNewProject.addEventListener("click", async () => {
+      const name = (newProjectNameInput.value || "").trim() || (bookTitleEl?.value || "").trim() || "Nuevo Proyecto";
+      try {
+        const entry = await saveNamedProject(name, getProjectPayload());
+        currentProjectId = entry.id;
+        currentProjectName = entry.name;
+        if (currentProjectNameEl) currentProjectNameEl.textContent = entry.name;
+        newProjectNameInput.value = "";
+        await renderProjectsList();
+        showToast(`✓ Proyecto «${entry.name}» guardado`, "success", "check-circle");
+      } catch (e) {
+        showToast("Error: " + e.message, "danger", "exclamation-triangle");
+      }
+    });
+  }
+
+  if (btnExportProject) {
+    btnExportProject.addEventListener("click", () => {
+      const payload = getProjectPayload();
+      const jsonStr = serializeProject(payload);
+      const safeName = (currentProjectName || "libro").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      downloadTextFile(`${safeName}.mandala.json`, jsonStr);
+      showToast("✓ Archivo de proyecto descargado", "success", "download");
+    });
+  }
+
+  if (btnImportProject && projectFileInput) {
+    btnImportProject.addEventListener("click", () => projectFileInput.click());
+    projectFileInput.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const proj = deserializeProject(text);
+        await applyProjectPayload(proj, proj.name || file.name.replace(".mandala.json", ""));
+        showToast(`✓ Proyecto importado: «${currentProjectName}»`, "success", "upload");
+      } catch (err) {
+        showToast("Error al importar proyecto: " + err.message, "danger", "exclamation-triangle");
+      } finally {
+        projectFileInput.value = "";
+      }
+    });
+  }
+
+  // Activar autoguardado en eventos clave
+  document.addEventListener("figures-changed", triggerAutoSave);
+  window.addEventListener("beforeunload", () => {
+    try { autoSaveProject(getProjectPayload()); } catch(e){}
+  });
+
+  // Restaurar autoguardado al arrancar la app si no hay parámetros en la URL
+  (async () => {
+    try {
+      const saved = await loadAutoSave();
+      if (saved && !window.location.hash && !window.location.search) {
+        // Restaurar figuras y ajustes si existen
+        if (saved.userFigures && saved.userFigures.length > 0) {
+          await applyProjectPayload(saved, saved.name);
+          console.log("Restored previous session from autosave");
+        }
+      }
+    } catch(e) {
+      console.warn("Could not restore autosave:", e);
+    }
+  })();
+
+    // Helper to detect if user is typing in any text control (including Shoelace web components)
   function isTyping(e) {
     const target = e.target;
     if (!target) return false;
@@ -2764,10 +3146,10 @@ function bindUI() {
         }
         try {
           await saveToFavorites(state, thumbnail);
-          alert("¡Guardado en favoritos!");
+          showToast("¡Guardado en favoritos!", "success", "bookmark-check");
         } catch (e) {
           console.error("No se pudo guardar el favorito:", e);
-          alert("No se pudo guardar en favoritos (¿sin conexión?).");
+          showToast("No se pudo guardar en favoritos", "danger", "x-circle");
         }
       };
       saveFavoriteQuick();

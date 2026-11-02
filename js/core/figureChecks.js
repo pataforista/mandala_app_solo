@@ -90,8 +90,8 @@ export function checkFigure(fig, use, meta = {}) {
 
   // 1. Resolución del original
   if (m.srcLong >= 800) add("ok", `Resolución suficiente (${m.srcLong} px).`);
-  else if (m.srcLong >= 350) add("warn", `Resolución baja (${m.srcLong} px): las líneas pueden verse irregulares.`, "Busca una versión más grande o amplíala.", TOOLS.upscale);
-  else add("error", `Resolución muy baja (${m.srcLong} px; mínimo 350, ideal 800+).`, "Amplíala antes de procesar.", TOOLS.upscale);
+  else if (m.srcLong >= 100) add("warn", `Resolución moderada (${m.srcLong} px): las líneas pueden verse suaves al ampliar.`, "Busca una versión más grande o amplíala.", TOOLS.upscale);
+  else add("error", `Resolución muy baja (${m.srcLong} px; mínimo 100, ideal 800+).`, "Amplíala antes de procesar.", TOOLS.upscale);
 
   // 2. Sin fondo
   if (m.boxFill <= 0.78) add("ok", "Fondo eliminado.");
@@ -104,15 +104,15 @@ export function checkFigure(fig, use, meta = {}) {
   else add("error", `${m.fragments} trazos sueltos: probablemente hay texto o ruido.`, "Recorta el texto y sube «Simplificar».", TOOLS.text);
 
   // 4. Pocos detalles (cuánto de la figura es línea)
-  const inkMax = use === "figura" ? 0.3 : 0.4;
+  const inkMax = use === "figura" ? 0.35 : (use === "extra" ? 0.55 : 0.45);
   if (m.inkFrac <= inkMax * 0.7) add("ok", "Nivel de detalle adecuado para colorear.");
-  else if (m.inkFrac <= inkMax) add("warn", `Bastante detalle (${Math.round(m.inkFrac * 100)} % de la figura es línea).`, "Sube «Simplificar».", TOOLS.detail);
+  else if (m.inkFrac <= (use === "extra" ? 0.78 : 0.70)) add("warn", `Bastante detalle (${Math.round(m.inkFrac * 100)} % de la figura es línea).`, "Sube «Simplificar».", TOOLS.detail);
   else add("error", `Demasiado detalle (${Math.round(m.inkFrac * 100)} % de la figura es línea).`, "Sube «Simplificar» o usa el tipo «Dibujo / grabado».", TOOLS.detail);
 
   // 5. Requisitos propios de cada uso
   if (use === "figura") {
-    if (m.insideFrac >= 0.3) add("ok", `Interior rellenable: ${Math.round(m.insideFrac * 100)} %.`);
-    else if (m.insideFrac >= 0.15) add("warn", `Poco interior cerrado (${Math.round(m.insideFrac * 100)} %): el relleno quedará escaso.`, "Prueba otro tipo de imagen, o úsala en «Anillos».", TOOLS.closed);
+    if (m.insideFrac >= 0.25) add("ok", `Interior rellenable: ${Math.round(m.insideFrac * 100)} %.`);
+    else if (m.insideFrac >= 0.04) add("warn", `Poco interior cerrado (${Math.round(m.insideFrac * 100)} %): el relleno quedará escaso.`, "Prueba otro tipo de imagen, o úsala en «Anillos».", TOOLS.closed);
     else add("error", `Casi sin regiones cerradas (${Math.round(m.insideFrac * 100)} %): no se puede rellenar.`, "Úsala en «Anillos» o «Medallón», o cierra los contornos.", TOOLS.closed);
   } else if (use === "anillos") {
     if (m.aspect >= 0.4 && m.aspect <= 1.6) add("ok", "Proporción adecuada para repetir en anillo.");
