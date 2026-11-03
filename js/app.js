@@ -3304,12 +3304,35 @@ function bindUI() {
     return false;
   }
 
+  // ¿La tecla va a un control? Espacio activa botones y casillas, y las flechas mueven
+  // deslizadores, pestañas, menús y listas: ahí no deben saltar los atajos (antes, Espacio
+  // sobre un botón generaba otro diseño en vez de pulsarlo).
+  const INTERACTIVE = /^(A|BUTTON|SELECT|SUMMARY|SL-[A-Z-]+)$/;
+  function onControl(e) {
+    const path = e.composedPath ? e.composedPath() : [e.target];
+    return path.some(el => {
+      if (!el || el === document || el === window || el === document.body || el === document.documentElement) return false;
+      const t = (el.tagName || "").toUpperCase();
+      if (el.id === "stage-container" || el.id === "stage") return false; // la vista previa sí usa atajos
+      return INTERACTIVE.test(t) || (el.getAttribute && (el.getAttribute("role") || el.getAttribute("tabindex") === "0"));
+    });
+  }
+
   // Keyboard shortcuts for rapid production
   window.addEventListener("keydown", (e) => {
     // Ignore if typing in an input
     if (isTyping(e)) return;
     // Ignorar atajos si hay algún diálogo modal abierto
     if (document.querySelector("sl-dialog[open]")) return;
+    // Deshacer/rehacer (los tooltips lo anunciaban pero no estaba implementado)
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); undoBtn?.onclick?.(); return; }
+      if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redoBtn?.onclick?.(); return; }
+    }
+    // Con Ctrl/Alt/Cmd la tecla es del navegador o del sistema; sobre un control, es del control
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    if (onControl(e)) return;
 
     const key = e.key.toLowerCase();
 
