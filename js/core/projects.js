@@ -10,11 +10,14 @@ const AUTOSAVE_ID = "_autosave";
 // Fallback en memoria si indexedDB no está disponible (ej. Node.js unit tests)
 const memStore = new Map();
 
+let dbPromise = null;
+
 function openDB() {
   if (typeof indexedDB === "undefined") {
     return Promise.resolve(null);
   }
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
@@ -23,8 +26,12 @@ function openDB() {
       }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error);
+    };
   });
+  return dbPromise;
 }
 
 function withStore(mode, fn) {

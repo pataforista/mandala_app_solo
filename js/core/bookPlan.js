@@ -208,12 +208,27 @@ const FILLED = new Set(["fondo", "constelacion", "esquinas", "medio"]);
 
 /** Tema de fondo equilibrado: el menos usado entre los posibles, distinto del anterior.
  *  Con patternOnly=true, usa solo tramas continuas (PATTERN_BACKGROUNDS), no confeti. */
-export function backgroundPicker(rng, { fillCentro = false, patternOnly = false } = {}) {
+export function backgroundPicker(rng, { fillCentro = false, patternOnly = false, backgrounds = null, useBackground = true } = {}) {
   const used = new Map();
   let last = null;
   return (composition, style = null) => {
+    if (useBackground === false) return null;
     const centro = composition === "centro" && fillCentro;
     if (!FILLED.has(composition) && !centro) return null;
+    if (Array.isArray(backgrounds) && backgrounds.length) {
+      const n = (b) => used.get(`${composition}|${b}`) || 0;
+      const min = Math.min(...backgrounds.map(n));
+      let least = backgrounds.filter(b => n(b) === min && b !== last);
+      if (!least.length) {
+        const pool = backgrounds.filter(b => b !== last);
+        const m2 = Math.min(...pool.map(n));
+        least = pool.length ? pool.filter(b => n(b) === m2) : backgrounds;
+      }
+      const pick = least[Math.floor(rng() * least.length)];
+      used.set(`${composition}|${pick}`, n(pick) + 1);
+      last = pick;
+      return pick;
+    }
     // Con patternOnly, usar solo tramas continuas (para perfiles de adulto)
     const basePool = patternOnly ? PATTERN_BACKGROUNDS :
       (composition === "fondo" || centro ? [...SCATTER_BACKGROUNDS, ...PATTERN_BACKGROUNDS] : SCATTER_BACKGROUNDS);
@@ -495,7 +510,12 @@ export function planBook(opts) {
   // Generador propio: añadir la silueta no cambia los sorteos de las demás dimensiones
   const nextSilhouette = silhouettePicker(mulberry32(((seed >>> 0) ^ 0x51A0E77E) >>> 0));
   const nextStructure = shuffleBag(mulberry32(((seed >>> 0) ^ 0x57A0C7E5) >>> 0), BOOK_STRUCTURES, STRUCTURE_WEIGHTS);
-  const nextBackground = backgroundPicker(mulberry32(((seed >>> 0) ^ 0xBAC6A0D5) >>> 0), { fillCentro: opts.fillCentro, patternOnly: opts.patternOnly });
+  const nextBackground = backgroundPicker(mulberry32(((seed >>> 0) ^ 0xBAC6A0D5) >>> 0), {
+    fillCentro: opts.fillCentro,
+    patternOnly: opts.patternOnly,
+    backgrounds: opts.backgrounds,
+    useBackground: opts.useBackground,
+  });
 
   // Páginas con imagen: espaciadas de forma uniforme (k + ½) · count / images
   const imageAt = new Map();

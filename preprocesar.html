@@ -99,6 +99,14 @@
     <div id="grid"></div>
   </main>
 
+  <dialog id="confirmModal" style="border:1px solid var(--line); border-radius:12px; background:var(--card); color:var(--ink); padding:20px; max-width:420px; box-shadow:0 12px 32px rgba(0,0,0,0.2);">
+    <p id="confirmModalMsg" style="margin:0 0 16px; line-height:1.45;"></p>
+    <div style="display:flex; justify-content:flex-end; gap:8px;">
+      <button id="confirmModalCancel">Cancelar</button>
+      <button id="confirmModalOk" class="primary">Exportar igual</button>
+    </div>
+  </dialog>
+
   <script type="module">
     import { loadImageFile, figureFromImage } from "./js/core/figureImport.js";
     import { packFigures } from "./js/core/figurePack.js";
@@ -316,10 +324,22 @@
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     };
-    $("exportPack").onclick = () => {
+    const askConfirm = (msg) => new Promise((resolve) => {
+      const dlg = $("confirmModal");
+      if (!dlg || typeof dlg.showModal !== "function") { resolve(true); return; }
+      $("confirmModalMsg").textContent = msg;
+      const done = (val) => { dlg.close(); resolve(val); };
+      $("confirmModalCancel").onclick = () => done(false);
+      $("confirmModalOk").onclick = () => done(true);
+      dlg.oncancel = () => done(false);
+      dlg.showModal();
+    });
+    $("exportPack").onclick = async () => {
       const pending = items.filter(it => it.fig && it.use !== "ninguno" && !it.ready);
-      if (pending.length && !confirm(`${pending.length} imagen(es) con uso elegido no están listas (marcadas en rojo). ` +
-        "Se exportan igual, pero la app no las pondrá en el libro hasta corregirlas. ¿Exportar?")) return;
+      if (pending.length) {
+        const ok = await askConfirm(`${pending.length} imagen(es) con uso elegido no están listas (marcadas en rojo). Se exportan igual, pero la app no las pondrá en el libro hasta corregirlas. ¿Exportar?`);
+        if (!ok) return;
+      }
       const figs = items.filter(it => it.fig).map(it => ({ name: it.name, use: it.use, source: it.source, rightsConfirmed: it.rightsConfirmed, ...it.fig }));
       save(new Blob([JSON.stringify(packFigures(figs))], { type: "application/json" }), "figuras.json");
       const ready = items.filter(it => it.ready).length;
