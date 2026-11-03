@@ -11,7 +11,7 @@ if (workbox) {
     { url: 'dataset_taoista.js', revision: '40430edc17' },
     { url: 'favicon.ico', revision: '82b6de504a' },
     { url: 'assets/sekaiwo/SekaiwoRegular.ttf', revision: '18b91dca8a' },
-    { url: 'assets/icons/icon-192.png', revision: '7554315dcc' },
+    { url: 'assets/icons/icon-192.png', revision: '40b39ab008' },
     { url: 'assets/icons/icon-512.png', revision: 'bbf769826f' },
     { url: 'assets/catalogo.json', revision: '51d5902a83' }
   ]);
