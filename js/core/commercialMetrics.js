@@ -332,3 +332,27 @@ export function commercialScore(m, opts = {}) {
   if (opts.minCellAreaMm2 !== undefined && opts.minCellAreaMm2 < 5) { score -= 10; issues.push(`celda mínima ${opts.minCellAreaMm2} mm² < 5 mm²`); }
   return { score: Math.max(0, Math.round(score)), issues };
 }
+
+/**
+ * Rectángulo que ocupa la tinta impresa (en mm), con el medio grosor de cada trazo y los
+ * recortes (clip-path) aplicados. Sirve para comprobar que nada invade los márgenes de KDP.
+ * Sólo mide <path>: los rótulos de texto se colocan aparte, con FOOTER_BASELINE_MM.
+ * Devuelve null si la página no tiene trazos.
+ */
+export function inkBounds(svg) {
+  const b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+  for (const el of elementsOf(svg)) {
+    const h = el.solid && !el.width ? 0 : el.width / 2;
+    for (const s of el.subs) for (const [x, y] of s.pts) {
+      let ax = x - h, bx = x + h, ay = y - h, by = y + h;
+      if (el.clip) {
+        if (bx < el.clip.x0 || ax > el.clip.x1 || by < el.clip.y0 || ay > el.clip.y1) continue;
+        ax = Math.max(ax, el.clip.x0); bx = Math.min(bx, el.clip.x1);
+        ay = Math.max(ay, el.clip.y0); by = Math.min(by, el.clip.y1);
+      }
+      if (ax < b.x0) b.x0 = ax; if (bx > b.x1) b.x1 = bx;
+      if (ay < b.y0) b.y0 = ay; if (by > b.y1) b.y1 = by;
+    }
+  }
+  return Number.isFinite(b.x0) ? b : null;
+}

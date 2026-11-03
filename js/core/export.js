@@ -18,6 +18,7 @@ export const BOOK_TEXTS = {
     copyrightPrefix: "Copyright ©",
     copyrightRights: "Todos los derechos reservados.",
     copyrightNotice: "Ninguna parte de esta publicación puede reproducirse, almacenarse en un sistema de recuperación o transmitida en cualquier forma o por cualquier medio, sin el permiso previo por escrito del editor.",
+    defaultTitle: "Mandalas para Colorear",
     defaultQuote: "Respira y sonríe",
     colorTestTitle: "Prueba tus colores",
   },
@@ -30,6 +31,7 @@ export const BOOK_TEXTS = {
     copyrightPrefix: "Copyright ©",
     copyrightRights: "All rights reserved.",
     copyrightNotice: "No part of this publication may be reproduced, stored in a retrieval system, or transmitted in any form or by any means, without the prior written permission of the publisher.",
+    defaultTitle: "Mandala Coloring Book",
     defaultQuote: "Breathe and smile",
     colorTestTitle: "Color Test",
   },
@@ -539,12 +541,14 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
     throw new Error("jsPDF no está cargado correctamente");
   }
   const {
-    preset, genOpts, title = "Mandalas para Colorear", subtitle = "", author = "",
+    preset, genOpts, title: titleIn = "", subtitle = "", author = "",
     titlePage = true, copyrightPage = false, belongsPage = false, welcomePage = false, reviewPage = false,
     copyrightText = "", colorTest = false, language = "es", quotePage = false, quoteText = "",
     blankBack = true, blackBack = false, keepBack = [], pageNumbers = false, dpi = 300, onProgress = null, marginMm = 10, signal = null,
   } = opts;
   const t = BOOK_TEXTS[language] || BOOK_TEXTS.es;
+  // Sin título, el de serie en el idioma del libro (un libro en inglés no lleva título en español)
+  const title = String(titleIn || "").trim() || t.defaultTitle;
 
   const { wMm, hMm } = createDoc({ preset }).page;
   const { jsPDF } = window.jspdf;

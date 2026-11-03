@@ -525,7 +525,7 @@ test("mural: cada hoja muestra su rectángulo exacto del diseño y la guía rotu
   const sp = { type: "mural", cols: 2, rows: 2 };
   const tiles = [];
   for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) tiles.push(special({ ...sp, col, row }));
-  const { m, tw, th } = muralGeometry(tiles[0].page, 2, 2);
+  const { m, tw, th } = muralGeometry(tiles[0].page, 2, 2, BASE.strokeWidthMm);
   tiles.forEach((d, k) => {
     const svg = renderDocToSvgString(d);
     assert.doesNotMatch(svg, /NaN|Infinity|undefined/);

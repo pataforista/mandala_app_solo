@@ -89,9 +89,11 @@ export function composePage(doc, opts, drawMandala) {
     spacing = 0.3, outlineMode = false, complexity = 130,
   } = opts;
   const page = doc.page;
-  const m = Number.isFinite(page.marginMm) ? page.marginMm : 10;
-  const rng = mulberry32(((seed >>> 0) ^ 0x51ED270B) >>> 0);
   const mainW = Math.max(0.3, strokeWidthMm);
+  // Línea del marco desplazada medio trazo hacia dentro: así el borde exterior de la tinta
+  // queda justo en el margen (KDP no admite tinta en el medianil ni a < 6,35 mm del corte)
+  const m = (Number.isFinite(page.marginMm) ? page.marginMm : 10) + mainW / 2;
+  const rng = mulberry32(((seed >>> 0) ^ 0x51ED270B) >>> 0);
   const detailW = Math.max(0.3, strokeWidthMm * 0.7);
   const style = pageBorder ? frameStyle : "ninguno";
 
@@ -140,7 +142,9 @@ export function composePage(doc, opts, drawMandala) {
 
   // Área de contenido (y de recorte) dentro del marco
   const gap = 1.6 + spacing * 3;
-  const pad = style === "ninguno" ? 2 : inset + gap; // sin marco: holgura para las curvas de los motivos
+  // Sin marco: holgura para las curvas de los motivos. Nunca menor que gap, porque el
+  // recorte y la línea que cierra la trama se dibujan a «gap» por fuera del área útil
+  const pad = style === "ninguno" ? Math.max(2, gap) : inset + gap;
   const A = { x0: m + pad, y0: m + pad, x1: page.wMm - m - pad, y1: page.hMm - m - pad };
   const aw = A.x1 - A.x0, ah = A.y1 - A.y0;
   const acx = (A.x0 + A.x1) / 2, acy = (A.y0 + A.y1) / 2;

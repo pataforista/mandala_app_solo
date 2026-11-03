@@ -3,7 +3,9 @@
 // rasteriza antes de entrar al PDF, así que no hace falta incrustar fuentes para KDP.
 // Sin DOM: el ancho de línea se estima con el ancho medio de un carácter serif.
 const FONT = "Georgia, 'Times New Roman', serif";
-const CHAR_EM = 0.5; // ancho medio de un carácter en una serif, en em
+// Ancho medio de un carácter, en em. 0,5 cubre la serif más ancha medida (DejaVu Serif, la
+// sustituta de Georgia en Linux; Georgia ≈ 0,46, Times ≈ 0,40)
+export const CHAR_EM = 0.5;
 
 // Línea base de los rótulos del margen inferior. KDP sin sangrado exige que todo quede a
 // ≥ 6,35 mm del corte; con letra de 2,8 mm las descendentes bajan ~0,7 mm más.

@@ -8,8 +8,9 @@
 // el resultado es exacto y reproducible. Coordenadas de la figura: x a la derecha,
 // y hacia arriba, figura dentro de [-1, 1]².
 import { mulberry32 } from "../core/prng.js";
+import { pageTexts } from "../core/pageTexts.js";
 import { PathBuilder } from "../core/pathBuilder.js";
-import { svgText } from "../core/svgText.js";
+import { svgText, wrapLines } from "../core/svgText.js";
 
 const TAU = Math.PI * 2;
 
@@ -117,7 +118,8 @@ export function generateMysteryMandala(doc, opts) {
   const P = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
 
   if (pageBorder && !opts.radius) {
-    const pb = new PathBuilder(), x0 = m, y0 = m, x1 = page.wMm - m, y1 = page.hMm - m, rc = 4;
+    const h = mainW / 2; // borde exterior del trazo justo en el margen
+    const pb = new PathBuilder(), x0 = m + h, y0 = m + h, x1 = page.wMm - m - h, y1 = page.hMm - m - h, rc = 4;
     pb.moveTo(x0 + rc, y0).lineTo(x1 - rc, y0).quadTo(x1, y0, x1, y0 + rc).lineTo(x1, y1 - rc).quadTo(x1, y1, x1 - rc, y1)
       .lineTo(x0 + rc, y1).quadTo(x0, y1, x0, y1 - rc).lineTo(x0, y0 + rc).quadTo(x0, y0, x0 + rc, y0).close();
     emit(pb, mainW);
@@ -214,7 +216,9 @@ export function generateMysteryMandala(doc, opts) {
   }
 
   if (instructions && !opts.radius) {
-    out.push(svgText(page.wMm / 2, page.hMm - m - 5, "Punto (●): color oscuro · Raya (–): color claro. Aparecerá una figura escondida.", { size: 3.4, italic: true }));
+    // Cortada al ancho útil: en una línea no cabía en 6×9; si ocupa dos, sube la primera
+    const lines = wrapLines(pageTexts(opts.lang).mysteryHint, page.wMm - 2 * m - 10, 3.4);
+    lines.forEach((l, i) => out.push(svgText(page.wMm / 2, page.hMm - m - 5 - (lines.length - 1 - i) * 4.4, l, { size: 3.4, italic: true })));
   }
   doc.body.push(...out);
   if (doc.meta) doc.meta.mystery = { shape, marked: g.marked.size + (g.coreMarked ? 1 : 0) };
@@ -225,10 +229,10 @@ export function generateMysteryMandala(doc, opts) {
  * Página de soluciones: miniaturas resueltas de cada mandala misterioso del libro.
  * entries: [{ label, shape, seed, complexity }]
  */
-export function generateMysterySolutions(doc, { entries = [], stroke = "#000" } = {}) {
+export function generateMysterySolutions(doc, { entries = [], stroke = "#000", lang = "es" } = {}) {
   const page = doc.page;
   const m = Number.isFinite(page.marginMm) ? page.marginMm : 10;
-  doc.body.push(svgText(page.wMm / 2, m + 12, "Soluciones de los mandalas misteriosos", { size: 6, weight: "bold" }));
+  doc.body.push(svgText(page.wMm / 2, m + 12, pageTexts(lang).solutionsTitle, { size: 6, weight: "bold" }));
   if (!entries.length) return doc;
   const cols = entries.length <= 2 ? entries.length : entries.length <= 6 ? 2 : 3;
   const rows = Math.ceil(entries.length / cols);

@@ -5,6 +5,7 @@
 // la línea de corte: recortadas por ahí, las hojas se tocan borde con borde y el
 // dibujo continúa sin saltos. Una hoja guía muestra el mapa para armarlo.
 import { generateMandalaClassic } from "./mandalaClassic.js";
+import { pageTexts } from "../core/pageTexts.js";
 import { PathBuilder } from "../core/pathBuilder.js";
 import { svgText, wrapLines, FOOTER_BASELINE_MM } from "../core/svgText.js";
 
@@ -12,8 +13,10 @@ const COLS = "ABCDEFGH";
 const cache = new Map();
 
 /** Medidas del mural: hoja útil (tw × th) y mural completo (W × H), en mm. */
-export function muralGeometry(page, cols, rows) {
-  const m = Number.isFinite(page.marginMm) ? page.marginMm : 10;
+// strokeMm: grosor de la línea de corte; la hoja se mete medio trazo para que su borde
+// exterior quede en el margen y no en el medianil
+export function muralGeometry(page, cols, rows, strokeMm = 0) {
+  const m = (Number.isFinite(page.marginMm) ? page.marginMm : 10) + strokeMm / 2;
   const tw = page.wMm - 2 * m, th = page.hMm - 2 * m;
   return { m, tw, th, W: cols * tw, H: rows * th };
 }
@@ -45,10 +48,10 @@ function muralBody(opts, W, H) {
 export function generateMuralPage(doc, opts) {
   const { cols = 3, rows = 3, col = 0, row = 0, guide = false } = opts.mural || {};
   const page = doc.page;
-  const { m, tw, th, W, H } = muralGeometry(page, cols, rows);
-  const mural = muralBody(opts, W, H);
   const stroke = opts.stroke || "#000";
   const mainW = Math.max(0.3, opts.strokeWidthMm ?? 0.55);
+  const { m, tw, th, W, H } = muralGeometry(page, cols, rows, mainW);
+  const mural = muralBody(opts, W, H);
   const uid = `${(opts.seed >>> 0).toString(36)}-${doc.defs.length}`;
   // Ids del mural renombrados por hoja: varias hojas no comparten documento, pero la guía
   // y una hoja podrían convivir en una misma vista previa
@@ -56,7 +59,8 @@ export function generateMuralPage(doc, opts) {
   const body = mural.body.map(b => b.replace(/url\(#([^)]+)\)/g, `url(#$1-${uid})`));
   doc.defs.push(...defs);
 
-  if (guide) return muralGuide(doc, { cols, rows, m, tw, th, W, H, body, uid, stroke });
+  const T = pageTexts(opts.lang);
+  if (guide) return muralGuide(doc, { cols, rows, m, tw, th, W, H, body, uid, stroke, T });
 
   const id = `mural-clip-${uid}`;
   doc.defs.push(`<clipPath id="${id}"><rect x="${m}" y="${m}" width="${tw}" height="${th}" /></clipPath>`);
@@ -67,25 +71,20 @@ export function generateMuralPage(doc, opts) {
   doc.body.push(cut.toPath({ stroke, strokeWidthMm: mainW, linejoin: "miter", linecap: "butt" }));
   // Rótulo en el margen inferior izquierdo (el número de página va al centro)
   const y = page.hMm - FOOTER_BASELINE_MM;
-  doc.body.push(svgText(m, y, `Mural · hoja ${tileName(col, row)} (columna ${COLS[col]}, fila ${row + 1})`, { size: 2.8, anchor: "start", fill: "#444" }));
+  doc.body.push(svgText(m, y, T.muralTile(tileName(col, row), COLS[col], row + 1), { size: 2.8, anchor: "start", fill: "#444" }));
   // Vecinas: flechas discretas que ayudan a orientar la hoja al armar
   const hint = [];
-  if (row > 0) hint.push(`arriba: ${tileName(col, row - 1)}`);
-  if (col < cols - 1) hint.push(`derecha: ${tileName(col + 1, row)}`);
+  if (row > 0) hint.push(T.muralUp(tileName(col, row - 1)));
+  if (col < cols - 1) hint.push(T.muralRight(tileName(col + 1, row)));
   if (hint.length) doc.body.push(svgText(page.wMm - m, y, hint.join(" · "), { size: 2.8, anchor: "end", fill: "#444" }));
   if (doc.meta) doc.meta.mural = { col, row, cols, rows };
   return doc;
 }
 
-function muralGuide(doc, { cols, rows, m, tw, th, W, H, body, uid, stroke }) {
+function muralGuide(doc, { cols, rows, m, tw, th, W, H, body, uid, stroke, T }) {
   const page = doc.page;
-  doc.body.push(svgText(page.wMm / 2, m + 12, "Arma tu mural", { size: 7, weight: "bold" }));
-  const steps = [
-    `1. Colorea las ${cols * rows} hojas del mural, en orden o al azar.`,
-    "2. Recorta cada hoja por su línea exterior.",
-    "3. Únelas por detrás con cinta según este mapa: la letra es la columna y el número la fila.",
-    `Tamaño final: ${Math.round(W / 10)} × ${Math.round(H / 10)} cm.`,
-  ];
+  doc.body.push(svgText(page.wMm / 2, m + 12, T.muralGuideTitle, { size: 7, weight: "bold" }));
+  const steps = T.muralSteps(cols * rows, Math.round(W / 10), Math.round(H / 10));
   let y = m + 21;
   for (const s of steps) for (const l of wrapLines(s, page.wMm - 2 * m - 10, 3.6)) { doc.body.push(svgText(page.wMm / 2, y, l, { size: 3.6 })); y += 5; }
   // Miniatura del mural con la cuadrícula de hojas

@@ -5,15 +5,15 @@ if (workbox) {
 
   // Pre-cache core local resources on install
   workbox.precaching.precacheAndRoute([
-    { url: 'index.html', revision: '1.0.7' },
-    { url: 'offline.html', revision: '1.0.1' },
-    { url: 'manifest.json', revision: '1.0.1' },
-    { url: 'dataset_taoista.js', revision: '1.0.1' },
-    { url: 'favicon.ico', revision: '1.0.1' },
-    { url: 'assets/sekaiwo/SekaiwoRegular.ttf', revision: '1.0.1' },
-    { url: 'assets/icons/icon-192.png', revision: '1.0.1' },
-    { url: 'assets/icons/icon-512.png', revision: '1.0.1' },
-    { url: 'assets/catalogo.json', revision: '1.0.0' }
+    { url: 'index.html', revision: '46d1165a19' },
+    { url: 'offline.html', revision: 'e3f75ca34c' },
+    { url: 'manifest.json', revision: '499c63e010' },
+    { url: 'dataset_taoista.js', revision: '40430edc17' },
+    { url: 'favicon.ico', revision: '82b6de504a' },
+    { url: 'assets/sekaiwo/SekaiwoRegular.ttf', revision: '18b91dca8a' },
+    { url: 'assets/icons/icon-192.png', revision: '40b39ab008' },
+    { url: 'assets/icons/icon-512.png', revision: 'bbf769826f' },
+    { url: 'assets/catalogo.json', revision: '51d5902a83' }
   ]);
 
   // Cache CDN assets (Shoelace, jsPDF, Resvg, Web Fonts) with CacheFirst strategy
@@ -48,10 +48,11 @@ if (workbox) {
   );
 
 
-  // Precache perezoso de paquetes de figuras y adornos al primer uso
+  // Paquetes de figuras y adornos: se guardan al primer uso y se refrescan en segundo plano
+  // (con CacheFirst, un paquete corregido no llegaba a quien ya lo tenía en caché)
   workbox.routing.registerRoute(
     ({url}) => url.pathname.includes('/assets/') && url.pathname.endsWith('.json'),
-    new workbox.strategies.CacheFirst({
+    new workbox.strategies.StaleWhileRevalidate({
       cacheName: 'figure-packages',
       plugins: [
         new workbox.expiration.ExpirationPlugin({
