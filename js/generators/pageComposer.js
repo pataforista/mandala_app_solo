@@ -44,7 +44,39 @@ export const SCATTER_THEMES = {
   // Páginas de dinosaurios: vegetación y huellas, no flores ni corazones. Palmeras y helechos sólo salen
   // grandes (si no, drawFiller los sustituye por una hoja); los pequeños son hojas, huevos y huellas.
   prehistorico: { palm: 3, fern: 2.5, egg: 1.5, footprint: 1.5, pterosaur: 1.3, leaf: 1.2 },
+  // Fondos de los temas de libro: acompañan a las figuras del paquete. Antes toda figura
+  // salía rodeada de margaritas y corazones (una orca entre corazones, página tras página)
+  oceano: { fish: 3, shell: 2, starfish: 2, bubble: 2, drop: 0.6 },
+  espacio: { star: 3, planet: 2.5, crescent: 2, bubble: 1, sun: 1 },
+  mistico: { crescent: 3, star: 2, gem: 2, sun: 1.5, drop: 0.6 },
+  mitologia: { flame: 3, sun: 2, crescent: 1.5, gem: 1, star: 1 },
+  bosque: { mushroom: 2.5, leaf: 2, daisy: 1.5, acorn: 1.5, pine: 1.2, fern: 0.5 },
+  navidad: { snowflake: 3, pine: 2, star: 2, crescent: 0.6 },
+  infantil: { heart: 2, star: 2, daisy: 2, butterfly: 1.5, bubble: 1, fish: 0.8 },
 };
+// Tema de una figura (campo «theme» de los paquetes) → fondo que la acompaña
+const THEME_ALIAS = { naturaleza: "bosque" };
+/** Pesos de relleno de un tema (de fondo, de libro o de figura); null si no hay uno propio. */
+export function scatterWeights(...keys) {
+  for (const k of keys) {
+    if (!k) continue;
+    const w = SCATTER_THEMES[k] || SCATTER_THEMES[THEME_ALIAS[k]];
+    if (w) return w;
+  }
+  return null;
+}
+/**
+ * Cada página con fondo temático usa una selección distinta de sus motivos (y otras
+ * proporciones): con la mezcla completa en todas, las páginas se veían como la misma
+ * tela recortada. Generador propio: no altera el resto del sorteo de la página.
+ */
+export function varyWeights(W, seed) {
+  const rng = mulberry32(((seed >>> 0) ^ 0x7E3A11CE) >>> 0);
+  const kinds = Object.keys(W);
+  const keep = Math.max(3, kinds.length - Math.floor(kinds.length / 3));
+  const order = kinds.map(k => [k, rng()]).sort((a, b) => a[1] - b[1]).map(([k]) => k).slice(0, keep);
+  return Object.fromEntries(order.map(k => [k, W[k] * (0.6 + rng() * 0.8)]));
+}
 export const PATTERN_THEMES = ["escamas", "flor_vida", "sol", "ondas", "mosaico"];
 export const BACKGROUNDS = [...Object.keys(SCATTER_THEMES), ...PATTERN_THEMES];
 
@@ -233,7 +265,7 @@ export function composePage(doc, opts, drawMandala) {
       // Huecos blancos entre copias y alrededor del medallón (si la figura trae su silueta cls)
       if (ring.cls) {
         content.push(...drawRingGaps({ cx: acx, cy: acy, rLo: d - Math.max(1.5, R * 0.02), rHi: rExt, n, rm, sw, sh, mirror,
-          cls: ring.cls, fw: ring.w, fh: ring.h, seed, styleMode, outlineMode, stroke, mainW, detailW, weights: SCATTER_THEMES[opts.background] || SCATTER_THEMES[ring.theme] || null, extraArt: opts.extraArt }));
+          cls: ring.cls, fw: ring.w, fh: ring.h, seed, styleMode, outlineMode, stroke, mainW, detailW, weights: SCATTER_THEMES[opts.background] || scatterWeights(opts.motifTheme, ring.theme), extraArt: opts.extraArt }));
       }
       // Mandala interior: núcleo propio del mandala. La figura sólo va al centro con opts.figureCenter
       // (una figura sola en un círculo se lee como una ilustración pegada, no como parte del mandala)
@@ -244,8 +276,10 @@ export function composePage(doc, opts, drawMandala) {
       break;
     }
     case "figura": {
+      const fw = scatterWeights(opts.motifTheme, opts.background, opts.figure.theme);
       content.push(...drawFigure({
         figure: opts.figure, A, seed, styleMode, outlineMode, stroke, mainW, detailW,
+        weights: fw ? varyWeights(fw, seed) : null,
         fillInside: opts.figureFillInside ?? true, fillOutside: opts.figureFillOutside ?? true,
         density: opts.figureDensity ?? 0.3,
         sub: (x, y, r, i) => sub(x, y, r, miniOpts(i, r)),
@@ -354,7 +388,7 @@ export function composePage(doc, opts, drawMandala) {
   }
 
   // ---------- Relleno del espacio libre ----------
-  const theme = SCATTER_THEMES[opts.background] || (opts.figureRing && SCATTER_THEMES[opts.figureRing.theme]) || null;
+  const theme = SCATTER_THEMES[opts.background] || scatterWeights(opts.motifTheme, opts.figureRing?.theme) || null;
   const fillItems = fill ? packFill({ A, obstacles, rng, gap, minis: fill.minis, style: styleMode, theme,
     outlineMode, stroke, mainW, detailW, sub, miniOpts, extraArt: opts.extraArt }) : [];
   if (fillPattern) fillItems.push(...drawPattern({ ...fillPattern, A, gap, stroke, mainW, detailW, outlineMode }));
@@ -457,7 +491,7 @@ export function circle(pb, x, y, rad) {
 }
 
 // Giro base de las figuras que tienen un «arriba» (el pájaro está dibujado con la cabeza en +v)
-const UPRIGHT = { tulip: 0, drop: 0, crown: 0, shell: 0, butterfly: 0, bird: Math.PI, palm: 0, fern: 0, egg: 0 };
+export const UPRIGHT = { tulip: 0, drop: 0, crown: 0, shell: 0, butterfly: 0, bird: Math.PI, palm: 0, fern: 0, egg: 0, mushroom: 0, acorn: 0, pine: 0, flame: 0, gem: 0 };
 
 // Motivos en coordenadas locales (u, v) ∈ [-1, 1], escalados a r y girados rot
 export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
@@ -465,6 +499,7 @@ export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
   if ((kind === "palm" || kind === "fern") && r < 7.5) kind = "leaf";
   else if (kind === "footprint" && r < 5) kind = "leaf";
   else if (kind === "pterosaur" && r < 4.5) kind = "leaf";
+  else if (kind === "snowflake" && r < 7) kind = "star"; // las ramas no se podrían colorear
   const c = Math.cos(rot), s = Math.sin(rot);
   const T = (u, v) => [x + r * (u * c - v * s), y + r * (u * s + v * c)];
   const M = (pb, u, v) => pb.moveTo(...T(u, v));
@@ -708,6 +743,88 @@ export function drawFiller(kind, main, detail, x, y, r, rot, rng, withDetail) {
     M(main, -0.7, 0.15); L(main, 0.7, 0.15);
     for (const [ux, uy] of [[-0.85, -0.6], [0, -0.75], [0.85, -0.6]]) circle(main, ...T(ux, uy - 0.1), r * 0.1);
     if (big) circle(detail, ...T(0, 0.33), r * 0.11);
+  } else if (kind === "fish") {
+    // Pez: cuerpo y cola en un solo contorno; agalla si hay sitio
+    M(main, 0.95, 0);
+    C(main, 0.55, -0.62, -0.2, -0.6, -0.5, -0.08);
+    L(main, -0.95, -0.55); Q(main, -0.72, 0, -0.95, 0.55); L(main, -0.5, 0.08);
+    C(main, -0.2, 0.6, 0.55, 0.62, 0.95, 0);
+    main.close();
+    if (big) { M(detail, 0.3, -0.36); Q(detail, 0.14, 0, 0.3, 0.36); }
+    if (big && r > 16) circle(detail, ...T(0.62, -0.12), r * 0.09); // ojo: celda ≥ 6 mm²
+  } else if (kind === "starfish") {
+    // Estrella de mar: cinco brazos redondeados; nervio en cada brazo si hay sitio
+    const n = 5, P = (rr, a) => [rr * Math.cos(a), rr * Math.sin(a)];
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + (i * TAU) / n, h = Math.PI / n;
+      if (i === 0) M(main, ...P(0.42, a - h));
+      Q(main, ...P(0.58, a - h * 0.45), ...P(0.84, a - 0.13));
+      Q(main, ...P(1.04, a), ...P(0.84, a + 0.13));
+      Q(main, ...P(0.58, a + h * 0.45), ...P(0.42, a + h));
+    }
+    main.close();
+    if (big) for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + (i * TAU) / n; M(detail, 0, 0); L(detail, ...P(0.72, a)); }
+  } else if (kind === "bubble") {
+    // Burbujas: tres círculos que no se tocan
+    circle(main, ...T(-0.25, 0.25), r * 0.62);
+    // Las burbujas menores sólo si su celda se puede colorear (≥ 6 mm²)
+    if (r >= 5) circle(main, ...T(0.47, -0.45), r * 0.32);
+    if (r >= 9) circle(main, ...T(0.62, 0.42), r * 0.2);
+    if (big) { const [hx, hy] = T(-0.25, 0.25); circle(detail, hx, hy, r * 0.3); }
+  } else if (kind === "planet") {
+    // Planeta con anillo inclinado
+    circle(main, x, y, r * 0.58);
+    const ring = (rx, ry) => { const n = 28; for (let i = 0; i <= n; i++) { const a = (i / n) * TAU; (i ? L : M)(main, rx * Math.cos(a) * 0.94 + ry * Math.sin(a) * 0.34, -rx * Math.cos(a) * 0.34 + ry * Math.sin(a) * 0.94); } main.close(); };
+    ring(0.98, 0.3);
+  } else if (kind === "gem") {
+    // Gema tallada: mesa, corona y pabellón
+    M(main, -0.5, -0.8); L(main, 0.5, -0.8); L(main, 0.95, -0.25); L(main, 0, 0.95); L(main, -0.95, -0.25);
+    main.close();
+    // Facetas sólo arriba: líneas que convergen en la punta dejaban cuñas sin espacio para colorear
+    if (big) { M(detail, -0.95, -0.25); L(detail, 0.95, -0.25); M(detail, -0.5, -0.8); L(detail, -0.3, -0.25); M(detail, 0.5, -0.8); L(detail, 0.3, -0.25); }
+  } else if (kind === "flame") {
+    // Llama con dos lenguas y llama interior
+    M(main, 0, 0.95);
+    C(main, -0.8, 0.9, -0.8, 0, -0.35, -0.45);
+    C(main, -0.3, -0.15, -0.15, -0.1, -0.1, -0.15);
+    C(main, -0.2, -0.55, 0.05, -0.8, 0.2, -0.98);
+    C(main, 0.2, -0.6, 0.45, -0.5, 0.5, -0.25);
+    C(main, 0.85, 0.2, 0.75, 0.9, 0, 0.95);
+    main.close();
+    if (big) { M(detail, 0, 0.72); C(detail, -0.4, 0.66, -0.35, 0.2, 0, -0.1); C(detail, 0.35, 0.2, 0.4, 0.66, 0, 0.72); detail.close(); }
+  } else if (kind === "mushroom") {
+    // Seta: sombrero y pie separados por una línea; motas si hay sitio
+    M(main, -0.95, 0.05); C(main, -0.95, -0.9, 0.95, -0.9, 0.95, 0.05);
+    L(main, 0.3, 0.05); L(main, 0.32, 0.8); Q(main, 0, 0.98, -0.32, 0.8); L(main, -0.3, 0.05);
+    main.close();
+    M(main, -0.3, 0.05); L(main, 0.3, 0.05);
+    if (big && r > 12) for (const [u, v] of [[-0.45, -0.3], [0.1, -0.5], [0.5, -0.2]]) circle(detail, ...T(u, v), r * 0.12);
+  } else if (kind === "acorn") {
+    // Bellota: fruto y caperuza
+    // Un solo contorno y una línea de separación (dos contornos superpuestos dejaban
+    // líneas dobles: celdas de ancho cero)
+    M(main, -0.72, -0.15); C(main, -0.72, -0.78, 0.72, -0.78, 0.72, -0.15); L(main, 0.55, -0.15);
+    C(main, 0.6, 0.5, 0.2, 0.9, 0, 0.98); C(main, -0.2, 0.9, -0.6, 0.5, -0.55, -0.15);
+    main.close();
+    M(main, -0.55, -0.15); L(main, 0.55, -0.15);
+  } else if (kind === "snowflake") {
+    // Copo de nieve: seis brazos con ramas, en un solo contorno
+    const P = (rr, deg) => { const a = (deg * Math.PI) / 180; return [rr * Math.sin(a), -rr * Math.cos(a)]; };
+    for (let i = 0; i < 6; i++) {
+      const a = i * 60;
+      const pts = [[0.32, a - 30], [0.55, a - 9], [0.8, a - 20], [0.72, a - 6], [0.98, a], [0.72, a + 6], [0.8, a + 20], [0.55, a + 9]];
+      pts.forEach(([rr, d], k) => (i === 0 && k === 0 ? M : L)(main, ...P(rr, d)));
+    }
+    main.close();
+    if (big) circle(detail, x, y, r * 0.18);
+  } else if (kind === "pine") {
+    // Pino de tres pisos con tronco
+    const half = [[0.45, -0.45], [0.25, -0.45], [0.65, 0.05], [0.4, 0.05], [0.85, 0.6], [0.2, 0.6], [0.2, 0.95]];
+    M(main, 0, -0.98);
+    for (const [u, v] of half) L(main, u, v);
+    for (const [u, v] of [...half].reverse()) L(main, -u, v);
+    main.close();
+    if (big) { M(detail, -0.25, -0.45); L(detail, 0.25, -0.45); M(detail, -0.4, 0.05); L(detail, 0.4, 0.05); }
   } else {
     // ring: circulito con punto
     circle(main, x, y, r * 0.85);

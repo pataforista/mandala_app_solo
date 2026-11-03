@@ -186,6 +186,9 @@
 
     .comp-box > .hint { grid-column: 1 / -1; }
     .comp-box.hidden-by-profile { display: none !important; }
+    #bookPkgBox { margin: 6px 0 10px; grid-template-columns: 1fr; }
+    #bookPkgBox > :not(.bookPkg) { grid-column: 1 / -1; }
+    #bookPkgBox > .bookPkg { font-size: 0.78rem; }
 
     #sideTabs sl-tab::part(base) { padding: 10px 10px; font-size: 0.85rem; }
     #sideTabs sl-tab-panel::part(base) { padding: 16px 0 8px; }
@@ -648,12 +651,38 @@
               <sl-option value="espacio">Espacio y Cosmos (Planetas, galaxias, constelaciones)</sl-option>
               <sl-option value="mistico">Místico, Tarot y Alquimia (Lunas, arcanos, geometría sagrada)</sl-option>
               <sl-option value="mitologia">Mitología y Leyendas (Bestias míticas, escamas, fuego)</sl-option>
+              <sl-option value="prehistorico">Dinosaurios y Prehistoria (Coronas de dinosaurios, helechos, huellas)</sl-option>
+              <sl-option value="zentangle">Animales Zentangle (Texturas, hojas y setas)</sl-option>
+              <sl-option value="infantil">Infantil (Animales amigables, corazones, burbujas)</sl-option>
             </sl-select>
             <div id="themeActionBox" style="display:none; margin: 6px 0 10px; padding: 10px; border-radius: 8px; background: var(--m3-surface); border: 1px solid var(--sl-color-primary-300);">
               <div id="themeDescText" style="font-size: 0.76rem; color: var(--m3-on-surface); margin-bottom: 6px; line-height: 1.35;"></div>
               <sl-button id="btnApplyThemePackage" size="small" variant="primary" style="width: 100%;">
                 <sl-icon slot="prefix" name="stars"></sl-icon> Configurar libro con este tema (1 clic)
               </sl-button>
+            </div>
+            <div id="bookPkgBox" class="comp-box">
+              <div class="hint" style="font-weight:600;">Ilustraciones del libro</div>
+              <div class="hint">Marca los paquetes que quieres usar (el tema propone los suyos) y pulsa «Cargar». Reemplazan la lista de «Mis imágenes».</div>
+              <sl-checkbox size="small" class="bookPkg" value="animales">🦊 Animales del bosque y safari (40)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="marinas">🌊 Criaturas y arrecifes del océano (64)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="espacio">🚀 Exploración espacial y cosmos (48)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="misticas">🔮 Místico, tarot y alquimia (48)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="mitologia">🐉 Criaturas mitológicas (64)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="dinosaurios">🦕 Dinosaurios y prehistoria (32)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="zentangle">✨ Animales zentangle (41)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="naturaleza">🌿 Adornos de naturaleza · fondo (104)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="infantiles">🎈 Adornos infantiles · fondo (78)</sl-checkbox>
+              <sl-button id="btnLoadBookPkgs" size="small" variant="default" style="width:100%; margin-top:4px;">
+                <sl-icon slot="prefix" name="box-arrow-in-down"></sl-icon> Cargar ilustraciones marcadas
+              </sl-button>
+              <sl-select id="bookFigureShare" label="Páginas con ilustración" size="small" value="0.5" help-text="Si hay más ilustraciones que páginas, se elige una selección distinta para cada semilla.">
+                <sl-option value="1">Todas las que se pueda</sl-option>
+                <sl-option value="0.66">2 de cada 3</sl-option>
+                <sl-option value="0.5">La mitad (alterna con mandalas puros)</sl-option>
+                <sl-option value="0.33">1 de cada 3</sl-option>
+              </sl-select>
+              <sl-checkbox id="bookMixUses" size="small" checked>Alternar la presentación de las ilustraciones (figura rellena, corona de copias, medallón)</sl-checkbox>
             </div>
             <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="50"></sl-input>
             <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="progresiva">

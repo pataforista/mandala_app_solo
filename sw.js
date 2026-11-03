@@ -5,7 +5,7 @@ if (workbox) {
 
   // Pre-cache core local resources on install
   workbox.precaching.precacheAndRoute([
-    { url: 'index.html', revision: '46d1165a19' },
+    { url: 'index.html', revision: 'c385f63fab' },
     { url: 'offline.html', revision: 'e3f75ca34c' },
     { url: 'manifest.json', revision: '499c63e010' },
     { url: 'dataset_taoista.js', revision: '40430edc17' },

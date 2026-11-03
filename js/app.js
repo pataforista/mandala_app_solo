@@ -11,7 +11,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, BOOK_STYLES, BESTSELLER_STYLE_W, chapterLayout, insertChapterDividers, applyPageOverride, PRODUCT_PROFILES, BOOK_THEMES } from "./core/bookPlan.js";
+import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, BOOK_STYLES, BESTSELLER_STYLE_W, chapterLayout, insertChapterDividers, applyPageOverride, PRODUCT_PROFILES, BOOK_THEMES, shuffleBag } from "./core/bookPlan.js";
 import { curateBook, attemptChoice, twinTargets as curatorTwinTargets, WEAK_SCORE, CURATE_TRIES } from "./core/bookCurator.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
@@ -1523,6 +1523,37 @@ function bindUI() {
     infantiles: { file: "assets/adornos-infantiles.json", name: "Infantil", defaultUse: "extra" },
   };
 
+  // Carga varios paquetes de la biblioteca. replace: vacía antes la lista de «Mis imágenes».
+  // Cada figura conserva el uso que trae el paquete (los adornos van al fondo).
+  const loadLibraryPackages = async (ids, { replace = true } = {}) => {
+    const loaded = [];
+    const incoming = [];
+    for (const pid of ids) {
+      const pkg = libraryFiles[pid];
+      if (!pkg) continue;
+      const res = await fetch(pkg.file);
+      if (!res.ok) throw new Error(`«${pkg.name}»: HTTP ${res.status}`);
+      const figs = unpackFigures(await res.json());
+      for (const f of figs) {
+        incoming.push({
+          name: f.name,
+          img: null,
+          use: f.use && f.use !== "ninguno" ? f.use : (pkg.defaultUse || "figura"),
+          source: f.source || pkg.name,
+          rightsConfirmed: f.rightsConfirmed ?? true,
+          fig: await withStamp(f),
+        });
+      }
+      loaded.push(pkg.name);
+    }
+    if (replace) userFigures.length = 0;
+    const start = userFigures.length;
+    userFigures.push(...incoming);
+    activeFigure = userFigures.length ? start : -1;
+    useFigures();
+    return { names: loaded, count: incoming.length };
+  };
+
   document.querySelectorAll(".btn-load-pkg").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = btn.getAttribute("data-id");
@@ -1970,6 +2001,11 @@ function bindUI() {
   const themeActionBox = document.getElementById("themeActionBox");
   const themeDescText = document.getElementById("themeDescText");
   const btnApplyThemePackage = document.getElementById("btnApplyThemePackage");
+  const btnLoadBookPkgs = document.getElementById("btnLoadBookPkgs");
+  const bookFigureShareEl = document.getElementById("bookFigureShare");
+  const bookMixUsesEl = document.getElementById("bookMixUses");
+  const bookPkgBoxes = () => [...document.querySelectorAll(".bookPkg")];
+  const checkedBookPkgs = () => bookPkgBoxes().filter(b => b.checked).map(b => b.value);
   const bookSummaryEl = document.getElementById("bookSummary");
 
   const bookCount = () => Math.min(120, Math.max(1, parseInt(bookPagesEl?.value, 10) || 1));
@@ -2092,6 +2128,8 @@ function bindUI() {
         mural: bookMuralEl?.value || "3x3",
         vary: !!bookVaryEl?.checked,
         chapters: !!bookChaptersEl?.checked,
+        figureShare: bookFigureShareEl?.value || "0.5",
+        mixUses: !!bookMixUsesEl?.checked,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch (e) {}
@@ -2130,6 +2168,8 @@ function bindUI() {
       if (s.mural !== undefined && bookMuralEl) bookMuralEl.value = s.mural;
       if (s.vary !== undefined && bookVaryEl) bookVaryEl.checked = s.vary;
       if (s.chapters !== undefined && bookChaptersEl) bookChaptersEl.checked = s.chapters;
+      if (s.figureShare !== undefined && bookFigureShareEl) bookFigureShareEl.value = s.figureShare;
+      if (s.mixUses !== undefined && bookMixUsesEl) bookMixUsesEl.checked = s.mixUses;
     } catch (e) {}
   };
 
@@ -2181,6 +2221,10 @@ function bindUI() {
     const theme = themeKey !== "none" ? BOOK_THEMES[themeKey] : null;
     if (theme) {
       themeActionBox.style.display = "block";
+      // El tema propone sus paquetes; el usuario puede marcar otros antes de cargar
+      if (Array.isArray(theme.packages) && theme.packages.length) {
+        for (const b of bookPkgBoxes()) b.checked = theme.packages.includes(b.value);
+      }
       if (themeDescText) {
         themeDescText.innerHTML = `<b>${escapeXml(theme.name)}:</b> ${escapeXml(theme.description)}`;
       }
@@ -2205,31 +2249,9 @@ function bindUI() {
             bookQuoteTextEl.style.display = "inline-block";
           }
         }
-        const pkgIds = [theme.packageId, theme.secondaryPackageId].filter(Boolean);
-        if (pkgIds.length) {
-          userFigures.length = 0;
-          for (const pid of pkgIds) {
-            const pkg = libraryFiles[pid];
-            if (!pkg) continue;
-            const res = await fetch(pkg.file);
-            if (!res.ok) continue;
-            const data = await res.json();
-            const figs = unpackFigures(data);
-            const defaultUse = pid === theme.secondaryPackageId ? "extra" : (pkg.defaultUse || "figura");
-            for (const f of figs) {
-              userFigures.push({
-                name: f.name,
-                img: null,
-                use: f.use && f.use !== "ninguno" ? f.use : defaultUse,
-                source: f.source || pkg.name,
-                rightsConfirmed: f.rightsConfirmed ?? true,
-                fig: await withStamp(f),
-              });
-            }
-          }
-          activeFigure = userFigures.length ? 0 : -1;
-          useFigures();
-        }
+        // Los paquetes marcados (el tema marca los suyos al elegirlo; se pueden cambiar)
+        const pkgIds = bookPkgBoxes().length ? checkedBookPkgs() : (theme.packages || []);
+        if (pkgIds.length) await loadLibraryPackages(pkgIds);
         updateBookSummary();
         showToast(`✓ Libro configurado con el tema «${theme.name}»`, "success", "stars");
       } catch (err) {
@@ -2240,6 +2262,48 @@ function bindUI() {
       }
     });
   }
+
+  if (btnLoadBookPkgs) {
+    btnLoadBookPkgs.addEventListener("click", async () => {
+      const ids = checkedBookPkgs();
+      if (!ids.length) { showToast("Marca al menos un paquete de ilustraciones", "warning", "exclamation-triangle"); return; }
+      btnLoadBookPkgs.loading = true;
+      try {
+        const { names, count } = await loadLibraryPackages(ids);
+        updateBookSummary();
+        showToast(`✓ ${count} ilustraciones cargadas: ${names.join(", ")}`, "success", "check-circle");
+      } catch (err) {
+        console.error("Error al cargar paquetes:", err);
+        showToast("No se pudieron cargar los paquetes: " + (err.message || err), "danger", "exclamation-triangle");
+      } finally {
+        btnLoadBookPkgs.loading = false;
+      }
+    });
+  }
+
+  // Ilustraciones del libro: cuántas páginas llevan una (proporción elegida) y cuáles.
+  // Con más ilustraciones que huecos, cada semilla elige otra selección y otro orden: antes
+  // entraban siempre las primeras del paquete, en el mismo orden, libro tras libro.
+  const figureShare = () => {
+    const v = parseFloat(bookFigureShareEl?.value);
+    return Number.isFinite(v) && v > 0 ? Math.min(1, v) : 1;
+  };
+  const bookFigureSlots = (chosen, regular) =>
+    chosen.length ? Math.min(chosen.length, Math.max(1, Math.round(regular * figureShare()))) : 0;
+  const bookFigureOrder = (chosen, seed) => {
+    const rng = mulberry32(((seed >>> 0) ^ 0xF1C0DE5) >>> 0);
+    const a = chosen.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  // Presentación de cada ilustración del libro: la elegida a mano o, con «alternar», un
+  // reparto barajado entre figura rellena, corona y medallón (nunca dos iguales seguidas)
+  const MIX_USES = ["figura", "anillos", "medallon"];
+  const bookFigureUses = (list, seed) => {
+    if (!bookMixUsesEl?.checked) return list.map(m => m.use);
+    const next = shuffleBag(mulberry32(((seed >>> 0) ^ 0x05E5F16) >>> 0), MIX_USES, [2, 1.5, 1]);
+    return list.map(m => (MIX_USES.includes(m.use) && m.fig?.cls ? next() : m.use));
+  };
 
   const updateBookSummary = () => {
     if (!bookSummaryEl) return;
@@ -2299,7 +2363,8 @@ function bindUI() {
       const pend = pendingFigures();
       if (pend.length) info.innerHTML += `<br>❌ ${pend.length} no entran (no están listas). Revisa su lista de verificación en «Mis imágenes».`;
     }
-    if (chosen.length > bookCount()) bookSummaryEl.innerHTML += `<br>⚠️ Hay ${chosen.length} imágenes elegidas y sólo ${bookCount()} páginas: sobran ${chosen.length - bookCount()}.`;
+    const slots = bookFigureSlots(chosen, bookCount());
+    if (chosen.length > slots) bookSummaryEl.innerHTML += `<br>🎲 ${slots} de ${chosen.length} ilustraciones entran en este libro (una selección distinta con cada semilla).`;
   };
 
   // ---------- Plan del libro (compartido por la revisión y la descarga) ----------
@@ -2326,14 +2391,16 @@ function bindUI() {
     const regular = regularCount();
     const baseSeed = state.seed >>> 0;
     const isClassic = true; // El libro siempre usa el motor clásico (mejor calidad: ≈84 vs 57-71)
-    const chosen = chosenFigures();
+    const allChosen = chosenFigures();
+    const chosen = bookFigureOrder(allChosen, baseSeed).slice(0, bookFigureSlots(allChosen, regular));
+    const chosenUses = bookFigureUses(chosen, baseSeed);
     const vary = bookVaryEl.checked;
     // lang: idioma de los rótulos impresos dentro de las páginas (crece, misterio, mural…)
     const lang = bookLanguageEl?.value || "es";
     const base = { ...buildOpts(state), lang };
     const comps = allowedCompositions();
     const {
-      prof, prod, styles: stylesToUse, styleWeights: styleWeightsToUse,
+      prof, prod, theme, styles: stylesToUse, styleWeights: styleWeightsToUse,
       patternOnly: patternOnlyVal, useBackground: useBackgroundVal, backgrounds: backgroundsToUse
     } = resolveBookStyleConfig();
     const baseCompVal = prod?.complexity ?? base.complexity;
@@ -2418,7 +2485,10 @@ function bindUI() {
         if (ap.silhouette) o.silhouette = ap.silhouette;
         // Cada imagen elegida aparece una vez, con el uso que se le asignó a mano;
         // el resto de páginas son mandalas sin imagen
-        const entry = pg.centerArt ? chosen[pg.centerArt.imageIndex] : null;
+        const k = pg.centerArt ? pg.centerArt.imageIndex : -1;
+        const entry = k >= 0 && chosen[k] ? { ...chosen[k], use: chosenUses[k] } : null;
+        // Motivos del fondo: los del tema del libro (peces, copos…) en vez de corazones genéricos
+        if (theme?.scatterTheme) o.motifTheme = theme.scatterTheme;
         Object.assign(o, resolveUserImage(state, entry));
         sourceLog[i] = { mandala: i + 1, composition: entry ? entry.use : o.composition, style: o.styleMode, image: entry ? entry.name : "", source: entry ? entry.source : "" };
         return o;
@@ -2857,6 +2927,7 @@ function bindUI() {
     if (bookThemeEl) {
       bookThemeEl.addEventListener("sl-change", updateThemeActionUI);
     }
+    [bookFigureShareEl, bookMixUsesEl].forEach(el => el && el.addEventListener("sl-change", () => { updateBookSummary(); saveBookSettings(); }));
     [bookTitleEl, bookSubtitleEl, bookAuthorEl, bookQuoteTextEl].forEach(el =>
       el && el.addEventListener("sl-input", saveBookSettings));
     restoreBookSettings();
@@ -2933,6 +3004,8 @@ function bindUI() {
         mural: bookMuralEl?.value || "0",
         vary: !!bookVaryEl?.checked,
         chapters: !!bookChaptersEl?.checked,
+        figureShare: bookFigureShareEl?.value || "0.5",
+        mixUses: !!bookMixUsesEl?.checked,
       },
       userFigures: figuresData,
       activeFigure,
@@ -2988,6 +3061,8 @@ function bindUI() {
       if (bs.mural !== undefined && bookMuralEl) bookMuralEl.value = bs.mural;
       if (bs.vary !== undefined && bookVaryEl) bookVaryEl.checked = bs.vary;
       if (bs.chapters !== undefined && bookChaptersEl) bookChaptersEl.checked = bs.chapters;
+      if (bs.figureShare !== undefined && bookFigureShareEl) bookFigureShareEl.value = bs.figureShare;
+      if (bs.mixUses !== undefined && bookMixUsesEl) bookMixUsesEl.checked = bs.mixUses;
       saveBookSettings();
     }
     if (Array.isArray(data.userFigures)) {
