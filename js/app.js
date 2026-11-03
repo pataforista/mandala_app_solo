@@ -15,6 +15,7 @@ import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPage
 import { curateBook, attemptChoice, twinTargets as curatorTwinTargets, WEAK_SCORE, CURATE_TRIES } from "./core/bookCurator.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
+import { pageTexts } from "./core/pageTexts.js";
 import { escapeXml } from "./core/svgText.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout, kdpCoverDimensions } from "./core/kdp.js";
 import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
@@ -2327,7 +2328,9 @@ function bindUI() {
     const isClassic = true; // El libro siempre usa el motor clásico (mejor calidad: ≈84 vs 57-71)
     const chosen = chosenFigures();
     const vary = bookVaryEl.checked;
-    const base = buildOpts(state);
+    // lang: idioma de los rótulos impresos dentro de las páginas (crece, misterio, mural…)
+    const lang = bookLanguageEl?.value || "es";
+    const base = { ...buildOpts(state), lang };
     const comps = allowedCompositions();
     const {
       prof, prod, styles: stylesToUse, styleWeights: styleWeightsToUse,
@@ -2375,7 +2378,8 @@ function bindUI() {
       return plan.map((p, j) => ({ p, j })).filter(({ p }) => p.special?.type === "mystery").map(({ p, j }) => ({
         // El número del misterioso va impreso en su propia página: sirve aunque el libro
         // no lleve números de página
-        label: `Misterioso ${p.special.n} (pág. ${layout.findIndex(q => q.kind === "mandala" && q.index === j + off) + 1}) · ${MYSTERY_SHAPES[p.special.shape]?.name || p.special.shape}`,
+        label: pageTexts(lang).solutionLabel(p.special.n, layout.findIndex(q => q.kind === "mandala" && q.index === j + off) + 1,
+          pageTexts(lang).shapes[p.special.shape] || MYSTERY_SHAPES[p.special.shape]?.name || p.special.shape),
         shape: p.special.shape, seed: seedOf(j), complexity: p.complexity,
       }));
     };
@@ -2788,7 +2792,7 @@ function bindUI() {
       await downloadBookPdf(filename, generatorFn, count, {
         preset: state.preset,
         genOpts: makeOpts,
-        title: (bookTitleEl.value || "").trim() || "Mandalas para Colorear",
+        title: (bookTitleEl.value || "").trim(), // vacío: título de serie en el idioma del libro
         subtitle: (bookSubtitleEl?.value || "").trim(),
         author: (bookAuthorEl?.value || "").trim(),
         ...layoutOpts,
@@ -2820,7 +2824,16 @@ function bindUI() {
           (qa.weak.length ? `, ${qa.weak.length} aún floja(s): revísalas en «Revisar páginas».` : ", ninguna floja.") +
           (qa.twins.length ? ` ${qa.twins.length} par(es) de páginas aún parecidas.` : "")
         : "";
-      showToast(`✅ Libro creado (${total} páginas). Listo para KDP.`, "success", "check-circle", 5000);
+      // El resumen de calidad se muestra siempre: «listo» sólo si no quedan páginas flojas ni gemelas
+      const pending = (qa?.weak?.length || 0) + (qa?.twins?.length || 0);
+      if (pending) {
+        showToast(`⚠️ Libro creado (${total} páginas), pero revisa antes de publicar.${qaMsg}`, "warning", "exclamation-triangle", 12000);
+      } else if (qa) {
+        showToast(`✅ Libro creado (${total} páginas). Listo para KDP.${qaMsg}`, "success", "check-circle", 6000);
+      } else {
+        // Sin control de calidad en esta descarga (desactivado o ya hecho en la revisión)
+        showToast(`✅ Libro creado (${total} páginas).`, "success", "check-circle", 6000);
+      }
     } catch (error) {
       if (error.name === "AbortError") {
         showToast("Generación de libro cancelada.", "neutral", "slash-circle");

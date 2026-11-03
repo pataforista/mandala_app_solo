@@ -9,6 +9,7 @@
 // Cada página lleva una nota breve. Las cifras están redactadas con cautela («suelen»,
 // «se estima»): son orientativas, no constantes universales.
 import { mulberry32 } from "../core/prng.js";
+import { PAGE_TEXTS, pageTexts } from "../core/pageTexts.js";
 import { PathBuilder } from "../core/pathBuilder.js";
 import { wrapLines, svgText } from "../core/svgText.js";
 
@@ -17,34 +18,14 @@ const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // 137,507…°
 
 export const NATURE_KINDS = ["girasol", "estrella", "copo", "diatomea"];
 
-export const NATURE_TEXT = {
-  girasol: {
-    title: "Girasol · el ángulo áureo",
-    // @a y @b: las espirales que tiene ESTE dibujo, contadas al dibujarlo (21 y 34, o 34 y 55,
-    // según el número de flósculos); @c y @d: el par de Fibonacci siguiente, frecuente en
-    // girasoles reales, para no repetir la misma cifra. Dos caracteres, igual que los
-    // números: el corte de líneas no cambia al sustituirlos.
-    body: "En el modelo clásico del girasol, cada flósculo queda girado unos 137,5° respecto al anterior: el ángulo áureo. Como ese giro nunca se repite exactamente, las semillas se empaquetan casi sin huecos. Busca las espirales que corren en los dos sentidos: en este dibujo hay @a y @b. En los girasoles reales suelen contarse números consecutivos de Fibonacci, como @c y @d, aunque no siempre.",
-  },
-  estrella: {
-    title: "Estrella de mar · simetría de cinco",
-    body: "Los equinodermos adultos tienen simetría pentarradial: cinco partes iguales alrededor de un eje. Sus larvas, en cambio, nadan con simetría bilateral, como la nuestra, y se reorganizan durante la metamorfosis. El pequeño círculo fuera del centro, la placa madrepórica, rompe la simetría: comunica con el mar el sistema hidráulico que mueve sus pies, el sistema vascular acuífero.",
-  },
-  copo: {
-    title: "Copo de nieve · simetría de seis",
-    body: "El hielo cristaliza en una red hexagonal; por eso los copos estrellados tienen seis brazos. Los brazos crecen casi igual porque viven, al mismo tiempo, los mismos cambios de temperatura y humedad durante la caída: ninguno copia a los otros. Como cada copo atraviesa nubes distintas, es muy improbable encontrar dos iguales.",
-  },
-  diatomea: {
-    title: "Diatomea · un vidrio vivo",
-    body: "Las diatomeas son algas de una sola célula que construyen su pared con sílice, el mismo compuesto del vidrio. En las diatomeas céntricas, como esta, los poros forman filas radiales. Ernst Haeckel las dibujó en «Kunstformen der Natur» (1899-1904). Se estima que producen entre una quinta y una cuarta parte del oxígeno de la Tierra.",
-  },
-};
+// Notas al pie en cada idioma: ver js/core/pageTexts.js (aquí, las de español)
+export const NATURE_TEXT = PAGE_TEXTS.es.nature;
 
 /** Página completa: dibujo + nota científica al pie (opts.captions, por defecto sí). */
 export function generateNaturePage(doc, opts) {
   const {
     kind = "girasol", seed = 1, stroke = "#000", strokeWidthMm = 0.55,
-    complexity = 130, captions = true,
+    complexity = 130, captions = true, lang = "es",
   } = opts;
   const page = doc.page;
   const m = Number.isFinite(page.marginMm) ? page.marginMm : 10;
@@ -58,8 +39,9 @@ export function generateNaturePage(doc, opts) {
   // ---------- Nota al pie ----------
   const text = [];
   let capH = 0;
-  if (captions && NATURE_TEXT[kind]) {
-    const t = NATURE_TEXT[kind];
+  const notes = pageTexts(lang).nature;
+  if (captions && notes[kind]) {
+    const t = notes[kind];
     const maxW = page.wMm - 2 * m - 10;
     const ts = Math.max(4, Math.min(5.4, page.wMm / 40));
     const bs = Math.max(3, Math.min(3.6, page.wMm / 62));

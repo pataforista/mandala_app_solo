@@ -7,7 +7,9 @@
     "start": "npx -y serve .",
     "dev": "npx -y serve .",
     "test": "node --test tests/*.test.mjs",
-    "check:figuras": "node scripts/checkFigures.mjs assets/figuras-dinosaurios.json"
+    "check:figuras": "node scripts/checkFigures.mjs assets/figuras-dinosaurios.json",
+    "sw:rev": "node scripts/sw-revisions.mjs",
+    "check": "node scripts/sw-revisions.mjs --check && node --test tests/*.test.mjs"
   },
   "keywords": [],
   "author": "",

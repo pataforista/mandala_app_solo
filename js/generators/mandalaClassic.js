@@ -629,7 +629,7 @@ export function generateMandalaClassic(doc, opts) {
 
   // ---------- Pintado: de afuera hacia adentro ----------
   if (pageBorder) {
-    const pb = mainPB(), m = marginMm, rr = 4;
+    const pb = mainPB(), m = marginMm + mainW / 2, rr = 4; // borde exterior del trazo en el margen
     const rect = (pb, x0, y0, x1, y1, rc) => {
       pb.moveTo(x0 + rc, y0).lineTo(x1 - rc, y0).quadTo(x1, y0, x1, y0 + rc).lineTo(x1, y1 - rc).quadTo(x1, y1, x1 - rc, y1)
         .lineTo(x0 + rc, y1).quadTo(x0, y1, x0, y1 - rc).lineTo(x0, y0 + rc).quadTo(x0, y0, x0 + rc, y0).close();
