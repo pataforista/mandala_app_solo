@@ -186,6 +186,9 @@
 
     .comp-box > .hint { grid-column: 1 / -1; }
     .comp-box.hidden-by-profile { display: none !important; }
+    #bookPkgBox { margin: 6px 0 10px; grid-template-columns: 1fr; }
+    #bookPkgBox > :not(.bookPkg) { grid-column: 1 / -1; }
+    #bookPkgBox > .bookPkg { font-size: 0.78rem; }
 
     #sideTabs sl-tab::part(base) { padding: 10px 10px; font-size: 0.85rem; }
     #sideTabs sl-tab-panel::part(base) { padding: 16px 0 8px; }
@@ -288,14 +291,17 @@
 
     @media (max-width: 768px) {
       .meta-footer {
-        left: 16px;
-        right: 16px;
-        bottom: 12px;
-        justify-content: space-around;
-        padding: 6px 12px;
-        font-size: 0.72rem;
-        gap: 8px;
+        left: 8px;
+        right: 8px;
+        bottom: 6px;
+        justify-content: center;
+        flex-wrap: wrap;
+        border-radius: 12px;
+        padding: 4px 10px;
+        font-size: 0.7rem;
+        gap: 2px 10px;
       }
+      .meta-footer sl-tooltip { display: none; }
       #stage-zoom-controls {
         top: 8px;
         right: 8px;
@@ -352,21 +358,59 @@
       border-radius: 10px;
     }
 
+    /* Secciones plegables (antes «sl-accordion», que Shoelace no tiene: no se plegaban) */
+    .details-group { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+    sl-details::part(base) { border-color: var(--m3-surface-variant); }
+    sl-details::part(header) { padding: 12px 14px; }
+    sl-details::part(content) { padding: 0 14px 6px; }
+
+    /* Saltar los controles con el teclado o un lector de pantalla */
+    .skip-link {
+      position: absolute; left: 8px; top: -60px; z-index: 100;
+      background: var(--m3-primary); color: #fff; padding: 10px 16px;
+      border-radius: 8px; font-weight: 600; text-decoration: none;
+    }
+    .skip-link:focus { top: 8px; }
+    #stage-container:focus { outline: none; }
+    #stage-container:focus-visible { outline: 3px solid var(--m3-primary); outline-offset: -3px; }
+
+    /* Pantallas táctiles: objetivos de al menos 44×44 px */
+    @media (pointer: coarse) {
+      sl-icon-button::part(base) { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+      sl-checkbox::part(base) { min-height: 44px; align-items: center; }
+      sl-tab::part(base) { min-height: 44px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #stage { transition: none; }
+    }
+
+    /* Móvil y tableta vertical: una sola columna y un solo desplazamiento. La vista previa
+       queda fija arriba mientras se mueven los controles; antes los controles vivían en una
+       caja de 40 % de alto con su propio scroll y la página desbordaba a lo ancho. */
     @media (max-width: 900px) {
-      main {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
+      body { height: auto; min-height: 100vh; display: block; overflow-x: hidden; overflow-y: auto; }
+      header { padding: 8px 12px; gap: 8px; flex-wrap: wrap; }
+      .brand { gap: 4px; min-width: 0; }
+      .brand h1 { font-size: 1.1rem; white-space: nowrap; }
+      main { display: flex; flex-direction: column; overflow: visible; }
+      #stage-container {
+        order: -1; position: sticky; top: 0; z-index: 6;
+        height: 42vh; padding: 12px; box-sizing: border-box;
+        border-bottom: 1px solid var(--m3-outline);
       }
+      #stage { max-height: 100%; }
+      #stage svg { max-height: calc(42vh - 24px); width: auto; max-width: 100%; margin: 0 auto; }
       #sidebar {
-        border-right: none;
-        border-bottom: 1px solid var(--m3-surface-variant);
-        max-height: 40vh;
+        border-right: none; overflow: visible; padding: 16px; min-width: 0;
       }
+      #sidebar sl-select, #sidebar sl-input, #sidebar sl-button { max-width: 100%; }
     }
   </style>
 </head>
 
 <body>
+  <a class="skip-link" href="#stage-container">Saltar a la vista previa</a>
   <header>
     <div class="brand">
       <sl-tooltip content="Mis favoritos y galería">
@@ -403,7 +447,7 @@
   </header>
 
   <main>
-    <div id="sidebar">
+    <div id="sidebar" role="region" aria-label="Controles">
       <!-- Formato: lo usan la vista previa, la descarga y el libro -->
       <div class="control-group">
         <sl-select id="preset" label="Formato de papel" size="small" value="A4" help-text="Se usa en la vista previa, en las descargas y en el libro.">
@@ -442,7 +486,7 @@
               <sl-icon slot="prefix" name="magic"></sl-icon>
               Mezcla Mágica
             </sl-button>
-            <p class="hint">Atajos: <b>R</b> o espacio = otro diseño · <b>←</b> <b>→</b> = semilla anterior/siguiente · <b>S</b> = guardar.</p>
+            <p class="hint">Atajos (con el foco fuera de los controles): <b>R</b> o espacio = otro diseño · <b>←</b> <b>→</b> = semilla anterior/siguiente · <b>S</b> = guardar · <b>Ctrl+Z</b>/<b>Ctrl+Y</b> = deshacer/rehacer.</p>
 
             <div class="section-title" style="margin:8px 0 0;"><sl-icon name="sliders"></sl-icon> Lo esencial</div>
             <sl-select id="coloringPreset" label="Nivel de dificultad" size="small" value="adulto" help-text="Se aplica al elegirlo.">
@@ -494,8 +538,8 @@
             </sl-checkbox>
           </div>
 
-          <sl-accordion style="margin-top:16px;">
-            <sl-accordion-item>
+          <div class="details-group">
+            <sl-details>
               <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="palette"></sl-icon> Trazo y detalle</span>
               <div class="control-group" style="padding: 12px 0;">
                 <sl-range id="strokeWidth" label="Grosor de línea (mm)" min="0.1" max="2.0" step="0.05" value="0.55" help-text="Mínimo recomendado para imprimir: 0.3 mm."></sl-range>
@@ -507,9 +551,9 @@
                 <sl-checkbox id="frames" checked>Marcos interiores</sl-checkbox>
                 <sl-checkbox id="pageBorder" checked>Borde de página</sl-checkbox>
               </div>
-            </sl-accordion-item>
+            </sl-details>
 
-            <sl-accordion-item>
+            <sl-details>
               <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="gear"></sl-icon> Motor y vista previa</span>
               <div class="control-group" style="padding: 12px 0;">
                 <sl-select id="generatorType" label="Tipo de motor" size="small" value="classic" help-text="El clásico es el único con composiciones, marcos e imágenes.">
@@ -532,9 +576,9 @@
                 <sl-checkbox id="showGuides">Mostrar guías estructurales</sl-checkbox>
                 <sl-checkbox id="spiroEnabled" style="display: none;">Espirógrafo</sl-checkbox>
               </div>
-            </sl-accordion-item>
+            </sl-details>
 
-        <sl-accordion-item id="layersAccordionItem">
+        <sl-details id="layersAccordionItem">
           <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="layers"></sl-icon> Capas (8)</span>
           <div class="control-group" style="padding: 12px 0;">
             <sl-select id="layerPreset" label="Perfil de Capas" size="small" value="custom">
@@ -553,9 +597,9 @@
             <sl-range id="layer7Intensity" label="Capas 7" min="0" max="1" step="0.05" value="0.5" size="small"></sl-range>
             <sl-range id="layer8Intensity" label="Capas 8 (Borde)" min="0" max="1" step="0.05" value="0.4" size="small"></sl-range>
           </div>
-        </sl-accordion-item>
+        </sl-details>
 
-        <sl-accordion-item id="imageAccordionItem">
+        <sl-details id="imageAccordionItem">
           <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Integración de Imagen</span>
           <div class="control-group" style="padding: 12px 0;">
             <input type="file" id="imageUpload" accept="image/*" style="display: none;">
@@ -576,9 +620,9 @@
             <sl-range id="imageIntensity" label="Intensidad de Capa" min="0" max="1" step="0.05" value="1.0"></sl-range>
             <sl-checkbox id="imageMirror" checked>Simetría de Espejo (Caleidoscopio)</sl-checkbox>
           </div>
-        </sl-accordion-item>
+        </sl-details>
 
-            <sl-accordion-item>
+            <sl-details>
               <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="file-earmark-pdf"></sl-icon> Exportar esta página</span>
               <div class="control-group" style="padding: 12px 0;">
                 <sl-select id="pageLayout" label="Distribución del PDF" value="classic" size="small">
@@ -599,8 +643,8 @@
                   Descargar PDF
                 </sl-button>
               </div>
-            </sl-accordion-item>
-          </sl-accordion>
+            </sl-details>
+          </div>
         </sl-tab-panel>
 
         <!-- ===== Libro KDP ===== -->
@@ -648,12 +692,38 @@
               <sl-option value="espacio">Espacio y Cosmos (Planetas, galaxias, constelaciones)</sl-option>
               <sl-option value="mistico">Místico, Tarot y Alquimia (Lunas, arcanos, geometría sagrada)</sl-option>
               <sl-option value="mitologia">Mitología y Leyendas (Bestias míticas, escamas, fuego)</sl-option>
+              <sl-option value="prehistorico">Dinosaurios y Prehistoria (Coronas de dinosaurios, helechos, huellas)</sl-option>
+              <sl-option value="zentangle">Animales Zentangle (Texturas, hojas y setas)</sl-option>
+              <sl-option value="infantil">Infantil (Animales amigables, corazones, burbujas)</sl-option>
             </sl-select>
             <div id="themeActionBox" style="display:none; margin: 6px 0 10px; padding: 10px; border-radius: 8px; background: var(--m3-surface); border: 1px solid var(--sl-color-primary-300);">
               <div id="themeDescText" style="font-size: 0.76rem; color: var(--m3-on-surface); margin-bottom: 6px; line-height: 1.35;"></div>
               <sl-button id="btnApplyThemePackage" size="small" variant="primary" style="width: 100%;">
                 <sl-icon slot="prefix" name="stars"></sl-icon> Configurar libro con este tema (1 clic)
               </sl-button>
+            </div>
+            <div id="bookPkgBox" class="comp-box">
+              <div class="hint" style="font-weight:600;">Ilustraciones del libro</div>
+              <div class="hint">Marca los paquetes que quieres usar (el tema propone los suyos) y pulsa «Cargar». Reemplazan la lista de «Mis imágenes».</div>
+              <sl-checkbox size="small" class="bookPkg" value="animales">🦊 Animales del bosque y safari (40)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="marinas">🌊 Criaturas y arrecifes del océano (64)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="espacio">🚀 Exploración espacial y cosmos (48)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="misticas">🔮 Místico, tarot y alquimia (48)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="mitologia">🐉 Criaturas mitológicas (64)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="dinosaurios">🦕 Dinosaurios y prehistoria (32)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="zentangle">✨ Animales zentangle (41)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="naturaleza">🌿 Adornos de naturaleza · fondo (104)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="infantiles">🎈 Adornos infantiles · fondo (78)</sl-checkbox>
+              <sl-button id="btnLoadBookPkgs" size="small" variant="default" style="width:100%; margin-top:4px;">
+                <sl-icon slot="prefix" name="box-arrow-in-down"></sl-icon> Cargar ilustraciones marcadas
+              </sl-button>
+              <sl-select id="bookFigureShare" label="Páginas con ilustración" size="small" value="0.5" help-text="Si hay más ilustraciones que páginas, se elige una selección distinta para cada semilla.">
+                <sl-option value="1">Todas las que se pueda</sl-option>
+                <sl-option value="0.66">2 de cada 3</sl-option>
+                <sl-option value="0.5">La mitad (alterna con mandalas puros)</sl-option>
+                <sl-option value="0.33">1 de cada 3</sl-option>
+              </sl-select>
+              <sl-checkbox id="bookMixUses" size="small" checked>Alternar la presentación de las ilustraciones (figura rellena, corona de copias, medallón)</sl-checkbox>
             </div>
             <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="50"></sl-input>
             <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="progresiva">
@@ -888,7 +958,7 @@
       </sl-tab-group>
     </div>
 
-    <div id="stage-container">
+    <div id="stage-container" role="region" aria-label="Vista previa" tabindex="-1">
       <div id="stage-zoom-controls">
         <sl-tooltip content="Alejar vista">
           <sl-icon-button id="btnZoomOut" name="dash" label="Alejar" style="font-size: 1rem;"></sl-icon-button>

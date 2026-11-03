@@ -41,111 +41,140 @@ export const PATTERN_BACKGROUNDS = ["escamas", "flor_vida", "sol", "ondas", "mos
 export const BESTSELLER_STYLE_W = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 };
 
 // Temas de libro: un tema dirige figuras, fondos y motivos para crear coherencia visual.
-// Cada tema define estilos permitidos, fondos, temas de relleno (scatter) y motivos especiales.
+// - packages: paquetes de ilustraciones que propone (assets/catalogo.json); el usuario
+//   puede añadir o quitar paquetes en la pestaña del libro
+// - backgrounds: tramas (sólo «fondo decorado» y centrado) + fondos sueltos del tema. El
+//   fondo suelto del tema (scatterTheme) rodea también a las figuras. Antes cada tema
+//   tenía sólo 2 tramas y el libro alternaba ondas/escamas durante 50 páginas.
 export const BOOK_THEMES = {
-  // Tema por defecto: sin tema, usa los valores del perfil o del usuario
   none: {
     name: "Sin tema",
     description: "Mezcla libre de estilos y fondos",
-    styles: null, // usa los del perfil
-    backgrounds: null, // usa los del perfil
-    scatterTheme: null, // usa el del perfil
+    styles: null, backgrounds: null, scatterTheme: null, packages: [],
   },
-  // Tema océano: olas, peces, conchas, estrellas de mar
   oceano: {
     name: "Océano y Vida Marina",
     description: "Mandalas marinos: olas, criaturas oceánicas, arrecifes y conchas",
-    packageId: "marinas",
+    packages: ["marinas"],
     styles: ["floral", "geometric", "sashiko"],
     styleWeights: [2, 1.5, 2],
-    backgrounds: ["ondas", "escamas"],
+    backgrounds: ["ondas", "escamas", "oceano"],
     scatterTheme: "oceano",
-    motifs: ["wave", "shell", "fish", "starfish", "anchor"],
     titlePreset: {
       title: "Mándalas del Océano",
       subtitle: "Criaturas Marinas, Arrecifes y Serenidad",
       quote: "El mar, una vez que lanza su hechizo, mantiene a uno en su red de maravillas para siempre. — Jacques Cousteau"
     }
   },
-  // Tema navidad: estrellas, copos de nieve, árboles, regalos
+  // Sin paquete navideño propio: fondos de copos y pinos; las ilustraciones se eligen a mano
   navidad: {
     name: "Navidad y Fiestas",
-    description: "Mandalas invernales: estrellas radiantes, copos de nieve y símbolos festivos",
-    packageId: "zentangle",
+    description: "Mandalas invernales: copos de nieve, pinos y estrellas (no hay paquete navideño: marca las ilustraciones que quieras abajo)",
+    packages: [],
     styles: ["geometric", "celtico", "floral"],
     styleWeights: [2.5, 1.5, 1],
-    backgrounds: ["estrellas", "sol"],
+    backgrounds: ["sol", "flor_vida", "navidad", "estrellas"],
     scatterTheme: "navidad",
-    motifs: ["star", "snowflake", "tree", "gift", "bell"],
     titlePreset: {
       title: "Mándalas de Invierno y Navidad",
       subtitle: "Diseños Festivos de Copos de Nieve, Estrellas y Magia Invernal",
       quote: "La paz y la serenidad se hacen presentes en cada pequeño destello invernal."
     }
   },
-  // Tema bosque: hojas, hongos, árboles, animales del bosque
   bosque: {
     name: "Bosque y Vida Silvestre",
     description: "Mandalas del bosque: animales de safari y bosque, hojas botánicas y naturaleza",
-    packageId: "animales",
-    secondaryPackageId: "naturaleza",
+    packages: ["animales", "naturaleza"],
     styles: ["floral", "celtico", "sashiko"],
     styleWeights: [3, 1, 1],
-    backgrounds: ["hojas", "vinas"],
+    backgrounds: ["flor_vida", "hojas", "vinas", "bosque"],
     scatterTheme: "bosque",
-    motifs: ["leaf", "mushroom", "tree", "acorn", "fern"],
     titlePreset: {
       title: "Mándalas del Bosque Encantado",
       subtitle: "Fauna Silvestre, Hojas Botánicas y Paz Natural",
       quote: "En cada paseo por la naturaleza uno recibe mucho más de lo que busca. — John Muir"
     }
   },
-  // Tema espacio: estrellas, planetas, galaxias, astronautas
   espacio: {
     name: "Espacio y Cosmos",
     description: "Mandalas cósmicos: planetas, estrellas, galaxias, astronautas, naves",
-    packageId: "espacio",
+    packages: ["espacio"],
     styles: ["geometric", "yantra", "islamico"],
     styleWeights: [2.5, 2, 1.5],
-    backgrounds: ["sol", "mosaico"],
+    backgrounds: ["sol", "mosaico", "espacio", "cielo"],
     scatterTheme: "espacio",
-    motifs: ["star", "planet", "rocket", "astronaut", "comet"],
     titlePreset: {
       title: "Mándalas del Cosmos",
       subtitle: "Viaje Geométrico a Través de las Estrellas y Galaxias",
       quote: "El cosmos está dentro de nosotros. Estamos hechos de materia estelar. — Carl Sagan"
     }
   },
-  // Tema místico y magia: tarot, alquimia, astros, símbolos sagrados
   mistico: {
     name: "Místico y Tarot",
     description: "Mandalas esotéricos: tarot, alquimia, lunas, sol radiante, geometría sagrada",
-    packageId: "misticas",
+    packages: ["misticas"],
     styles: ["yantra", "islamico", "celtico", "geometric"],
     styleWeights: [3, 2, 1.5, 1],
-    backgrounds: ["sol", "flor_vida", "mosaico"],
+    backgrounds: ["sol", "flor_vida", "mosaico", "mistico", "cielo"],
     scatterTheme: "mistico",
-    motifs: ["moon", "sun", "star", "crystal", "eye"],
     titlePreset: {
       title: "Mándalas Místicos y Sagrados",
       subtitle: "Símbolos Alquímicos, Tarot y Geometría Secreta",
       quote: "Como es arriba, es abajo; como es adentro, es afuera. — Hermes Trismegisto"
     }
   },
-  // Tema mitología y leyendas: bestias míticas, monstruos clásicos, leyendas
   mitologia: {
     name: "Mitología y Leyendas",
     description: "Mandalas de criaturas mitológicas: dragones, grifos, pegasos, fénix, leyendas",
-    packageId: "mitologia",
+    packages: ["mitologia"],
     styles: ["celtico", "geometric", "yantra", "islamico"],
     styleWeights: [2.5, 2, 1.5, 1],
-    backgrounds: ["escamas", "sol", "mosaico"],
+    backgrounds: ["escamas", "sol", "mosaico", "mitologia"],
     scatterTheme: "mitologia",
-    motifs: ["dragon", "wing", "feather", "claw", "fire"],
     titlePreset: {
       title: "Mándalas Mitológicos y Criaturas Legendarias",
       subtitle: "Bestias Fantásticas, Dragones y Símbolos Ancestrales",
       quote: "Los mitos son sueños públicos, los sueños son mitos privados. — Joseph Campbell"
+    }
+  },
+  prehistorico: {
+    name: "Dinosaurios y Prehistoria",
+    description: "Coronas de dinosaurios alrededor del mandala, helechos, palmeras, huevos y huellas",
+    packages: ["dinosaurios", "naturaleza"],
+    styles: ["floral", "celtico", "azteca", "sashiko"],
+    styleWeights: [2, 1.5, 1.5, 1],
+    backgrounds: ["escamas", "sol", "prehistorico", "hojas"],
+    scatterTheme: "prehistorico",
+    titlePreset: {
+      title: "Mándalas de Dinosaurios",
+      subtitle: "Gigantes Prehistóricos, Helechos y Huellas para Colorear",
+      quote: "La Tierra guarda en sus piedras la memoria de los gigantes."
+    }
+  },
+  zentangle: {
+    name: "Animales Zentangle",
+    description: "Animales con textura zentangle en coronas y medallones, con hojas y setas de fondo",
+    packages: ["zentangle", "naturaleza"],
+    styles: ["floral", "celtico", "islamico", "sashiko"],
+    styleWeights: [2, 1.5, 1, 1],
+    backgrounds: ["flor_vida", "mosaico", "bosque", "vinas"],
+    scatterTheme: "bosque",
+    titlePreset: {
+      title: "Animales Zentangle",
+      subtitle: "Mándalas y Texturas para Colorear con Calma",
+    }
+  },
+  infantil: {
+    name: "Infantil y Animales Amigables",
+    description: "Para niños: animales simpáticos, corazones, estrellas y burbujas",
+    packages: ["animales", "infantiles"],
+    styles: ["floral", "sashiko", "celtico"],
+    styleWeights: [2, 1, 1],
+    backgrounds: ["dulce", "cielo", "infantil", "flor_vida"],
+    scatterTheme: "infantil",
+    titlePreset: {
+      title: "Mis Mándalas de Animales",
+      subtitle: "Libro para Colorear para Niños",
     }
   },
 };
@@ -216,13 +245,17 @@ export function backgroundPicker(rng, { fillCentro = false, patternOnly = false,
     const centro = composition === "centro" && fillCentro;
     if (!FILLED.has(composition) && !centro) return null;
     if (Array.isArray(backgrounds) && backgrounds.length) {
+      // Las tramas sólo se dibujan en «fondo decorado» y en el centrado que completa la hoja;
+      // en constelación, esquinas o medio mandala salían como el relleno de siempre
+      const fits = composition === "fondo" || centro ? backgrounds : backgrounds.filter(b => !PATTERN_BACKGROUNDS.includes(b));
+      const list = fits.length ? fits : backgrounds;
       const n = (b) => used.get(`${composition}|${b}`) || 0;
-      const min = Math.min(...backgrounds.map(n));
-      let least = backgrounds.filter(b => n(b) === min && b !== last);
+      const min = Math.min(...list.map(n));
+      let least = list.filter(b => n(b) === min && b !== last);
       if (!least.length) {
-        const pool = backgrounds.filter(b => b !== last);
+        const pool = list.filter(b => b !== last);
         const m2 = Math.min(...pool.map(n));
-        least = pool.length ? pool.filter(b => n(b) === m2) : backgrounds;
+        least = pool.length ? pool.filter(b => n(b) === m2) : list;
       }
       const pick = least[Math.floor(rng() * least.length)];
       used.set(`${composition}|${pick}`, n(pick) + 1);

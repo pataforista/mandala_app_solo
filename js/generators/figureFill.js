@@ -9,7 +9,7 @@
 import { mulberry32 } from "../core/prng.js";
 import { PathBuilder } from "../core/pathBuilder.js";
 import { distanceTransform } from "../core/lineArt.js";
-import { FILLERS, drawFiller, circle, extraImage, EXTRA_MIN_R, EXTRA_SHARE } from "./pageComposer.js";
+import { FILLERS, UPRIGHT, drawFiller, circle, extraImage, EXTRA_MIN_R, EXTRA_SHARE } from "./pageComposer.js";
 
 /**
  * figure: { href, cls, w, h } (cls: 0 tinta, 1 interior, 2 exterior; ver processFigure)
@@ -18,7 +18,7 @@ import { FILLERS, drawFiller, circle, extraImage, EXTRA_MIN_R, EXTRA_SHARE } fro
  * Devuelve los fragmentos SVG (imagen + relleno).
  */
 export function drawFigure({ figure, A, seed = 1, styleMode = "floral", fillInside = true, fillOutside = true,
-  density = 0.6, outlineMode = false, stroke = "#000", mainW = 0.55, detailW = 0.4, sub }) {
+  density = 0.6, outlineMode = false, stroke = "#000", mainW = 0.55, detailW = 0.4, sub, weights = null }) {
   const rng = mulberry32(((seed >>> 0) ^ 0xF16A7E) >>> 0);
   const aw = A.x1 - A.x0, ah = A.y1 - A.y0;
   // La figura ocupa todo lo posible sin deformarse
@@ -51,7 +51,8 @@ export function drawFigure({ figure, A, seed = 1, styleMode = "floral", fillInsi
     avail[i] = on ? dist[i] * cell - (z === 1 ? gapIn : gapOut) : -1;
   }
 
-  const W = FILLERS[styleMode] || FILLERS.floral;
+  // weights: motivos del tema (peces alrededor de una orca); si no, los del estilo
+  const W = weights || FILLERS[styleMode] || FILLERS.floral;
   const kinds = Object.keys(W);
   const pickKind = () => { let t = rng() * kinds.reduce((s, q) => s + W[q], 0); for (const q of kinds) { t -= W[q]; if (t <= 0) return q; } return kinds[0]; };
   const main = new PathBuilder(), detail = new PathBuilder(), dots = new PathBuilder();
@@ -79,9 +80,12 @@ export function drawFigure({ figure, A, seed = 1, styleMode = "floral", fillInsi
       out.push(...sub(x, y, r, minis++));
     } else if (r >= 4.5) {
       // Detalle interior sólo en motivos grandes: si no, las celdas quedan diminutas
-      drawFiller(pickKind(), main, detail, x, y, r, rot, rng, !outlineMode && r >= 8);
+      const kind = pickKind(), up = weights ? UPRIGHT[kind] : undefined;
+      // Con tema, setas, pinos y llamas casi derechos (como en el fondo de las demás páginas)
+      drawFiller(kind, main, detail, x, y, r, up === undefined ? rot : up + (rot - Math.PI) * 0.12, rng, !outlineMode && r >= 8);
     } else {
-      drawFiller(rng() < 0.5 ? "ring" : (rng() < 0.5 ? "heart" : "daisy"), main, detail, x, y, r, rot, rng, false);
+      // Pequeños: formas simples (con tema, sin corazones ni margaritas fuera de lugar)
+      drawFiller(rng() < 0.5 || weights ? "ring" : (rng() < 0.5 ? "heart" : "daisy"), main, detail, x, y, r, rot, rng, false);
     }
     // Actualiza el espacio libre sólo en el entorno del motivo nuevo
     const reach = Math.ceil((r + Math.max(maxIn, maxOut) + gapOut) / cell);
