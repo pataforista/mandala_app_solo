@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { planBook, BOOK_THEMES, PRODUCT_PROFILES, chapterLayout } from "../js/core/bookPlan.js";
+import { COLORING_PRESETS, levelToGeneratorOpts } from "../js/core/levels.js";
 
 // Build a lightweight DOM simulation from index.html so js/app.js can initialize and bind all handlers in Node
 const indexHtml = fs.readFileSync("index.html", "utf8");
@@ -61,7 +62,10 @@ function makeMockElement(id = "", tag = "DIV") {
     insertAdjacentHTML() {},
     setAttribute(k, v) { this[k] = v; },
     getAttribute(k) { return this[k] || null; },
-    querySelector() { return makeMockElement("", "DIV"); },
+    querySelector(sel) {
+      if (sel && sel.includes("[open]")) return null;
+      return makeMockElement("", "DIV");
+    },
     querySelectorAll(sel) {
       if (sel.includes("btn-load-proj")) return children.filter(c => c._projId);
       return [];
@@ -102,6 +106,7 @@ elementMap.get("bookBack").value = "blanco";
 elementMap.get("bookMural").value = "3x3";
 elementMap.get("bookGrowth").value = "1";
 elementMap.get("bookMystery").value = "3";
+elementMap.get("bookFigureShare").value = "0.5";
 elementMap.get("styleMode").value = "sashiko";
 elementMap.get("generatorType").value = "classic";
 elementMap.get("coloringPreset").value = "adulto";
@@ -111,6 +116,16 @@ elementMap.get("strokeWidth").value = "0.55";
 elementMap.get("petals").value = "12";
 elementMap.get("complexity").value = "130";
 
+const bookPkgElements = [
+  "animales", "marinas", "espacio", "misticas", "mitologia",
+  "dinosaurios", "zentangle", "naturaleza", "infantiles"
+].map(id => {
+  const c = makeMockElement("", "SL-CHECKBOX");
+  c.value = id;
+  c.checked = false;
+  return c;
+});
+
 const docListeners = new Map();
 globalThis.document = {
   getElementById(id) {
@@ -119,7 +134,10 @@ globalThis.document = {
     }
     return elementMap.get(id);
   },
-  querySelector() { return makeMockElement(); },
+  querySelector(sel) {
+    if (sel && sel.includes("[open]")) return null;
+    return makeMockElement();
+  },
   querySelectorAll(sel) {
     if (sel === ".bookComp") {
       return ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio"].map(v => {
@@ -128,6 +146,9 @@ globalThis.document = {
         c.checked = true;
         return c;
       });
+    }
+    if (sel === ".bookPkg") {
+      return bookPkgElements;
     }
     return [];
   },
@@ -147,10 +168,19 @@ globalThis.document = {
   documentElement: makeMockElement("html", "HTML"),
 };
 
+const winListeners = new Map();
 globalThis.window = {
   location: { search: "", hash: "", href: "http://localhost/", pathname: "/" },
   history: { replaceState() {}, pushState() {} },
-  addEventListener() {},
+  addEventListener(type, fn) {
+    if (!winListeners.has(type)) winListeners.set(type, []);
+    winListeners.get(type).push(fn);
+  },
+  dispatchEvent(evt) {
+    const list = winListeners.get(evt.type) || [];
+    for (const fn of list) fn(evt);
+    return true;
+  },
   matchMedia: () => ({ matches: false, addEventListener() {} }),
   devicePixelRatio: 1,
 };
@@ -183,7 +213,7 @@ globalThis.CustomEvent = class CustomEvent extends globalThis.Event {
   constructor(type, opts = {}) { super(type); this.detail = opts.detail; }
 };
 
-test("UI initialization, controls, themes, and project lifecycle in js/app.js", async (t) => {
+test("UI initialization, controls, themes, keyboard a11y, and project lifecycle in js/app.js", async (t) => {
   await import("../js/app.js");
 
   await t.test("initial render populates #stage with an SVG mandala and updates KDP summary", () => {
@@ -216,26 +246,60 @@ test("UI initialization, controls, themes, and project lifecycle in js/app.js", 
     assert.equal(stage.style.transform, "none");
   });
 
-  await t.test("selecting a book theme updates themeActionBox and chapter styles", () => {
+  await t.test("selecting each book theme updates themeActionBox, chapter styles, and checks proposed .bookPkg boxes", () => {
     const bookTheme = document.getElementById("bookTheme");
     const themeActionBox = document.getElementById("themeActionBox");
     const themeDescText = document.getElementById("themeDescText");
 
     assert.equal(themeActionBox.style.display, "none");
 
+    for (const [key, theme] of Object.entries(BOOK_THEMES)) {
+      if (key === "none") continue;
+      bookTheme.value = key;
+      bookTheme.dispatchEvent(new Event("sl-change"));
+
+      assert.equal(themeActionBox.style.display, "block");
+      assert.ok(themeDescText.innerHTML.includes(theme.name));
+
+      const checkedIds = bookPkgElements.filter(b => b.checked).map(b => b.value);
+      assert.deepEqual(checkedIds.sort(), [...theme.packages].sort(), `Theme ${key} should pre-check its packages`);
+    }
+
     bookTheme.value = "espacio";
     bookTheme.dispatchEvent(new Event("sl-change"));
-
-    assert.equal(themeActionBox.style.display, "block");
-    assert.ok(themeDescText.innerHTML.includes("Espacio y Cosmos"));
-
-    // Verify bookSummary chapters reflect theme styles (geometric, yantra, islamico)
     const summary = document.getElementById("bookSummary");
     assert.ok(!summary.innerHTML.includes("Jardín de pétalos"), "Space theme should not include floral chapter");
 
     bookTheme.value = "none";
     bookTheme.dispatchEvent(new Event("sl-change"));
     assert.equal(themeActionBox.style.display, "none");
+  });
+
+  await t.test("keyboard shortcuts do not hijack Space or arrows when focused on an interactive control", () => {
+    const seedEl = document.getElementById("seed");
+    const initialSeed = seedEl.value;
+    const mockButton = makeMockElement("someBtn", "SL-BUTTON");
+
+    // Pressing Space while focused on an SL-BUTTON must NOT change the seed
+    window.dispatchEvent({
+      type: "keydown",
+      key: " ",
+      target: mockButton,
+      composedPath: () => [mockButton, document.body],
+      preventDefault() {},
+    });
+    assert.equal(seedEl.value, initialSeed, "Space on a button must not trigger random seed shortcut");
+
+    // Pressing ArrowRight on #stage-container SHOULD advance the seed
+    const stageContainer = document.getElementById("stage-container");
+    window.dispatchEvent({
+      type: "keydown",
+      key: "ArrowRight",
+      target: stageContainer,
+      composedPath: () => [stageContainer, document.body],
+      preventDefault() {},
+    });
+    assert.notEqual(seedEl.value, initialSeed, "ArrowRight on stage-container should advance the seed");
   });
 
   await t.test("planBook respects theme backgrounds and product profile useBackground=false", () => {
@@ -266,6 +330,14 @@ test("UI initialization, controls, themes, and project lifecycle in js/app.js", 
     });
     for (const p of lpPlan) {
       assert.equal(p.background, null, "large_print_easy profile must disable backgrounds");
+    }
+  });
+
+  await t.test("levels.js is the single source of truth for COLORING_PRESETS", () => {
+    for (const k of ["ninos", "ninos_grande", "adulto", "bestseller", "letra_grande", "experto", "zen"]) {
+      assert.ok(COLORING_PRESETS[k], `Missing preset ${k}`);
+      const opts = levelToGeneratorOpts(k);
+      assert.equal(opts.strokeWidthMm, COLORING_PRESETS[k].strokeWidth);
     }
   });
 

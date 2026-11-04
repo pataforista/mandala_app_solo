@@ -7,7 +7,11 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 
 export function fileRevision(path) {
-  return crypto.createHash("sha1").update(fs.readFileSync(path)).digest("hex").slice(0, 10);
+  const buf = fs.readFileSync(path);
+  const data = /\.(html|m?js|json|css|svg)$/i.test(path)
+    ? buf.toString("utf8").replace(/\r\n/g, "\n")
+    : buf;
+  return crypto.createHash("sha1").update(data).digest("hex").slice(0, 10);
 }
 
 export function precacheEntries(swSource) {

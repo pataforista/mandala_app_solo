@@ -12,18 +12,14 @@ import { planBook, bestSellerProfile, pageStrokeMm, chapterLayout, addSpecialPag
 import { measureSvg, commercialScore } from "../js/core/commercialMetrics.js";
 import { pageFingerprint } from "../js/core/variety.js";
 import { curateBook, attemptChoice, summarize, CURATE_TRIES } from "../js/core/bookCurator.js";
+import { levelToGeneratorOpts } from "../js/core/levels.js";
 
 const args = process.argv.slice(2).filter(a => !a.startsWith("--"));
 const BOOKS = Number(args[0]) || 3, PAGES = Number(args[1]) || 50, PRESET = args[2] || "KDP_8_5x11", LEVEL = args[3] || "adulto";
 const CURATE = !process.argv.includes("--sin-curar");
 
-// Niveles de la app (COLORING_PRESETS en js/app.js), sólo lo que usa el motor clásico
-const LEVELS = {
-  adulto: { complexity: 110, densityFactor: 0.65, strokeWidthMm: 0.8, spacing: 0.4, minCellAreaMm2: 5, detailSimplification: 0.6, outlineMode: false, includeFrames: true },
-  letra_grande: { complexity: 85, densityFactor: 0.5, strokeWidthMm: 1.1, spacing: 0.5, minCellAreaMm2: 7, detailSimplification: 0.75, outlineMode: false, includeFrames: true },
-  ninos: { complexity: 40, densityFactor: 0.35, strokeWidthMm: 0.8, spacing: 0.6, minCellAreaMm2: 6, detailSimplification: 0.85, outlineMode: true, includeFrames: false },
-};
-const lv = LEVELS[LEVEL];
+// Niveles importados desde js/core/levels.js (fuente única de verdad)
+const lv = levelToGeneratorOpts(LEVEL);
 const base = { ...lv, organicLevel: 0.2, textures: false, pageBorder: true, kaleidoscope: true,
   complexity: Math.max(20, Math.round(lv.complexity * Math.min(1.6, Math.max(0.3, lv.densityFactor / 0.7)))) };
 const W = { floral: 3, geometric: 2, islamico: 0.3, sashiko: 0.5, celtico: 0.3, azteca: 0.2, yantra: 0.2 }; // BESTSELLER_STYLE_W

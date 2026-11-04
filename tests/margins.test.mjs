@@ -12,17 +12,18 @@ import { generateMandalaClassic } from "../js/generators/mandalaClassic.js";
 import { withSpecialPages } from "../js/generators/specialPages.js";
 import { inkBounds } from "../js/core/commercialMetrics.js";
 import { kdpGutterMm, KDP_OUTSIDE_MARGIN_MM } from "../js/core/kdp.js";
+import { levelToGeneratorOpts } from "../js/core/levels.js";
 import {
   planBook, pageStrokeMm, addSpecialPages, insertChapterDividers, chapterLayout,
   BOOK_STYLES, BOOK_COMPOSITIONS, BOOK_FRAMES, SCATTER_BACKGROUNDS, PATTERN_BACKGROUNDS,
 } from "../js/core/bookPlan.js";
 
 const gen = withSpecialPages(generateMandalaClassic);
-// Trazo y espaciado de los niveles de la app (los extremos son los que más arriesgan)
+// Trazo y espaciado desde js/core/levels.js (con complejidad ágil para la batería de pruebas)
 const LEVELS = {
-  adulto: { strokeWidthMm: 0.8, spacing: 0.4, complexity: 80, minCellAreaMm2: 5, detailSimplification: 0.6, includeFrames: true },
-  letra_grande: { strokeWidthMm: 1.1, spacing: 0.5, complexity: 60, minCellAreaMm2: 7, detailSimplification: 0.75, includeFrames: true },
-  ninos: { strokeWidthMm: 0.8, spacing: 0.6, complexity: 20, minCellAreaMm2: 6, detailSimplification: 0.85, outlineMode: true, includeFrames: false },
+  adulto: { ...levelToGeneratorOpts("adulto"), complexity: 80 },
+  letra_grande: { ...levelToGeneratorOpts("letra_grande"), complexity: 60 },
+  ninos: { ...levelToGeneratorOpts("ninos"), complexity: 20 },
 };
 
 function violation(svg, page, margin) {
