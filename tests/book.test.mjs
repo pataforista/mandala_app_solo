@@ -12,7 +12,7 @@ import { kdpGutterMm, kdpSafeMarginMm, bookLayout, kdpChecklist, kdpCoverDimensi
 import { BOOK_TEXTS, BOOK_FONT } from "../js/core/export.js";
 import { PATTERN_THEMES } from "../js/generators/pageComposer.js";
 import { encodeGrayPng, rgbaToGray } from "../js/core/grayPng.js";
-import { stampRaster } from "../js/core/lineArt.js";
+import { stampRaster, STAMP_VERSION } from "../js/core/lineArt.js";
 import { imageToLineArt, processFigure } from "../js/core/lineArt.js";
 import { packFigures, unpackFigures } from "../js/core/figurePack.js";
 import { mulberry32 } from "../js/core/prng.js";
@@ -882,4 +882,29 @@ test("kdpCoverDimensions: calcula dimensiones exactas para Canva y KDP", () => {
   // Con 100 páginas (>= 80): texto en lomo permitido
   const big = kdpCoverDimensions({ pages: 100, trimWidthMm: 215.9, trimHeightMm: 279.4 });
   assert.equal(big.spineTextAllowed, true);
+});
+
+test("sello: un dibujo con detalle fino no se funde en negro macizo", () => {
+  // Rosetón de 40 pétalos en 4 anillos concéntricos (líneas de 2 px a ~6 px de distancia),
+  // como un mandala importado: con el grosor fijo antiguo (1,6 %) el sello salía ~50 % negro.
+  const w = 1000, h = 1000, cls = new Uint8Array(w * h).fill(2);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = x - 500, dy = y - 500, r = Math.hypot(dx, dy);
+    if (r > 480) continue;
+    const a = Math.atan2(dy, dx);
+    const ring = Math.abs(((r % 44) + 44) % 44 - 22) < 1.2;
+    const spoke = r > 40 && Math.abs(Math.sin(a * 20)) * r < 1.6;
+    if (ring || spoke) cls[y * w + x] = 0;
+  }
+  const ink = (st) => { let n = 0; for (const g of st.gray) if (g < 128) n++; return n / st.gray.length; };
+  const st = stampRaster(cls, w, h);
+  assert.ok(ink(st) <= 0.31, `sello con ${(ink(st) * 100).toFixed(0)} % de tinta`);
+  // Una figura sencilla conserva el grosor completo (el afinado sólo actúa donde hace falta)
+  const rect = new Uint8Array(150 * 150).fill(2);
+  for (let i = 20; i < 130; i++) { rect[20 * 150 + i] = 0; rect[129 * 150 + i] = 0; rect[i * 150 + 20] = 0; rect[i * 150 + 99] = 0; }
+  const thin = stampRaster(rect, 150, 150, 300, 0.02);
+  let run = 0, best = 0;
+  for (let x = 0; x < thin.w; x++) { const v = thin.gray[Math.floor(thin.h / 2) * thin.w + x]; run = v < 128 ? run + 1 : 0; best = Math.max(best, run); }
+  assert.ok(best >= 5, `grosor ${best}`);
+  assert.ok(Number.isInteger(STAMP_VERSION) && STAMP_VERSION >= 2);
 });
