@@ -208,7 +208,11 @@ export function composePage(doc, opts, drawMandala) {
   let fill = null;       // { minis: bool } si la composición rellena el espacio libre
   let fillPattern = null; // { kind, cx, cy, halo } trama de fondo («fondo decorado»)
 
-  switch (opts.figure ? "figura" : opts.figureRing ? "anillos" : composition) {
+  // «figura» y «anillos» sólo existen con su imagen; sin ella (estado guardado o enlace viejo)
+  // se dibuja el mandala centrado en vez de fallar
+  const mode = opts.figure ? "figura" : opts.figureRing ? "anillos"
+    : (composition === "figura" || composition === "anillos") ? "centro" : composition;
+  switch (mode) {
     case "anillos": {
       // Mandala con un anillo de la figura repetida: bandas clásicas por fuera, copias
       // grandes de la figura en medio (en espejo alterno) y la figura entera en el

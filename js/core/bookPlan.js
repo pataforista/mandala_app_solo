@@ -62,8 +62,7 @@ export const BOOK_THEMES = {
     scatterTheme: "oceano",
     titlePreset: {
       title: "Mándalas del Océano",
-      subtitle: "Criaturas Marinas, Arrecifes y Serenidad",
-      quote: "El mar, una vez que lanza su hechizo, mantiene a uno en su red de maravillas para siempre. — Jacques Cousteau"
+      subtitle: "Criaturas Marinas, Arrecifes y Serenidad"
     }
   },
   // Sin paquete navideño propio: fondos de copos y pinos; las ilustraciones se eligen a mano
@@ -77,8 +76,7 @@ export const BOOK_THEMES = {
     scatterTheme: "navidad",
     titlePreset: {
       title: "Mándalas de Invierno y Navidad",
-      subtitle: "Diseños Festivos de Copos de Nieve, Estrellas y Magia Invernal",
-      quote: "La paz y la serenidad se hacen presentes en cada pequeño destello invernal."
+      subtitle: "Diseños Festivos de Copos de Nieve, Estrellas y Magia Invernal"
     }
   },
   bosque: {
@@ -91,8 +89,7 @@ export const BOOK_THEMES = {
     scatterTheme: "bosque",
     titlePreset: {
       title: "Mándalas del Bosque Encantado",
-      subtitle: "Fauna Silvestre, Hojas Botánicas y Paz Natural",
-      quote: "En cada paseo por la naturaleza uno recibe mucho más de lo que busca. — John Muir"
+      subtitle: "Fauna Silvestre, Hojas Botánicas y Paz Natural"
     }
   },
   espacio: {
@@ -105,8 +102,7 @@ export const BOOK_THEMES = {
     scatterTheme: "espacio",
     titlePreset: {
       title: "Mándalas del Cosmos",
-      subtitle: "Viaje Geométrico a Través de las Estrellas y Galaxias",
-      quote: "El cosmos está dentro de nosotros. Estamos hechos de materia estelar. — Carl Sagan"
+      subtitle: "Viaje Geométrico a Través de las Estrellas y Galaxias"
     }
   },
   mistico: {
@@ -119,8 +115,7 @@ export const BOOK_THEMES = {
     scatterTheme: "mistico",
     titlePreset: {
       title: "Mándalas Místicos y Sagrados",
-      subtitle: "Símbolos Alquímicos, Tarot y Geometría Secreta",
-      quote: "Como es arriba, es abajo; como es adentro, es afuera. — Hermes Trismegisto"
+      subtitle: "Símbolos Alquímicos, Tarot y Geometría Secreta"
     }
   },
   mitologia: {
@@ -133,8 +128,7 @@ export const BOOK_THEMES = {
     scatterTheme: "mitologia",
     titlePreset: {
       title: "Mándalas Mitológicos y Criaturas Legendarias",
-      subtitle: "Bestias Fantásticas, Dragones y Símbolos Ancestrales",
-      quote: "Los mitos son sueños públicos, los sueños son mitos privados. — Joseph Campbell"
+      subtitle: "Bestias Fantásticas, Dragones y Símbolos Ancestrales"
     }
   },
   prehistorico: {
@@ -147,12 +141,11 @@ export const BOOK_THEMES = {
     scatterTheme: "prehistorico",
     titlePreset: {
       title: "Mándalas de Dinosaurios",
-      subtitle: "Gigantes Prehistóricos, Helechos y Huellas para Colorear",
-      quote: "La Tierra guarda en sus piedras la memoria de los gigantes."
+      subtitle: "Gigantes Prehistóricos, Helechos y Huellas para Colorear"
     }
   },
   zentangle: {
-    name: "Animales Zentangle",
+    name: "Animales con texturas",
     description: "Animales con textura zentangle en coronas y medallones, con hojas y setas de fondo",
     packages: ["zentangle", "naturaleza"],
     styles: ["floral", "celtico", "islamico", "sashiko"],
@@ -160,7 +153,7 @@ export const BOOK_THEMES = {
     backgrounds: ["flor_vida", "mosaico", "bosque", "vinas"],
     scatterTheme: "bosque",
     titlePreset: {
-      title: "Animales Zentangle",
+      title: "Animales con Texturas",
       subtitle: "Mándalas y Texturas para Colorear con Calma",
     }
   },

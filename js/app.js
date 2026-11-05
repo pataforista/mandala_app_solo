@@ -3,7 +3,6 @@ import { createDoc } from "./core/svgDoc.js";
 import { renderDocToSvgString } from "./core/svgRender.js";
 import { downloadTextFile, downloadPng, downloadPdf, downloadBatchPdf, downloadBookPdf, bookPageCount, flattenSvgElement, svgStringToImageData } from "./core/export.js";
 import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
-import { TAOISTA_DATASET } from "../dataset_taoista.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
 import { generateMandalaRadial } from "./generators/mandalaRadial.js";
 import { generateMandalaClassic } from "./generators/mandalaClassic.js";
@@ -37,13 +36,49 @@ export function showToast(message, variant = "primary", icon = "info-circle", du
       innerHTML: `<sl-icon name="${icon}" slot="icon"></sl-icon> ${message}`
     });
     document.body.appendChild(alertEl);
-    alertEl.addEventListener("sl-after-hide", () => alertEl.remove());
+    // toast() mueve el aviso a su pila y lo retira al cerrarse; retirarlo también aquí
+    // hacía fallar a Shoelace (removeChild) y dejaba su pila vacía en la página.
     if (typeof alertEl.toast === "function") {
       return alertEl.toast();
     }
+    alertEl.addEventListener("sl-after-hide", () => alertEl.remove());
   } catch (err) {
     console.warn("Toast notification fallback:", err);
   }
+}
+
+// Confirmación con el diálogo de Shoelace (sustituye a window.confirm). Resuelve true sólo
+// si se pulsa «Aceptar»; cerrar con Esc, la X o fuera del diálogo cuenta como cancelar.
+export function showConfirm(message, { title = "Confirmar acción", confirmLabel = "Aceptar", cancelLabel = "Cancelar", variant = "primary" } = {}) {
+  const dialog = document.getElementById("confirmDialog");
+  const msgEl = document.getElementById("confirmDialogMessage");
+  const okBtn = document.getElementById("confirmDialogOk");
+  const cancelBtn = document.getElementById("confirmDialogCancel");
+  if (!dialog || !okBtn || !cancelBtn || typeof dialog.show !== "function") {
+    console.warn("Diálogo de confirmación no disponible:", message);
+    return Promise.resolve(false);
+  }
+  return new Promise((resolve) => {
+    let answer = false;
+    dialog.label = title;
+    if (msgEl) msgEl.textContent = message;
+    okBtn.textContent = confirmLabel;
+    okBtn.variant = variant;
+    cancelBtn.textContent = cancelLabel;
+    const onOk = () => { answer = true; dialog.hide(); };
+    const onCancel = () => { answer = false; dialog.hide(); };
+    const onHide = (e) => {
+      if (e.target !== dialog) return; // sl-hide de un hijo (p. ej. un tooltip) no cierra
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      dialog.removeEventListener("sl-after-hide", onHide);
+      resolve(answer);
+    };
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+    dialog.addEventListener("sl-after-hide", onHide);
+    dialog.show();
+  });
 }
 
 const historyMan = new StateHistory();
@@ -297,6 +332,9 @@ const recentSeeds = [];
 // sólo se aplicaba al cambiarlo, así que un libro nuevo salía con línea fina sin avisar.
 Object.assign(DEFAULTS, COLORING_PRESETS[DEFAULTS.coloringPreset]);
 const state = getStateFromURL(DEFAULTS);
+// Un enlace o estado viejo puede traer una composición que ya no existe en el selector
+const VALID_COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio"];
+if (!VALID_COMPOSITIONS.includes(state.composition)) state.composition = "centro";
 
 if (typeof state.frames === "string") state.frames = state.frames === "true";
 if (typeof state.pageBorder === "string") state.pageBorder = state.pageBorder === "true";
@@ -1410,11 +1448,10 @@ function bindUI() {
             fig: await withStamp(f),
           });
         }
+        // La imagen activa ya decide la página (figura, anillos o medallón): no hace falta
+        // cambiar la composición. Fijarla en «figura» rompía el dibujo si la imagen activa
+        // pasaba a otro uso, y el autoguardado repetía el fallo al reabrir la app.
         activeFigure = Math.max(0, userFigures.length - figs.length);
-        if (defaultUse === "figura" && state.composition === "centro") {
-          state.composition = "figura";
-          if (compositionEl) compositionEl.value = "figura";
-        }
         useFigures();
         btn.variant = "success";
         setTimeout(() => { btn.variant = "neutral"; }, 2000);
@@ -1678,9 +1715,11 @@ function bindUI() {
           const guides = svgClone.querySelector("#guides-layer");
           if (guides) guides.remove();
           const doc = getCurrentDoc();
-          const filename = `mandala_${state.preset}_seed_${state.seed}_${state.pngDpi}dpi.png`;
+          const wanted = Number(state.pngDpi) || 300;
+          const filename = `mandala_${state.preset}_seed_${state.seed}_${wanted}dpi.png`;
           const { wMm, hMm } = doc.page;
-          await downloadPng(filename, svgClone.outerHTML, wMm, hMm, state.pngDpi || 300);
+          const used = await downloadPng(filename, svgClone.outerHTML, wMm, hMm, wanted);
+          if (used < wanted) showToast(`Este equipo no admite ${wanted} DPI; el PNG se guardó a ${used} DPI.`, "warning", "exclamation-triangle", 6000);
         } else if (id === "downloadPdf") {
           await downloadManualPdf();
         } else if (id === "share") {
@@ -1688,6 +1727,7 @@ function bindUI() {
         }
       } catch (error) {
         console.error("Download error:", error);
+        showToast("No se pudo descargar: " + (error?.message || error), "danger", "exclamation-triangle");
       }
     });
   }
@@ -1706,8 +1746,12 @@ function bindUI() {
       }
     } else {
       // Fallback: Copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
-      showToast("URL copiada al portapapeles", "success", "clipboard-check");
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        showToast("URL copiada al portapapeles", "success", "clipboard-check");
+      } catch {
+        showToast("No se pudo copiar el enlace. Cópialo de la barra de direcciones.", "warning", "clipboard");
+      }
     }
   };
 
@@ -1718,7 +1762,7 @@ function bindUI() {
   const downloadManualPdf = async () => {
     const doc = getCurrentDoc();
     const { wMm, hMm } = doc.page;
-    const layout = pageLayoutEl.value || "classic";
+    const layout = (pageLayoutEl.value && pageLayoutEl.value !== "inspirational") ? pageLayoutEl.value : "classic";
     const filename = `mandala_page_${layout}_seed${state.seed}.pdf`;
 
     // 1. Determine how many mandalas of the current design to print
@@ -1730,16 +1774,8 @@ function bindUI() {
     // 2. Build opts (all same design)
     const batchOpts = Array.from({ length: count }, () => buildOpts(state));
 
-    // 3. Get quote if needed
-    let quotes = [];
-    if (layout === "inspirational" && typeof TAOISTA_DATASET !== "undefined") {
-      const allCards = TAOISTA_DATASET.cards || [];
-      if (allCards.length > 0) {
-        // Quote selection deterministic for reproducible exports
-        const quoteRng = mulberry32((state.seed ^ 0xA511E9B3) >>> 0);
-        quotes = [allCards[rInt(quoteRng, 0, allCards.length - 1)]];
-      }
-    }
+    // Sin frases ni citas de terceros en lo que se imprime (evita problemas de derechos)
+    const quotes = [];
 
     if (downloadPdfSidebar) {
       downloadPdfSidebar.loading = true;
@@ -2077,11 +2113,6 @@ function bindUI() {
         if (theme.titlePreset) {
           if (bookTitleEl) bookTitleEl.value = theme.titlePreset.title || "";
           if (bookSubtitleEl) bookSubtitleEl.value = theme.titlePreset.subtitle || "";
-          if (theme.titlePreset.quote && bookQuotePageEl && bookQuoteTextEl) {
-            bookQuotePageEl.checked = true;
-            bookQuoteTextEl.value = theme.titlePreset.quote;
-            bookQuoteTextEl.style.display = "inline-block";
-          }
         }
         // Los paquetes marcados (el tema marca los suyos al elegirlo; se pueden cambiar)
         const pkgIds = bookPkgBoxes().length ? checkedBookPkgs() : (theme.packages || []);
@@ -2733,6 +2764,8 @@ function bindUI() {
       const pending = (qa?.weak?.length || 0) + (qa?.twins?.length || 0);
       if (pending) {
         showToast(`⚠️ Libro creado (${total} páginas), pero revisa antes de publicar.${qaMsg}`, "warning", "exclamation-triangle", 12000);
+      } else if (total < 24) {
+        showToast(`Libro creado (${total} páginas). KDP exige al menos 24 páginas: añade mandalas antes de publicar.${qaMsg}`, "warning", "exclamation-triangle", 10000);
       } else if (qa) {
         showToast(`✅ Libro creado (${total} páginas). Listo para KDP.${qaMsg}`, "success", "check-circle", 6000);
       } else {
@@ -3105,16 +3138,22 @@ function bindUI() {
     try { autoSaveProject(getProjectPayload()); } catch(e){}
   });
 
-  // Restaurar autoguardado al arrancar la app si no hay parámetros en la URL
+  // Restaurar el autoguardado al arrancar. La app escribe el diseño en la URL en cada cambio,
+  // así que al recargar casi siempre hay parámetros: entonces el diseño sale de la URL y del
+  // autoguardado sólo las imágenes (antes, con parámetros en la URL, se perdían al recargar).
   (async () => {
     try {
       const saved = await loadAutoSave();
-      if (saved && !window.location.hash && !window.location.search) {
-        // Restaurar figuras y ajustes si existen
-        if (saved.userFigures && saved.userFigures.length > 0) {
-          await applyProjectPayload(saved, saved.name);
-          console.log("Restored previous session from autosave");
-        }
+      if (saved && saved.userFigures && saved.userFigures.length > 0 && !userFigures.length) {
+        const urlHasState = !!(window.location.hash || window.location.search);
+        // Los cambios de «Revisar páginas» valen para una semilla: con otra, no se aplican
+        const sameSeed = (saved.state?.seed >>> 0) === (state.seed >>> 0);
+        // Los ajustes del libro no se toman de aquí: se guardan aparte en cada cambio
+        // (localStorage) y son más recientes que este autoguardado
+        const payload = { ...saved, bookSettings: undefined };
+        if (urlHasState) { payload.state = undefined; if (!sameSeed) payload.bookOverrides = undefined; }
+        await applyProjectPayload(payload, saved.name);
+        console.log("Restored previous session from autosave");
       }
     } catch(e) {
       console.warn("Could not restore autosave:", e);
