@@ -908,3 +908,21 @@ test("sello: un dibujo con detalle fino no se funde en negro macizo", () => {
   assert.ok(best >= 5, `grosor ${best}`);
   assert.ok(Number.isInteger(STAMP_VERSION) && STAMP_VERSION >= 2);
 });
+
+test("rasterizado por franjas: recorte de SVG exacto y detector de manchas", async () => {
+  const { cropSvg, mismatchFraction, MISMATCH_LIMIT } = await import("../js/core/export.js");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg"\n width="215.9mm" height="279.4mm"\n viewBox="0 0 215.9 279.4"><path d="M0 0"/></svg>`;
+  const out = cropSvg(svg, [0, 0, 215.9, 279.4], 2550, 825, 0.25, 0.5);
+  assert.match(out, /width="2550" height="825" viewBox="0 69.85 215.9 69.85" preserveAspectRatio="none"/);
+  assert.equal((out.match(/viewBox=/g) || []).length, 1);
+  assert.equal((out.match(/ width=/g) || []).length, 1);
+  assert.ok(out.endsWith("<path d=\"M0 0\"/></svg>"));
+  // Control: dos páginas iguales no difieren; una mancha negra de 3 % sí
+  const n = 400 * 500, a = new Uint8ClampedArray(n * 4).fill(255), b = a.slice();
+  assert.equal(mismatchFraction(a, b), 0);
+  for (let i = 0; i < n * 0.03; i++) { b[i * 4] = b[i * 4 + 1] = b[i * 4 + 2] = 0; }
+  assert.ok(mismatchFraction(a, b) > MISMATCH_LIMIT * 10);
+  // Diferencias de antialiasing (gris medio) no cuentan
+  const c = a.slice(); for (let i = 0; i < n; i++) c[i * 4] = 180;
+  assert.equal(mismatchFraction(a, c), 0);
+});
