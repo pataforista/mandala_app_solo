@@ -87,38 +87,30 @@ export function svgStringToImageData(svgString, widthPx, heightPx) {
 }
 
 /**
- * Download PNG from SVG
+ * Descarga un PNG del SVG, rasterizado con el lienzo del navegador (sin CDN ni WASM).
+ * Si el equipo no admite un lienzo tan grande (Safari en iPhone/iPad limita a ~16 Mpx),
+ * baja la resolución hasta que quepa y devuelve los DPI realmente usados.
  */
 export async function downloadPng(filename, svgString, widthMm, heightMm, dpi = 300) {
-  try {
-    const pixelDensity = dpi / 25.4;
-    const wPx = Math.ceil(widthMm * pixelDensity);
-    const hPx = Math.ceil(heightMm * pixelDensity);
-
-    const { Resvg, initWasm } = await import("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/wasm.js");
-
-    try {
-      await initWasm("https://cdn.jsdelivr.net/npm/@resvg/resvg-js@2.6.2/index_bg.wasm");
-    } catch (e) {
-      console.warn("WASM initialization failed, but continuing", e);
-    }
-
-    const resvg = new Resvg(svgString, {
-      fitTo: {
-        mode: 'width',
-        value: wPx,
-      },
-      background: '#ffffff'
-    });
-
-    const pngData = resvg.render();
-    const pngBuffer = pngData.asPng();
-    const blob = new Blob([pngBuffer], { type: "image/png" });
-    saveBlob(blob, filename);
-  } catch (error) {
-    console.error("PNG download failed:", error);
-    throw error;
+  let usedDpi = dpi;
+  let wPx = Math.ceil(widthMm * usedDpi / 25.4);
+  let hPx = Math.ceil(heightMm * usedDpi / 25.4);
+  while (!canvasWorks(wPx, hPx) && usedDpi > 72) {
+    usedDpi = Math.max(72, Math.floor(usedDpi * 0.75));
+    wPx = Math.ceil(widthMm * usedDpi / 25.4);
+    hPx = Math.ceil(heightMm * usedDpi / 25.4);
   }
+  // Tamaño explícito en píxeles: un SVG con width="100%" no tiene tamaño propio como imagen
+  const sized = svgString.replace(/<svg\b([^>]*)>/, (m, attrs) => {
+    const clean = attrs.replace(/\s(width|height)="[^"]*"/g, "");
+    return `<svg${clean} width="${wPx}" height="${hPx}">`;
+  });
+  const canvas = await svgToCanvas(sized, wPx, hPx);
+  const blob = await new Promise((resolve, reject) =>
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error("No se pudo crear el PNG"))), "image/png"));
+  canvas.width = canvas.height = 0;
+  saveBlob(blob, filename);
+  return usedDpi;
 }
 
 /**
@@ -661,69 +653,90 @@ export async function downloadBookPdf(filename, generateFn, count, opts) {
       }
       label = "Página de reseña";
     } else if (page.kind === "quote") {
-      // Página de frase: letras grandes de contorno rellenas con motivos decorativos
+      // Página de frase: letras de contorno para colorear. Una frase larga (las de los temas
+      // pasan de 80 caracteres) se corta en varias líneas; antes iba en una sola, la letra
+      // quedaba de ~4 mm con un contorno de 1,2 mm y se imprimía como una mancha negra.
       canvas = blankCanvas(wPx, hPx);
       const ctx = canvas.getContext("2d");
-      const phrase = quoteText || t.defaultQuote || "Respira y sonríe";
+      const raw = String(quoteText || t.defaultQuote || "Respira y sonríe").trim();
+      const dash = raw.lastIndexOf(" — ");
+      const phrase = dash > 0 ? raw.slice(0, dash).trim() : raw;
+      const author = dash > 0 ? raw.slice(dash + 3).trim() : "";
       const maxTextW = (wMm - 2 * marginMm - 10) * pxPerMm;
-      // Calcular tamaño de fuente para que la frase quepa
-      let fontSize = Math.min(28 * pxPerMm, maxTextW / (phrase.length * 0.55));
-      ctx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
-      const metrics = ctx.measureText(phrase);
-      // Si es muy ancha, reducir
-      if (metrics.width > maxTextW) {
-        fontSize *= maxTextW / metrics.width;
-        ctx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
-      }
-      const textY = hPx * 0.5;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      // Dibujar las letras con contorno (sin relleno, para colorear)
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 1.2 * pxPerMm;
-      ctx.lineJoin = "round";
-      ctx.strokeText(phrase, wPx / 2, textY);
-      // Usar un canvas temporal para rellenar los motivos dentro de las letras (source-in)
-      const tempCanvas = blankCanvas(wPx, hPx);
-      const tempCtx = tempCanvas.getContext("2d");
-      tempCtx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
-      tempCtx.textAlign = "center";
-      tempCtx.textBaseline = "middle";
-      tempCtx.fillStyle = "#000";
-      tempCtx.fillText(phrase, wPx / 2, textY);
-      tempCtx.globalCompositeOperation = "source-in";
-
-      // Dibujar motivos decorativos dentro de la máscara de letras
-      const motifSize = fontSize * 0.18;
-      const motifs = ["flower", "star", "heart", "leaf", "circle"];
-      const rng = mulberry32(phrase.length * 12345);
-      const halfW = (metrics.width > maxTextW ? maxTextW : metrics.width) / 2 + motifSize;
-      const startX = wPx / 2 - halfW;
-      const endX = wPx / 2 + halfW;
-      const startY = textY - fontSize * 0.8;
-      const endY = textY + fontSize * 0.8;
-      const step = motifSize * 1.5;
-
-      for (let y = startY; y <= endY; y += step) {
-        for (let x = startX; x <= endX; x += step) {
-          const jx = x + (rng() - 0.5) * motifSize * 0.4;
-          const jy = y + (rng() - 0.5) * motifSize * 0.4;
-          const motif = motifs[Math.floor(rng() * motifs.length)];
-          drawMotif(tempCtx, motif, jx, jy, motifSize, rng);
+      const maxTextH = (hMm - 2 * marginMm) * 0.6 * pxPerMm;
+      const fontOf = (size) => `bold ${Math.round(size)}px ${BOOK_FONT}`;
+      const words = phrase.split(/\s+/).filter(Boolean);
+      const wrap = (size) => {
+        ctx.font = fontOf(size);
+        const lines = [];
+        let line = "";
+        for (const w of words) {
+          const next = line ? `${line} ${w}` : w;
+          if (line && ctx.measureText(next).width > maxTextW) { lines.push(line); line = w; }
+          else line = next;
         }
+        if (line) lines.push(line);
+        return lines;
+      };
+      let fontSize = 28 * pxPerMm;
+      let lines = wrap(fontSize);
+      const LINE_H = 1.18;
+      while (fontSize > 3 * pxPerMm &&
+        (lines.some(l => ctx.measureText(l).width > maxTextW) || lines.length * fontSize * LINE_H > maxTextH)) {
+        fontSize *= 0.92;
+        lines = wrap(fontSize);
+      }
+      const font = fontOf(fontSize);
+      const lineGap = fontSize * LINE_H;
+      const authorSize = author ? Math.min(8 * pxPerMm, Math.max(4 * pxPerMm, fontSize * 0.4)) : 0;
+      const blockH = lines.length * lineGap + (author ? authorSize * 2 : 0);
+      const firstY = hPx / 2 - blockH / 2 + lineGap / 2;
+      const lineY = (i) => firstY + i * lineGap;
+      // Contorno proporcional a la letra: grueso en letra grande, fino pero imprimible en pequeña
+      const outlineW = Math.max(0.35 * pxPerMm, Math.min(1.2 * pxPerMm, fontSize * 0.035));
+
+      // Motivos dentro de las letras sólo si la letra es lo bastante grande para colorearlos
+      if (fontSize >= 18 * pxPerMm) {
+        const tempCanvas = document.createElement("canvas"); // transparente: la máscara son las letras
+        tempCanvas.width = wPx; tempCanvas.height = hPx;
+        const tempCtx = tempCanvas.getContext("2d");
+        tempCtx.font = font;
+        tempCtx.textAlign = "center";
+        tempCtx.textBaseline = "middle";
+        tempCtx.fillStyle = "#000";
+        lines.forEach((l, i) => tempCtx.fillText(l, wPx / 2, lineY(i)));
+        tempCtx.globalCompositeOperation = "source-in";
+        tempCtx.fillStyle = "#fff";
+        tempCtx.fillRect(0, 0, wPx, hPx);
+        const motifSize = fontSize * 0.18;
+        const motifs = ["flower", "star", "heart", "leaf", "circle"];
+        const rng = mulberry32(phrase.length * 12345);
+        const step = motifSize * 1.5;
+        const x0 = wPx / 2 - maxTextW / 2, x1 = wPx / 2 + maxTextW / 2;
+        const y0 = lineY(0) - fontSize * 0.8, y1 = lineY(lines.length - 1) + fontSize * 0.8;
+        for (let y = y0; y <= y1; y += step) {
+          for (let x = x0; x <= x1; x += step) {
+            const jx = x + (rng() - 0.5) * motifSize * 0.4;
+            const jy = y + (rng() - 0.5) * motifSize * 0.4;
+            drawMotif(tempCtx, motifs[Math.floor(rng() * motifs.length)], jx, jy, motifSize, rng);
+          }
+        }
+        ctx.drawImage(tempCanvas, 0, 0);
+        tempCanvas.width = tempCanvas.height = 0;
       }
 
-      // Dibujar el contenido decorado en el canvas principal
-      ctx.drawImage(tempCanvas, 0, 0);
-
-      // Dibujar las letras con contorno exterior nítido (para colorear)
-      ctx.font = `bold ${Math.round(fontSize)}px ${BOOK_FONT}`;
+      ctx.font = font;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.strokeStyle = "#000";
-      ctx.lineWidth = 1.2 * pxPerMm;
+      ctx.lineWidth = outlineW;
       ctx.lineJoin = "round";
-      ctx.strokeText(phrase, wPx / 2, textY);
+      lines.forEach((l, i) => ctx.strokeText(l, wPx / 2, lineY(i)));
+      if (author) {
+        ctx.font = `italic ${Math.round(authorSize)}px ${BOOK_FONT}`;
+        ctx.fillStyle = "#000";
+        ctx.fillText(`— ${author}`, wPx / 2, lineY(lines.length - 1) + lineGap / 2 + authorSize * 1.2);
+      }
       label = "Página de frase";
     } else if (page.kind === "mandala" && colorTest && page.index === 0) {
       // Página para probar colores: 24 círculos en rejilla

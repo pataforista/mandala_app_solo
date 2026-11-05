@@ -2,7 +2,8 @@
 // Del archivo de imagen a una figura lista para la página (navegador).
 // Lo comparten la app y preprocesar.html, así ambas dan exactamente el mismo resultado.
 import { processFigure, stampRaster } from "./lineArt.js";
-import { encodeGrayPng, bytesToDataUrl } from "./grayPng.js";
+import { encodeGrayPng, bytesToDataUrl, rgbaToGray } from "./grayPng.js";
+import { thickInkMask } from "./figureChecks.js";
 
 // Se procesa a tamaño real (sin ampliar): ampliar antes crea rampas suaves en los
 // bordes y el detector de fondo se cuela por ellas. Sólo se reduce si es enorme.
@@ -53,4 +54,32 @@ export async function withStamp(fig) {
   if (fig.stampHref) return fig;
   const st = stampRaster(fig.cls, fig.w, fig.h);
   return { ...fig, stampHref: bytesToDataUrl(await encodeGrayPng(st.gray, st.w, st.h)) };
+}
+
+/**
+ * Añade fig.thinHref: el dibujo con los trazos gruesos vaciados (ver thickInkMask).
+ * Si no hay trazos gruesos, thinHref es el mismo dibujo. Se calcula una vez por figura.
+ */
+export async function withThinInk(fig) {
+  if (!fig || fig.thinHref || !fig.cls || !fig.href) return fig;
+  const { mask, count } = thickInkMask(fig.cls, fig.w, fig.h);
+  if (!count) { fig.thinHref = fig.href; return fig; }
+  const img = await new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error("No se pudo leer la ilustración"));
+    im.src = fig.href;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = fig.w; canvas.height = fig.h;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, fig.w, fig.h);
+  ctx.drawImage(img, 0, 0, fig.w, fig.h);
+  const { data } = ctx.getImageData(0, 0, fig.w, fig.h);
+  const gray = rgbaToGray(data, fig.w, fig.h);
+  for (let i = 0; i < gray.length; i++) if (mask[i]) gray[i] = 255;
+  canvas.width = canvas.height = 0;
+  fig.thinHref = bytesToDataUrl(await encodeGrayPng(gray, fig.w, fig.h));
+  return fig;
 }

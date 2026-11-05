@@ -25,3 +25,48 @@ test("checkFigures: una zona grande es verde; una franja fina entre dos paredes 
   assert.notEqual(rows.find((x) => x.name === "franja").estado, "verde");
   assert.ok(rows.find((x) => x.name === "franja").minDiam < rows.find((x) => x.name === "grande").minDiam);
 });
+
+test("checkFigure: una figura con negro macizo no entra al libro; un contorno fino sí", async () => {
+  const { checkFigure } = await import("../js/core/figureChecks.js");
+  const w = 400, h = 400;
+  const disk = (solid) => {
+    const cls = new Uint8Array(w * h).fill(2);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const r = Math.hypot(x - 200, y - 200);
+      if (r < 160) cls[y * w + x] = r > 154 || (solid && r < 90) ? 0 : 1; // contorno de 6 px; disco negro opcional
+    }
+    return { name: "d", href: "x", cls, w, h };
+  };
+  const meta = { rightsConfirmed: true };
+  const fine = checkFigure(disk(false), "figura", meta);
+  const blob = checkFigure(disk(true), "figura", meta);
+  assert.equal(fine.ready, true, JSON.stringify(fine.checks.filter(c => !c.ok)));
+  assert.equal(blob.ready, false);
+  assert.ok(blob.checks.some(c => c.level === "error" && /negras macizas/.test(c.msg)));
+});
+
+test("afinado: un trazo fino no cambia; uno grueso queda en dos líneas con hueco; el negro macizo sigue fuera", async () => {
+  const { thickInkMask, checkFigure } = await import("../js/core/figureChecks.js");
+  const w = 400, h = 400;
+  const ring = (thick) => {
+    const cls = new Uint8Array(w * h).fill(2);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const r = Math.hypot(x - 200, y - 200);
+      if (r < 160) cls[y * w + x] = r > 160 - thick ? 0 : 1;
+    }
+    return cls;
+  };
+  assert.equal(thickInkMask(ring(4), w, h).count, 0, "un contorno de 4 px (≈1,9 mm a página completa) no se toca");
+  const thick = ring(30);
+  const { mask, count } = thickInkMask(thick, w, h);
+  assert.ok(count > 0);
+  // Por el radio: tinta, hueco blanco, tinta
+  const row = Array.from({ length: 30 }, (_, k) => mask[200 * w + (200 + 131 + k)]);
+  assert.equal(row[0], 0, "borde interior conservado");
+  assert.equal(row[29], 0, "borde exterior conservado");
+  assert.ok(row.includes(1), "el centro del trazo se vacía");
+  const fig = { name: "t", href: "x", cls: thick, w, h };
+  assert.equal(checkFigure({ ...fig }, "figura", { rightsConfirmed: true }).ready, false);
+  // El afinado no rescata figuras con negro macizo: siguen fuera del libro
+  assert.equal(checkFigure({ ...fig }, "figura", { rightsConfirmed: true, thin: true }).ready, false);
+});

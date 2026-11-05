@@ -40,7 +40,7 @@ puntúan, y las de un grupo (mandala que crece, mural) se cambian a mano con «C
 Los cambios se guardan mientras no cambies la semilla, las composiciones permitidas o la dificultad,
 y se aplican al pulsar «Crear libro».
 
-### Perfil «Los más vendidos para este formato» (por defecto)
+### «Qué diseños pueden salir: Automático según el formato» (por defecto)
 
 No se basa en datos de ventas (la app no los tiene). Resume las convenciones de los libros de
 mandalas mejor posicionados: un mandala grande y centrado por página, impreso a una sola cara,

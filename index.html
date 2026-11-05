@@ -139,8 +139,12 @@
 
     #stage svg {
       display: block;
-      width: 100%;
+      /* La hoja entera cabe en la ventana: el alto manda y el ancho se ajusta a la proporción
+         (con width: 100% el dibujo se salía por debajo de la hoja blanca) */
+      width: auto;
       height: auto;
+      max-width: 100%;
+      max-height: calc(100vh - 150px);
       border-radius: 28px;
     }
 
@@ -406,6 +410,15 @@
       }
       #sidebar sl-select, #sidebar sl-input, #sidebar sl-button { max-width: 100%; }
     }
+    /* El cuerpo de sl-tab-group trae overflow:auto, que anula position:sticky dentro de las pestañas */
+    #sideTabs::part(body) { overflow: visible; }
+    #bookActionBar {
+      position: sticky; bottom: 0; z-index: 5;
+      margin: 10px -4px 0; padding: 8px 4px 10px;
+      background: var(--m3-surface, #fff);
+      border-top: 1px solid var(--m3-outline);
+    }
+    #bookActionBar .hint { margin: 0 0 6px; }
   </style>
 </head>
 
@@ -413,8 +426,8 @@
   <a class="skip-link" href="#stage-container">Saltar a la vista previa</a>
   <header>
     <div class="brand">
-      <sl-tooltip content="Mis favoritos y galería">
-        <sl-icon-button id="openGallery" name="grid" label="Galería" style="font-size: 1.5rem;"></sl-icon-button>
+      <sl-tooltip content="Ver mis favoritos">
+        <sl-icon-button id="openGallery" name="grid" label="Ver mis favoritos" style="font-size: 1.5rem;"></sl-icon-button>
       </sl-tooltip>
       <h1>Mandala Studio</h1>
       <div style="display:flex; gap:2px; margin-left: 6px;">
@@ -427,20 +440,22 @@
       </div>
     </div>
     <div style="display:flex; gap:8px;">
-      <sl-button id="saveFav" variant="text" size="medium">
-        <sl-icon slot="prefix" name="heart"></sl-icon>
-        Guardar
-      </sl-button>
+      <sl-tooltip content="Guarda este diseño en «Mis favoritos» (tecla S)">
+        <sl-button id="saveFav" variant="text" size="medium">
+          <sl-icon slot="prefix" name="heart"></sl-icon>
+          Favorito
+        </sl-button>
+      </sl-tooltip>
       <sl-dropdown placement="bottom-end">
         <sl-button slot="trigger" variant="primary" pill caret>
-          Descargar
+          Descargar página
         </sl-button>
         <sl-menu id="downloadMenu">
-          <sl-menu-item id="download">SVG</sl-menu-item>
-          <sl-menu-item id="downloadPng">PNG (Alta Res)</sl-menu-item>
-          <sl-menu-item id="downloadPdf">Descargar PDF (Página Simple)</sl-menu-item>
+          <sl-menu-item id="download">SVG (vectorial, editable)</sl-menu-item>
+          <sl-menu-item id="downloadPng">PNG (imagen)</sl-menu-item>
+          <sl-menu-item id="downloadPdf">PDF de esta página</sl-menu-item>
           <sl-divider></sl-divider>
-          <sl-menu-item id="share">Compartir</sl-menu-item>
+          <sl-menu-item id="share">Compartir enlace del diseño</sl-menu-item>
         </sl-menu>
       </sl-dropdown>
     </div>
@@ -477,23 +492,24 @@
                 <sl-tooltip content="Semilla siguiente (→)">
                   <sl-icon-button id="nextSeed" name="chevron-right" label="Siguiente"></sl-icon-button>
                 </sl-tooltip>
-                <sl-tooltip content="Diseño aleatorio (R o Espacio)">
-                  <sl-icon-button id="regen" name="dice-5" label="Aleatorio" style="font-size: 1.5rem; color: var(--m3-primary);"></sl-icon-button>
+                <sl-tooltip content="Otro diseño con los mismos ajustes (R o Espacio)">
+                  <sl-icon-button id="regen" name="dice-5" label="Otro diseño con los mismos ajustes" style="font-size: 1.5rem; color: var(--m3-primary);"></sl-icon-button>
                 </sl-tooltip>
               </div>
             </div>
             <sl-button id="magicShuffle" variant="primary" size="medium" pill style="width: 100%; --sl-color-primary-600: #d81b60; --sl-color-primary-500: #e91e63;">
               <sl-icon slot="prefix" name="magic"></sl-icon>
-              Mezcla Mágica
+              Sorpréndeme: cambiar todo al azar
             </sl-button>
-            <p class="hint">Atajos (con el foco fuera de los controles): <b>R</b> o espacio = otro diseño · <b>←</b> <b>→</b> = semilla anterior/siguiente · <b>S</b> = guardar · <b>Ctrl+Z</b>/<b>Ctrl+Y</b> = deshacer/rehacer.</p>
+            <p class="hint" style="margin-top:4px;">El dado cambia sólo el dibujo; «Sorpréndeme» cambia también estilo, pétalos, composición y marco.</p>
+            <p class="hint">Atajos (con el foco fuera de los controles): <b>R</b> o espacio = otro diseño · <b>←</b> <b>→</b> = semilla anterior/siguiente · <b>S</b> = guardar en favoritos · <b>Ctrl+Z</b>/<b>Ctrl+Y</b> = deshacer/rehacer.</p>
 
             <div class="section-title" style="margin:8px 0 0;"><sl-icon name="sliders"></sl-icon> Lo esencial</div>
             <sl-select id="coloringPreset" label="Nivel de dificultad" size="small" value="adulto" help-text="Se aplica al elegirlo.">
               <sl-option value="ninos">Niños (5-8 años) - Muy simple</sl-option>
               <sl-option value="ninos_grande">Niños grandes (9-12) - Simple</sl-option>
               <sl-option value="letra_grande">Adulto - Trazo grueso (fácil de colorear)</sl-option>
-              <sl-option value="bestseller">Más vendido KDP (trazo grueso, sin texturas)</sl-option>
+              <sl-option value="bestseller">Comercial: trazo grueso, sin texturas</sl-option>
               <sl-option value="adulto">Adulto - Balanceado</sl-option>
               <sl-option value="experto">Experto - Detallado</sl-option>
               <sl-option value="zen">Zen - Minimalista</sl-option>
@@ -630,7 +646,6 @@
                   <sl-option value="duo">Dúo (2 mandalas)</sl-option>
                   <sl-option value="mirror">Espejo (2 simétricos)</sl-option>
                   <sl-option value="trio">Trío (3 mandalas)</sl-option>
-                  <sl-option value="inspirational">Inspiracional (frase)</sl-option>
                   <sl-option value="collage">Collage (4 por página)</sl-option>
                 </sl-select>
                 <sl-select id="pngDpi" label="Resolución PNG" size="small" value="300">
@@ -673,83 +688,99 @@
             </div>
             <input type="file" id="projectFileInput" accept=".json,application/json" style="display:none;">
             <p class="hint">
-              Interior completo para KDP (sin sangrado, B/N). Parte de la semilla y el nivel de «Diseñar»;
-              márgenes, páginas pares y textos se ajustan solos a las reglas de KDP.
+              Seis pasos para el interior de un libro de KDP (sin sangrado, blanco y negro). Márgenes, páginas
+              pares y textos legales se ajustan solos. El formato de papel se elige arriba.
             </p>
-            <div class="section-title" style="margin:8px 0 0;"><sl-icon name="collection"></sl-icon> 1 · Contenido</div>
-            <sl-select id="bookProductProfile" label="Perfil de producto (público objetivo)" size="small" value="none">
-              <sl-option value="none">Personalizado (libre)</sl-option>
-              <sl-option value="mindful_patterns">Mindful Patterns · Adulto (Florales + Tramas continuas)</sl-option>
-              <sl-option value="large_print_easy">Large Print Easy · Seniors (Trazo 1.1 mm, celdas grandes)</sl-option>
-              <sl-option value="intricate_sacred">Intricate Sacred Geometry · Experto (Geom. sagrada, detalle alto)</sl-option>
-              <sl-option value="kids_mandalas">Kids Mandalas · Niños (Trazo grueso, amigable)</sl-option>
+            <div class="section-title step-title" style="margin:14px 0 2px;"><sl-icon name="people"></sl-icon> 1 · Público y tema</div>
+            <sl-select id="bookProductProfile" label="Público" size="small" value="none" help-text="Fija trazo, detalle y estilos pensados para ese público.">
+              <sl-option value="none">Sin perfil (lo decides tú)</sl-option>
+              <sl-option value="mindful_patterns">Adultos · florales y tramas continuas</sl-option>
+              <sl-option value="large_print_easy">Personas mayores · trazo de 1,1 mm y celdas grandes</sl-option>
+              <sl-option value="intricate_sacred">Expertos · geometría sagrada muy detallada</sl-option>
+              <sl-option value="kids_mandalas">Niños · trazo grueso y formas amigables</sl-option>
             </sl-select>
-            <sl-select id="bookTheme" label="Tema visual del libro" size="small" value="none">
-              <sl-option value="none">Sin tema específico (Variado)</sl-option>
-              <sl-option value="oceano">Océano y Vida Marina (Olas, conchas, escamas)</sl-option>
-              <sl-option value="navidad">Navidad y Fiestas (Estrellas, copos, invierno)</sl-option>
-              <sl-option value="bosque">Bosque y Naturaleza (Hojas, viñas)</sl-option>
-              <sl-option value="espacio">Espacio y Cosmos (Planetas, galaxias, constelaciones)</sl-option>
-              <sl-option value="mistico">Místico, Tarot y Alquimia (Lunas, arcanos, geometría sagrada)</sl-option>
-              <sl-option value="mitologia">Mitología y Leyendas (Bestias míticas, escamas, fuego)</sl-option>
-              <sl-option value="prehistorico">Dinosaurios y Prehistoria (Coronas de dinosaurios, helechos, huellas)</sl-option>
-              <sl-option value="zentangle">Animales Zentangle (Texturas, hojas y setas)</sl-option>
-              <sl-option value="infantil">Infantil (Animales amigables, corazones, burbujas)</sl-option>
+            <sl-select id="bookTheme" label="Tema del libro" size="small" value="none">
+              <sl-option value="none">Sin tema (variado)</sl-option>
+              <sl-option value="oceano">Océano y vida marina (olas, conchas, escamas)</sl-option>
+              <sl-option value="navidad">Navidad e invierno (estrellas, copos)</sl-option>
+              <sl-option value="bosque">Bosque y naturaleza (hojas, viñas)</sl-option>
+              <sl-option value="espacio">Espacio y cosmos (planetas, galaxias)</sl-option>
+              <sl-option value="mistico">Místico, tarot y alquimia (lunas, arcanos)</sl-option>
+              <sl-option value="mitologia">Mitología y leyendas (bestias míticas, fuego)</sl-option>
+              <sl-option value="prehistorico">Dinosaurios y prehistoria (helechos, huellas)</sl-option>
+              <sl-option value="zentangle">Animales con texturas (hojas y setas)</sl-option>
+              <sl-option value="infantil">Infantil (animales amigables, corazones)</sl-option>
             </sl-select>
             <div id="themeActionBox" style="display:none; margin: 6px 0 10px; padding: 10px; border-radius: 8px; background: var(--m3-surface); border: 1px solid var(--sl-color-primary-300);">
               <div id="themeDescText" style="font-size: 0.76rem; color: var(--m3-on-surface); margin-bottom: 6px; line-height: 1.35;"></div>
               <sl-button id="btnApplyThemePackage" size="small" variant="primary" style="width: 100%;">
-                <sl-icon slot="prefix" name="stars"></sl-icon> Configurar libro con este tema (1 clic)
+                <sl-icon slot="prefix" name="stars"></sl-icon> Aplicar tema: título, ilustraciones y fondos
               </sl-button>
             </div>
-            <div id="bookPkgBox" class="comp-box">
-              <div class="hint" style="font-weight:600;">Ilustraciones del libro</div>
-              <div class="hint">Marca los paquetes que quieres usar (el tema propone los suyos) y pulsa «Cargar». Reemplazan la lista de «Mis imágenes».</div>
-              <sl-checkbox size="small" class="bookPkg" value="animales">🦊 Animales del bosque y safari (40)</sl-checkbox>
-              <sl-checkbox size="small" class="bookPkg" value="marinas">🌊 Criaturas y arrecifes del océano (64)</sl-checkbox>
-              <sl-checkbox size="small" class="bookPkg" value="espacio">🚀 Exploración espacial y cosmos (48)</sl-checkbox>
-              <sl-checkbox size="small" class="bookPkg" value="misticas">🔮 Místico, tarot y alquimia (48)</sl-checkbox>
-              <sl-checkbox size="small" class="bookPkg" value="mitologia">🐉 Criaturas mitológicas (64)</sl-checkbox>
-              <sl-checkbox size="small" class="bookPkg" value="dinosaurios">🦕 Dinosaurios y prehistoria (32)</sl-checkbox>
-              <sl-checkbox size="small" class="bookPkg" value="zentangle">✨ Animales zentangle (41)</sl-checkbox>
-              <sl-checkbox size="small" class="bookPkg" value="naturaleza">🌿 Adornos de naturaleza · fondo (104)</sl-checkbox>
-              <sl-checkbox size="small" class="bookPkg" value="infantiles">🎈 Adornos infantiles · fondo (78)</sl-checkbox>
-              <sl-button id="btnLoadBookPkgs" size="small" variant="default" style="width:100%; margin-top:4px;">
-                <sl-icon slot="prefix" name="box-arrow-in-down"></sl-icon> Cargar ilustraciones marcadas
-              </sl-button>
-              <sl-select id="bookFigureShare" label="Páginas con ilustración" size="small" value="0.5" help-text="Si hay más ilustraciones que páginas, se elige una selección distinta para cada semilla.">
-                <sl-option value="1">Todas las que se pueda</sl-option>
-                <sl-option value="0.66">2 de cada 3</sl-option>
-                <sl-option value="0.5">La mitad (alterna con mandalas puros)</sl-option>
-                <sl-option value="0.33">1 de cada 3</sl-option>
-              </sl-select>
-              <sl-checkbox id="bookMixUses" size="small" checked>Alternar la presentación de las ilustraciones (figura rellena, corona de copias, medallón)</sl-checkbox>
-            </div>
-            <sl-input id="bookPages" type="number" label="Número de mandalas" size="small" min="1" max="120" value="50"></sl-input>
-            <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="progresiva">
-              <sl-option value="progresiva">Creciente: de fácil a difícil (recomendado)</sl-option>
-              <sl-option value="mixta">Mixta (alterna)</sl-option>
-              <sl-option value="fija">Fija (la complejidad actual)</sl-option>
+            <sl-select id="bookDifficulty" label="Dificultad a lo largo del libro" size="small" value="progresiva" help-text="Creciente es lo recomendado: el lector empieza con páginas fáciles.">
+              <sl-option value="progresiva">Creciente: de fácil a difícil</sl-option>
+              <sl-option value="mixta">Mixta: alterna</sl-option>
+              <sl-option value="fija">Igual en todo el libro</sl-option>
             </sl-select>
-            <sl-select id="bookProfile" label="Patrones del libro" size="small" value="rentable">
-              <sl-option value="rentable">Los más vendidos para este formato (recomendado)</sl-option>
-              <sl-option value="personalizada">Elegir yo las composiciones</sl-option>
+            <div class="section-title step-title" style="margin:14px 0 2px;"><sl-icon name="grid-3x3"></sl-icon> 2 · Páginas y diseños</div>
+            <sl-input id="bookPages" type="number" label="Mandalas para colorear" size="small" min="1" max="120" value="50" help-text="Entre 1 y 120. Las páginas extra del paso 4 se suman aparte."></sl-input>
+            <sl-select id="bookProfile" label="Qué diseños pueden salir" size="small" value="rentable" help-text="«Los elijo yo» muestra composiciones, estilos y marcos para marcar.">
+              <sl-option value="rentable">Automático según el formato</sl-option>
+              <sl-option value="personalizada">Los elijo yo</sl-option>
             </sl-select>
             <p id="bookProfileInfo" class="hint"></p>
             <div id="bookCompBox" class="comp-box">
-              <div class="hint" style="font-weight:600;">Composiciones que pueden salir</div>
+              <div class="hint" style="font-weight:600;">Composiciones</div>
               <sl-checkbox class="bookComp" value="centro" checked>Centrado</sl-checkbox>
               <sl-checkbox class="bookComp" value="fondo" checked>Fondo decorado</sl-checkbox>
               <sl-checkbox class="bookComp" value="constelacion" checked>Constelación</sl-checkbox>
               <sl-checkbox class="bookComp" value="esquinas" checked>Esquinas</sl-checkbox>
               <sl-checkbox class="bookComp" value="gigante" checked>Gigante</sl-checkbox>
               <sl-checkbox class="bookComp" value="medio" checked>Medio mandala</sl-checkbox>
+              <div class="hint" style="font-weight:600; margin-top:6px;">Estilos</div>
+              <sl-checkbox class="bookStyle" value="sashiko" checked>Sashiko</sl-checkbox>
+              <sl-checkbox class="bookStyle" value="floral" checked>Floral</sl-checkbox>
+              <sl-checkbox class="bookStyle" value="geometric" checked>Geométrico</sl-checkbox>
+              <sl-checkbox class="bookStyle" value="islamico" checked>Islámico</sl-checkbox>
+              <sl-checkbox class="bookStyle" value="azteca" checked>Azteca</sl-checkbox>
+              <sl-checkbox class="bookStyle" value="yantra" checked>Yantra</sl-checkbox>
+              <sl-checkbox class="bookStyle" value="celtico" checked>Céltico</sl-checkbox>
+              <div class="hint" style="font-weight:600; margin-top:6px;">Marcos</div>
+              <sl-checkbox class="bookFrame" value="redondeado" checked>Redondeado</sl-checkbox>
+              <sl-checkbox class="bookFrame" value="doble" checked>Doble con rombos</sl-checkbox>
+              <sl-checkbox class="bookFrame" value="feston" checked>Festón</sl-checkbox>
+              <sl-checkbox class="bookFrame" value="ninguno" checked>Sin marco</sl-checkbox>
+              <div class="hint">Si desmarcas todo un grupo, se usa lo elegido en «Diseñar». Tu elección manda sobre el tema y el público.</div>
             </div>
-            <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco</sl-checkbox>
-            <sl-checkbox id="bookChapters" checked>Organizar en capítulos temáticos, cada uno con su portadilla</sl-checkbox>
-            <div class="section-title" style="margin:8px 0 0;"><sl-icon name="stars"></sl-icon> 2 · Páginas extra</div>
-            <sl-details id="bookSpecials" summary="✨ Páginas sorprendentes">
-              <div class="control-group">
+            <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco entre páginas</sl-checkbox>
+            <sl-checkbox id="bookChapters" checked>Agrupar en capítulos, cada uno con su portadilla</sl-checkbox>
+            <div class="section-title step-title" style="margin:14px 0 2px;"><sl-icon name="image"></sl-icon> 3 · Ilustraciones (opcional)</div>
+            <div id="bookPkgBox" class="comp-box">
+              <div class="hint">Marca los paquetes y pulsa «Cargar ilustraciones marcadas». Sustituyen la lista de la pestaña «Imágenes». Sin ilustraciones, el libro es sólo de mandalas.</div>
+              <sl-checkbox size="small" class="bookPkg" value="animales">🦊 Animales del bosque y safari (40)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="marinas">🌊 Criaturas y arrecifes del océano (64)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="espacio">🚀 Exploración espacial y cosmos (48)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="misticas">🔮 Místico, tarot y alquimia (48)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="mitologia">🐉 Criaturas mitológicas (64)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="dinosaurios">🦕 Dinosaurios y prehistoria (32)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="zentangle">✨ Animales con texturas (41)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="naturaleza">🌿 Adornos de naturaleza · fondo (104)</sl-checkbox>
+              <sl-checkbox size="small" class="bookPkg" value="infantiles">🎈 Adornos infantiles · fondo (78)</sl-checkbox>
+              <sl-button id="btnLoadBookPkgs" size="small" variant="default" style="width:100%; margin-top:4px;">
+                <sl-icon slot="prefix" name="box-arrow-in-down"></sl-icon> Cargar ilustraciones marcadas
+              </sl-button>
+              <sl-select id="bookFigureShare" label="Páginas con ilustración" size="small" value="0.5" help-text="El resto son mandalas sin ilustración. Si hay más ilustraciones que páginas, cada semilla elige otras.">
+                <sl-option value="1">Todas las que se pueda</sl-option>
+                <sl-option value="0.66">2 de cada 3</sl-option>
+                <sl-option value="0.5">La mitad</sl-option>
+                <sl-option value="0.33">1 de cada 3</sl-option>
+              </sl-select>
+              <sl-checkbox id="bookMixUses" size="small" checked>Alternar la presentación de las ilustraciones (figura rellena, corona de copias, medallón)</sl-checkbox>
+              <sl-checkbox id="bookFigureThin" size="small" help-text="Los trazos de más de ~4 mm pasan a ser dos líneas con hueco para colorear. Revisa el resultado en «Revisar páginas».">Vaciar los trazos muy gruesos de las ilustraciones</sl-checkbox>
+            </div>
+            <p id="bookImagesInfo" class="hint"></p>
+            <div class="section-title step-title" style="margin:14px 0 2px;"><sl-icon name="stars"></sl-icon> 4 · Páginas extra</div>
+            <div class="control-group">
                 <sl-select id="bookGrowth" label="Mandala que crece" size="small" value="1" help-text="El mismo mandala en 4 páginas seguidas: cada una añade anillos.">
                   <sl-option value="0">Ninguno</sl-option>
                   <sl-option value="1">1 secuencia (4 páginas)</sl-option>
@@ -763,39 +794,38 @@
                   <sl-option value="2x2">2×2 hojas</sl-option>
                   <sl-option value="3x3">3×3 hojas</sl-option>
                 </sl-select>
-              </div>
-            </sl-details>
-            <sl-details summary="📝 Título, autor e impresión">
-              <div class="control-group">
-                <sl-input id="bookTitle" label="Título (hoja de título)" size="small" placeholder="Mandalas para Colorear"></sl-input>
-                <sl-input id="bookSubtitle" label="Subtítulo (opcional)" size="small" placeholder="50 diseños antiestrés"></sl-input>
-                <sl-input id="bookAuthor" label="Autor / sello (opcional)" size="small"></sl-input>
-                <sl-select id="bookBack" label="Reverso de cada página" size="small" value="blanco">
-                  <sl-option value="blanco">En blanco (recomendado: el marcador no arruina otro dibujo)</sl-option>
-                  <sl-option value="negro">Negro (oculta lo que traspase el marcador; más tinta)</sl-option>
-                  <sl-option value="ninguno">Sin páginas en blanco: otro dibujo al reverso (doble cara)</sl-option>
-                </sl-select>
-                <sl-select id="bookDpi" label="Nitidez de impresión" size="small" value="300">
-                  <sl-option value="300">Estándar · 300 DPI (mínimo de KDP)</sl-option>
-                  <sl-option value="600">Alta · 600 DPI (líneas más nítidas; PDF más pesado y lento)</sl-option>
-                </sl-select>
-                <sl-select id="bookLanguage" value="es" size="small" style="max-width:180px;">
-                  <sl-option value="es">Español</sl-option>
-                  <sl-option value="en">English</sl-option>
-                </sl-select>
-                <sl-checkbox id="bookTitlePage" checked>Incluir hoja de título</sl-checkbox>
-                <sl-checkbox id="bookCopyright" checked>Incluir página de derechos de autor</sl-checkbox>
-                <sl-checkbox id="bookBelongsPage">Incluir página «Este libro pertenece a»</sl-checkbox>
-                <sl-checkbox id="bookWelcomePage">Incluir página de bienvenida</sl-checkbox>
-                <sl-checkbox id="bookReviewPage">Incluir página de reseña al final</sl-checkbox>
-                <sl-checkbox id="bookQuotePage">Incluir página de frase</sl-checkbox>
-                <sl-input id="bookQuoteText" placeholder="Escribe una frase o afirmación..." size="small" style="margin-left: 24px; max-width: 300px; display: none;"></sl-input>
-                <sl-checkbox id="bookColorTest">Incluir página para probar colores</sl-checkbox>
-                <sl-checkbox id="bookPageNumbers">Numerar páginas</sl-checkbox>
-              </div>
-            </sl-details>
-            <p id="bookImagesInfo" class="hint"></p>
-            <div class="section-title" style="margin:8px 0 0;"><sl-icon name="check2-circle"></sl-icon> 3 · Revisar y crear</div>
+
+              <div class="hint" style="font-weight:600; margin-top:6px;">Al principio y al final</div>
+              <sl-checkbox id="bookTitlePage" checked>Hoja de título</sl-checkbox>
+              <sl-checkbox id="bookCopyright" checked>Página de derechos de autor</sl-checkbox>
+              <sl-checkbox id="bookBelongsPage">«Este libro pertenece a»</sl-checkbox>
+              <sl-checkbox id="bookWelcomePage">Página de bienvenida</sl-checkbox>
+              <sl-checkbox id="bookColorTest">Página para probar colores</sl-checkbox>
+              <sl-checkbox id="bookReviewPage">Petición de reseña (al final)</sl-checkbox>
+            </div>
+            <div class="section-title step-title" style="margin:14px 0 2px;"><sl-icon name="printer"></sl-icon> 5 · Datos e impresión</div>
+            <sl-input id="bookTitle" label="Título" size="small" help-text="Va en la hoja de título. Vacío: «Mandalas para Colorear» (o «Mandala Coloring Book» en inglés)."></sl-input>
+            <sl-input id="bookSubtitle" label="Subtítulo (opcional)" size="small"></sl-input>
+            <sl-input id="bookAuthor" label="Autor o sello (opcional)" size="small"></sl-input>
+            <sl-select id="bookLanguage" label="Idioma de los textos impresos" value="es" size="small">
+              <sl-option value="es">Español</sl-option>
+              <sl-option value="en">English</sl-option>
+            </sl-select>
+            <sl-select id="bookBack" label="Reverso de cada página" size="small" value="blanco" help-text="En blanco es lo recomendado: el marcador que traspasa no arruina otro dibujo.">
+              <sl-option value="blanco">En blanco</sl-option>
+              <sl-option value="negro">Negro (oculta lo que traspasa)</sl-option>
+              <sl-option value="ninguno">Otro dibujo (doble cara)</sl-option>
+            </sl-select>
+            <sl-select id="bookPaper" label="Papel en KDP" size="small" value="white" help-text="Cambia el grosor del lomo en las medidas de portada.">
+              <sl-option value="white">Blanco</sl-option>
+              <sl-option value="cream">Crema</sl-option>
+            </sl-select>
+            <sl-select id="bookDpi" label="Nitidez de impresión" size="small" value="300">
+              <sl-option value="300">300 DPI (estándar de KDP)</sl-option>
+              <sl-option value="600">600 DPI (más nítido, PDF más pesado)</sl-option>
+            </sl-select>
+            <sl-checkbox id="bookPageNumbers">Numerar páginas</sl-checkbox>
+            <div class="section-title step-title" style="margin:14px 0 2px;"><sl-icon name="check2-circle"></sl-icon> 6 · Revisar y crear</div>
             <div id="bookSummary" class="hint"></div>
             <div id="canvaCoverCard" style="margin:8px 0; padding:10px; border-radius:8px; background:var(--m3-surface-variant); border-left:4px solid var(--m3-primary); font-size:0.75rem; line-height:1.4;">
               <div style="font-weight:600; display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:0.8rem;">
@@ -811,16 +841,21 @@
                 </sl-button>
               </div>
             </div>
-            <sl-button id="reviewBook" variant="primary" outline size="medium" pill style="width: 100%;">
-              <sl-icon slot="prefix" name="grid-3x3-gap"></sl-icon>
-              Revisar páginas antes de crear
-            </sl-button>
-            <sl-checkbox id="bookAutoQuality" checked>Control de calidad automático: rehacer páginas flojas o repetidas antes de crear</sl-checkbox>
+            <sl-checkbox id="bookAutoQuality" checked>Control de calidad: rehacer páginas flojas o repetidas antes de crear</sl-checkbox>
             <p id="bookReviewInfo" class="hint"></p>
-            <sl-button id="downloadBook" variant="success" size="medium" pill style="width: 100%;">
-              <sl-icon slot="prefix" name="journal-bookmark"></sl-icon>
-              Crear libro (PDF)
-            </sl-button>
+            <div id="bookActionBar">
+              <div id="bookStickyInfo" class="hint" aria-live="polite"></div>
+              <div style="display:flex; gap:6px;">
+                <sl-button id="reviewBook" variant="primary" outline size="medium" pill style="flex:1;">
+                  <sl-icon slot="prefix" name="grid-3x3-gap"></sl-icon>
+                  Revisar páginas
+                </sl-button>
+                <sl-button id="downloadBook" variant="success" size="medium" pill style="flex:1.3;">
+                  <sl-icon slot="prefix" name="journal-bookmark"></sl-icon>
+                  Crear libro (PDF)
+                </sl-button>
+              </div>
+            </div>
           </div>
         </sl-tab-panel>
 
@@ -834,7 +869,7 @@
               e importa aquí el paquete.
             </p>
             <!-- Biblioteca de paquetes prediseñados -->
-            <sl-details summary="📚 Biblioteca de paquetes incluidos (1 clic)" open style="font-size:0.8rem; margin-bottom:8px;">
+            <sl-details summary="📚 Biblioteca incluida: añadir a mi lista" open style="font-size:0.8rem; margin-bottom:8px;">
               <div id="libraryContainer" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
                 <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
                   <div>
@@ -880,7 +915,7 @@
                 </div>
                 <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
                   <div>
-                    <div style="font-weight:600;">✨ Animales Zentangle & Místicos <small style="color:var(--m3-on-surface-variant);">(41 figuras)</small></div>
+                    <div style="font-weight:600;">✨ Animales con texturas y místicos <small style="color:var(--m3-on-surface-variant);">(41 figuras)</small></div>
                     <div style="font-size:0.72rem; color:var(--m3-on-surface-variant);">Animales detallados para colorear</div>
                   </div>
                   <sl-button size="small" variant="neutral" class="btn-load-pkg" data-id="zentangle" data-use="anillos">Cargar</sl-button>
@@ -905,17 +940,17 @@
             <input type="file" id="figurePackUpload" accept=".json,application/json" style="display: none;">
             <div style="display:flex; gap:8px;">
               <sl-button id="medallionUploadBtn" variant="primary" size="small" pill style="flex:1;">
-                <sl-icon slot="prefix" name="upload"></sl-icon> Subir imágenes
+                <sl-icon slot="prefix" name="upload"></sl-icon> Subir mis imágenes
               </sl-button>
               <sl-button id="figurePackBtn" variant="default" size="small" pill style="flex:1;">
-                <sl-icon slot="prefix" name="box-arrow-in-down"></sl-icon> Importar paquete
+                <sl-icon slot="prefix" name="box-arrow-in-down"></sl-icon> Abrir paquete .json
               </sl-button>
             </div>
             <div id="medallionList" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0;">
-              <sl-button id="btnSetAllFigura" size="small" variant="text" style="font-size:0.72rem; font-weight:600;">Usar todas en Figura</sl-button>
-              <sl-button id="btnSetAllAnillos" size="small" variant="text" style="font-size:0.72rem;">Usar todas en Anillos</sl-button>
-              <sl-button id="btnSetAllExtra" size="small" variant="text" style="font-size:0.72rem;">Usar todas en Fondo</sl-button>
+              <sl-button id="btnSetAllFigura" size="small" variant="text" style="font-size:0.72rem; font-weight:600;">Todas como figura rellena</sl-button>
+              <sl-button id="btnSetAllAnillos" size="small" variant="text" style="font-size:0.72rem;">Todas como anillos</sl-button>
+              <sl-button id="btnSetAllExtra" size="small" variant="text" style="font-size:0.72rem;">Todas como decorado de fondo</sl-button>
               <sl-button id="btnClearFigures" size="small" variant="text" style="font-size:0.72rem; color:var(--sl-color-danger-600);">Vaciar lista</sl-button>
             </div>
             <div id="figureChecks" style="font-size:0.78rem;"></div>
