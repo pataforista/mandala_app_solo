@@ -17,7 +17,7 @@ import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
 import { pageTexts } from "./core/pageTexts.js";
 import { escapeXml } from "./core/svgText.js";
 import { kdpSafeMarginMm, kdpChecklist, bookLayout, kdpCoverDimensions } from "./core/kdp.js";
-import { loadImageFile, figureFromImage, withStamp } from "./core/figureImport.js";
+import { loadImageFile, figureFromImage, withStamp, withThinInk } from "./core/figureImport.js";
 import { fitOf } from "./generators/pageComposer.js";
 import { packFigures, unpackFigures, encodeCls, decodeCls } from "./core/figurePack.js";
 import { autoSaveProject, loadAutoSave, saveNamedProject, listProjects, loadProject, deleteProject, duplicateProject, serializeProject, deserializeProject } from "./core/projects.js";
@@ -439,10 +439,25 @@ function resolveUserImage(s, entry = userFigures[activeFigure]) {
   const fig = entry?.fig;
   if (!fig || !entry.use || entry.use === "ninguno" || entry.use === "extra") return out;
   const stamp = fig.stampHref || fig.href;
-  if (entry.use === "figura") out.figure = fig;
+  // Con «Afinar los trazos gruesos», la figura rellena usa su versión de contornos finos
+  if (entry.use === "figura") out.figure = thinOn() && fig.thinHref ? { ...fig, href: fig.thinHref } : fig;
   else if (entry.use === "anillos") out.figureRing = { href: stamp, centerHref: stamp, w: fig.w, h: fig.h, cls: fig.cls, theme: fig.theme };
   else if (entry.use === "medallon") out.centerArt = { type: "image", href: stamp, scale: s.centerArtScale, ...fitOf(fig) };
   return out;
+}
+
+// «Vaciar los trazos muy gruesos» (Libro, paso 3). Desactivado por defecto: conviene revisar el resultado.
+function thinOn() {
+  return !!document.getElementById("bookFigureThin")?.checked;
+}
+// Prepara las versiones afinadas de las figuras indicadas (todas las de página si no se indican)
+async function ensureThinFigures(list = userFigures) {
+  if (!thinOn()) return;
+  for (const m of list) {
+    if (m?.fig && !m.fig.thinHref) {
+      try { await withThinInk(m.fig); } catch (e) { console.warn("Afinado de ilustración:", e); }
+    }
+  }
 }
 
 function getCurrentDoc() {
@@ -527,7 +542,33 @@ function updateImmediate() {
   scheduleRender(true);
 }
 
+// La figura activa necesita su versión afinada: se prepara aparte y se vuelve a dibujar
+let thinPending = false;
+function prepareActiveThin() {
+  const m = userFigures[activeFigure];
+  if (thinPending || !thinOn() || !m?.fig || m.fig.thinHref || m.use !== "figura") return;
+  thinPending = true;
+  withThinInk(m.fig).catch(e => console.warn("Afinado de ilustración:", e))
+    .finally(() => { thinPending = false; if (m.fig.thinHref) scheduleRender(); });
+}
+
+// Los deslizadores muestran su valor en la etiqueta (Shoelace sólo lo enseña al arrastrar)
+function refreshRangeLabels() {
+  document.querySelectorAll("#sidebar sl-range[label]").forEach(r => {
+    if (!r.dataset.baseLabel) r.dataset.baseLabel = r.getAttribute("label");
+    const v = Number(r.value);
+    if (!Number.isFinite(v)) return;
+    const step = Number(r.step) || 1;
+    const txt = step >= 1 ? String(Math.round(v)) : v.toFixed(step >= 0.1 ? 1 : 2).replace(".", ",");
+    const label = `${r.dataset.baseLabel}: ${txt}`;
+    if (r.label !== label) r.label = label;
+  });
+}
+document.addEventListener("sl-input", (e) => { if (e.target?.tagName === "SL-RANGE") refreshRangeLabels(); });
+
 function render() {
+  prepareActiveThin();
+  refreshRangeLabels();
   updateGeneratorUI();
   seedText.textContent = String(state.seed >>> 0);
 
@@ -1860,12 +1901,17 @@ function bindUI() {
   const bookBelongsPageEl = document.getElementById("bookBelongsPage");
   const bookWelcomePageEl = document.getElementById("bookWelcomePage");
   const bookReviewPageEl = document.getElementById("bookReviewPage");
-  const bookQuotePageEl = document.getElementById("bookQuotePage");
-  const bookQuoteTextEl = document.getElementById("bookQuoteText");
   const bookColorTestEl = document.getElementById("bookColorTest");
   const bookPageNumbersEl = document.getElementById("bookPageNumbers");
   const bookDpiEl = document.getElementById("bookDpi");
   const bookLanguageEl = document.getElementById("bookLanguage");
+  const bookPaperEl = document.getElementById("bookPaper");
+  const bookFigureThinEl = document.getElementById("bookFigureThin");
+  const checkedValues = (sel) => [...document.querySelectorAll(sel)].filter(b => b.checked).map(b => b.value);
+  const setChecked = (sel, values) => {
+    if (!Array.isArray(values)) return;
+    document.querySelectorAll(sel).forEach(b => { b.checked = values.includes(b.value); });
+  };
   const bookProductProfileEl = document.getElementById("bookProductProfile");
   const bookThemeEl = document.getElementById("bookTheme");
   const themeActionBox = document.getElementById("themeActionBox");
@@ -1927,7 +1973,24 @@ function bindUI() {
         backgrounds = theme.backgrounds;
       }
     }
+    // «Los elijo yo»: los estilos marcados mandan sobre el tema y el público
+    if (vary && !bestSeller()) {
+      const picked = checkedValues(".bookStyle");
+      if (picked.length) {
+        const w = styleWeights && styles ? Object.fromEntries(styles.map((st, i) => [st, styleWeights[i]])) : null;
+        styles = picked;
+        styleWeights = w ? picked.map(st => w[st] ?? 1) : null;
+      }
+    }
     return { vary, prof, prod, theme, styles, styleWeights, patternOnly, useBackground, backgrounds };
+  };
+  // Marcos permitidos: los marcados en «Los elijo yo»; si no, los del perfil o todos
+  const allowedFrames = (prof) => {
+    if (!bestSeller()) {
+      const picked = checkedValues(".bookFrame");
+      if (picked.length) return { frames: picked, frameWeights: null };
+    }
+    return { frames: prof?.frames, frameWeights: prof?.frameWeights ?? null };
   };
   const chaptersFor = (regular) => {
     if (!bookChaptersEl?.checked || !bookVaryEl.checked || state.generatorType !== "classic") return [];
@@ -1951,7 +2014,7 @@ function bindUI() {
     belongsPage: !!bookBelongsPageEl?.checked,
     welcomePage: !!bookWelcomePageEl?.checked,
     reviewPage: !!bookReviewPageEl?.checked,
-    quotePage: !!bookQuotePageEl?.checked,
+    quotePage: false, // sin frases de terceros
     colorTest: !!bookColorTestEl?.checked,
     };
   };
@@ -1970,76 +2033,36 @@ function bindUI() {
 
   // Persistencia de ajustes del libro en localStorage
   const STORAGE_KEY = "mandala_studio_kdp_settings";
-  const saveBookSettings = () => {
-    try {
-      const s = {
-        title: bookTitleEl?.value || "",
-        subtitle: bookSubtitleEl?.value || "",
-        author: bookAuthorEl?.value || "",
-        pages: bookPagesEl?.value || "50",
-        difficulty: bookDifficultyEl?.value || "progresiva",
-        productProfile: bookProductProfileEl?.value || "none",
-        theme: bookThemeEl?.value || "none",
-        back: bookBackEl?.value || "blanco",
-        dpi: bookDpiEl?.value || "300",
-        language: bookLanguageEl?.value || "es",
-        titlePage: !!bookTitlePageEl?.checked,
-        copyright: !!bookCopyrightEl?.checked,
-        belongsPage: !!bookBelongsPageEl?.checked,
-        welcomePage: !!bookWelcomePageEl?.checked,
-        reviewPage: !!bookReviewPageEl?.checked,
-        quotePage: !!bookQuotePageEl?.checked,
-        quoteText: bookQuoteTextEl?.value || "",
-        colorTest: !!bookColorTestEl?.checked,
-        pageNumbers: !!bookPageNumbersEl?.checked,
-        growth: bookGrowthEl?.value || "1",
-        mystery: bookMysteryEl?.value || "3",
-        nature: !!bookNatureEl?.checked,
-        mural: bookMuralEl?.value || "3x3",
-        vary: !!bookVaryEl?.checked,
-        chapters: !!bookChaptersEl?.checked,
-        figureShare: bookFigureShareEl?.value || "0.5",
-        mixUses: !!bookMixUsesEl?.checked,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-    } catch (e) {}
+  // Ajustes del libro: una sola lista para el navegador (localStorage) y los proyectos
+  const SELECT_SETTINGS = { title: "bookTitle", subtitle: "bookSubtitle", author: "bookAuthor", pages: "bookPages",
+    difficulty: "bookDifficulty", productProfile: "bookProductProfile", theme: "bookTheme", back: "bookBack",
+    dpi: "bookDpi", language: "bookLanguage", paper: "bookPaper", growth: "bookGrowth", mystery: "bookMystery",
+    mural: "bookMural", figureShare: "bookFigureShare", designs: "bookProfile" };
+  const CHECK_SETTINGS = { titlePage: "bookTitlePage", copyright: "bookCopyright", belongsPage: "bookBelongsPage",
+    welcomePage: "bookWelcomePage", reviewPage: "bookReviewPage", colorTest: "bookColorTest",
+    pageNumbers: "bookPageNumbers", nature: "bookNature", vary: "bookVary", chapters: "bookChapters",
+    mixUses: "bookMixUses", figureThin: "bookFigureThin", autoQuality: "bookAutoQuality" };
+  const GROUP_SETTINGS = { compositions: ".bookComp", styles: ".bookStyle", frames: ".bookFrame" };
+  const collectBookSettings = () => {
+    const out = {};
+    for (const [k, id] of Object.entries(SELECT_SETTINGS)) { const el = document.getElementById(id); if (el) out[k] = el.value ?? ""; }
+    for (const [k, id] of Object.entries(CHECK_SETTINGS)) { const el = document.getElementById(id); if (el) out[k] = !!el.checked; }
+    for (const [k, sel] of Object.entries(GROUP_SETTINGS)) out[k] = checkedValues(sel);
+    return out;
   };
-
+  const applyBookSettings = (s) => {
+    if (!s || typeof s !== "object") return;
+    for (const [k, id] of Object.entries(SELECT_SETTINGS)) { const el = document.getElementById(id); if (el && s[k] !== undefined) el.value = String(s[k]); }
+    for (const [k, id] of Object.entries(CHECK_SETTINGS)) { const el = document.getElementById(id); if (el && s[k] !== undefined) el.checked = !!s[k]; }
+    for (const [k, sel] of Object.entries(GROUP_SETTINGS)) setChecked(sel, s[k]);
+  };
+  const saveBookSettings = () => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collectBookSettings())); } catch (e) {}
+  };
   const restoreBookSettings = () => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      if (s.title !== undefined && bookTitleEl) bookTitleEl.value = s.title;
-      if (s.subtitle !== undefined && bookSubtitleEl) bookSubtitleEl.value = s.subtitle;
-      if (s.author !== undefined && bookAuthorEl) bookAuthorEl.value = s.author;
-      if (s.pages !== undefined && bookPagesEl) bookPagesEl.value = s.pages;
-      if (s.difficulty !== undefined && bookDifficultyEl) bookDifficultyEl.value = s.difficulty;
-      if (s.productProfile !== undefined && bookProductProfileEl) bookProductProfileEl.value = s.productProfile;
-      if (s.theme !== undefined && bookThemeEl) bookThemeEl.value = s.theme;
-      if (s.back !== undefined && bookBackEl) bookBackEl.value = s.back;
-      if (s.dpi !== undefined && bookDpiEl) bookDpiEl.value = s.dpi;
-      if (s.language !== undefined && bookLanguageEl) bookLanguageEl.value = s.language;
-      if (s.titlePage !== undefined && bookTitlePageEl) bookTitlePageEl.checked = s.titlePage;
-      if (s.copyright !== undefined && bookCopyrightEl) bookCopyrightEl.checked = s.copyright;
-      if (s.belongsPage !== undefined && bookBelongsPageEl) bookBelongsPageEl.checked = s.belongsPage;
-      if (s.welcomePage !== undefined && bookWelcomePageEl) bookWelcomePageEl.checked = s.welcomePage;
-      if (s.reviewPage !== undefined && bookReviewPageEl) bookReviewPageEl.checked = s.reviewPage;
-      if (s.quotePage !== undefined && bookQuotePageEl) {
-        bookQuotePageEl.checked = s.quotePage;
-        if (bookQuoteTextEl) bookQuoteTextEl.style.display = s.quotePage ? "inline-block" : "none";
-      }
-      if (s.quoteText !== undefined && bookQuoteTextEl) bookQuoteTextEl.value = s.quoteText;
-      if (s.colorTest !== undefined && bookColorTestEl) bookColorTestEl.checked = s.colorTest;
-      if (s.pageNumbers !== undefined && bookPageNumbersEl) bookPageNumbersEl.checked = s.pageNumbers;
-      if (s.growth !== undefined && bookGrowthEl) bookGrowthEl.value = s.growth;
-      if (s.mystery !== undefined && bookMysteryEl) bookMysteryEl.value = s.mystery;
-      if (s.nature !== undefined && bookNatureEl) bookNatureEl.checked = s.nature;
-      if (s.mural !== undefined && bookMuralEl) bookMuralEl.value = s.mural;
-      if (s.vary !== undefined && bookVaryEl) bookVaryEl.checked = s.vary;
-      if (s.chapters !== undefined && bookChaptersEl) bookChaptersEl.checked = s.chapters;
-      if (s.figureShare !== undefined && bookFigureShareEl) bookFigureShareEl.value = s.figureShare;
-      if (s.mixUses !== undefined && bookMixUsesEl) bookMixUsesEl.checked = s.mixUses;
+      if (raw) applyBookSettings(JSON.parse(raw));
     } catch (e) {}
   };
 
@@ -2049,7 +2072,7 @@ function bindUI() {
     btnCopyCanva.addEventListener("click", () => {
       const total = bookPageCount(bookLayoutOpts());
       const { wMm, hMm } = getCurrentDoc().page;
-      const dims = kdpCoverDimensions({ pages: total, trimWidthMm: wMm, trimHeightMm: hMm });
+      const dims = kdpCoverDimensions({ pages: total, trimWidthMm: wMm, trimHeightMm: hMm, paperType: bookPaperEl?.value || "white" });
       const text = `MEDIDAS DE PORTADA KDP PARA CANVA:
 - Dimensiones del lienzo: ${dims.totalWidthIn.toFixed(2)} x ${dims.totalHeightIn.toFixed(2)} pulgadas
 - En píxeles a 300 DPI: ${dims.widthPx300} x ${dims.heightPx300} px
@@ -2184,21 +2207,27 @@ function bindUI() {
     bookSummaryEl.innerHTML =
       `${total} páginas · ${wMm}×${hMm} mm · margen ${margin.toFixed(1)} mm · ${dpi} DPI<br>` +
       (bad.length ? bad.map(c => `⚠️ ${c.msg}`).join("<br>") : "✅ Cumple los requisitos de interior de KDP (sin sangrado).");
+    // Barra fija: lo esencial siempre a la vista junto al botón de crear
+    const stickyEl = document.getElementById("bookStickyInfo");
+    if (stickyEl) {
+      const fmt = presetEl?.selectedOptions?.[0]?.textContent?.trim() || state.preset;
+      stickyEl.textContent = `${total} páginas · ${fmt} · ` + (bad.length ? `⚠️ ${bad.length} aviso(s) en el paso 6` : "✅ cumple KDP");
+    }
 
     // Actualizar medidas para Canva
     const canvaDetailsEl = document.getElementById("canvaCoverDetails");
     if (canvaDetailsEl) {
-      const coverDims = kdpCoverDimensions({ pages: total, trimWidthMm: wMm, trimHeightMm: hMm });
+      const coverDims = kdpCoverDimensions({ pages: total, trimWidthMm: wMm, trimHeightMm: hMm, paperType: bookPaperEl?.value || "white" });
       canvaDetailsEl.innerHTML =
         `<b>Tamaño lienzo Canva:</b> ${coverDims.totalWidthIn.toFixed(2)}″ × ${coverDims.totalHeightIn.toFixed(2)}″ (${coverDims.totalWidthMm.toFixed(1)} × ${coverDims.totalHeightMm.toFixed(1)} mm)<br>` +
         `<b>Píxeles (300 DPI):</b> <code>${coverDims.widthPx300} × ${coverDims.heightPx300} px</code><br>` +
         `<b>Lomo central:</b> ${coverDims.spineIn.toFixed(3)}″ (${coverDims.spineMm.toFixed(1)} mm) · ${coverDims.spineTextAllowed ? "✅ Texto en lomo permitido (≥ 80 págs)" : "⚠️ Sin texto en lomo (< 80 págs)"}`;
     }
     saveBookSettings();
-    // Consejos de calidad (no bloquean): lo que distingue a los libros mejor valorados
+    // Consejos (no bloquean)
     const tips = [];
     if (!/^KDP_/.test(state.preset)) tips.push("💡 8.5×11 in es el formato más común en libros de mandalas; A4 y Carta también los acepta KDP.");
-    if (bookCount() < 40) tips.push(`💡 ${bookCount()} mandalas: los libros mejor valorados traen entre 40 y 100.`);
+    if (bookCount() < 40) tips.push(`💡 ${bookCount()} mandalas: con menos de 40 el libro puede parecer corto para su precio.`);
     if (backMode() === "ninguno") {
       tips.push("💡 Doble cara: ideal para lápices de colores. Con marcadores la tinta puede traspasar al dibujo del otro lado.");
       if (regularCount() > bookCount()) tips.push(`➕ Se añade 1 mandala (${regularCount()} en total) para que la última página no quede en blanco.`);
@@ -2282,8 +2311,8 @@ function bindUI() {
       petals: prof?.petals,
       compositions: vary && isClassic ? comps : [state.composition || "centro"],
       compositionWeights: vary && isClassic ? (prof && isClassic ? prof.compositionWeights : comps.map(c => COMP_WEIGHTS[c] ?? 1)) : null,
-      frames: vary && isClassic ? prof?.frames : [state.frameStyle || "redondeado"],
-      frameWeights: vary && isClassic ? prof?.frameWeights ?? null : null,
+      frames: vary && isClassic ? allowedFrames(prof).frames : [state.frameStyle || "redondeado"],
+      frameWeights: vary && isClassic ? allowedFrames(prof).frameWeights : null,
       difficulty: bookDifficultyEl?.value || "mixta",
       baseComplexity: baseCompVal,
       images: chosen.length,
@@ -2318,6 +2347,9 @@ function bindUI() {
         shape: p.special.shape, seed: seedOf(j), complexity: p.complexity,
       }));
     };
+    // Las páginas especiales usan el marco de «Diseñar», salvo que se hayan elegido marcos y ése no esté
+    const pickedFrames = !bestSeller() && vary ? checkedValues(".bookFrame") : [];
+    const specialFrame = pickedFrames.length && !pickedFrames.includes(base.frameStyle) ? pickedFrames[0] : base.frameStyle;
     // Registro de fuentes: qué imagen va en qué página (trazabilidad de derechos)
     const sourceLog = [];
 
@@ -2330,6 +2362,7 @@ function bindUI() {
         const special = { ...pg.special };
         if (special.type === "solutions") special.entries = solutionEntries();
         const o = { ...base, seed, complexity: pg.complexity, petals: pg.petals, styleMode: pg.styleMode,
+          frameStyle: specialFrame,
           strokeWidthMm: pageStrokeMm(baseStrokeMm, pg.strokeScale ?? 1), special,
           ...(pg.silhouette ? { silhouette: pg.silhouette } : {}) };
         sourceLog[i] = { mandala: i + 1, composition: specialLabel(special), style: o.styleMode, image: "", source: "" };
@@ -2535,6 +2568,7 @@ function bindUI() {
   const autoQuality = () => autoQualityEl ? autoQualityEl.checked : true;
 
   const fixWeakPages = async () => {
+    await ensureThinFigures(chosenFigures());
     const book0 = buildBook();
     const measured = Array.from({ length: book0.count }, (_, i) => ({ score: reviewScores.get(i) ?? null, fp: reviewFps.get(i) || null }));
     if (reviewFixBtn) reviewFixBtn.loading = true;
@@ -2560,6 +2594,7 @@ function bindUI() {
   // Antes de crear el PDF sin pasar por la revisión: mide cada página y cura el libro.
   // Devuelve el resumen (o null si no hizo falta).
   const ensureCurated = async (onProgress, signal = null) => {
+    await ensureThinFigures(chosenFigures());
     const book0 = buildBook();
     const sig = bookSignature(book0);
     if (!autoQuality() || curatedSigs.has(sig)) return null;
@@ -2586,6 +2621,7 @@ function bindUI() {
 
   const openReview = async () => {
     const token = ++reviewToken;
+    await ensureThinFigures(chosenFigures());
     const book = buildBook();
     reviewGrid.innerHTML = "";
     reviewScores.clear();
@@ -2739,7 +2775,6 @@ function bindUI() {
         marginMm,
         dpi: parseInt(bookDpiEl?.value, 10) || 300,
         language: bookLanguageEl?.value || "es",
-        quoteText: bookQuoteTextEl?.value || "",
         onProgress: progress,
         signal,
       });
@@ -2792,23 +2827,25 @@ function bindUI() {
   if (bookBtn) {
     bookBtn.addEventListener("click", downloadBook);
     document.addEventListener("figures-changed", updateBookSummary);
-    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookBelongsPageEl, bookWelcomePageEl, bookReviewPageEl, bookQuotePageEl, bookColorTestEl, presetEl, bookDpiEl, bookLanguageEl, bookProductProfileEl, bookThemeEl, coloringPresetEl, strokeWidthEl, generatorTypeEl].forEach(el =>
+    [bookPagesEl, bookBackEl, bookTitlePageEl, bookCopyrightEl, bookBelongsPageEl, bookWelcomePageEl, bookReviewPageEl, bookColorTestEl, presetEl, bookDpiEl, bookLanguageEl, bookPaperEl, bookProductProfileEl, bookThemeEl, coloringPresetEl, strokeWidthEl, generatorTypeEl].forEach(el =>
       el && el.addEventListener("sl-change", updateBookSummary));
     if (bookThemeEl) {
       bookThemeEl.addEventListener("sl-change", updateThemeActionUI);
     }
     [bookFigureShareEl, bookMixUsesEl].forEach(el => el && el.addEventListener("sl-change", () => { updateBookSummary(); saveBookSettings(); }));
-    [bookTitleEl, bookSubtitleEl, bookAuthorEl, bookQuoteTextEl].forEach(el =>
+    [bookTitleEl, bookSubtitleEl, bookAuthorEl].forEach(el =>
       el && el.addEventListener("sl-input", saveBookSettings));
+    // Cualquier otro cambio en la pestaña del libro también se guarda
+    document.querySelector('sl-tab-panel[name="libro"]')?.addEventListener("sl-change", saveBookSettings);
+    // Estilos, marcos y afinado cambian el plan: los cambios hechos a mano en la revisión ya no valen
+    document.querySelectorAll(".bookStyle, .bookFrame").forEach(b => b.addEventListener("sl-change", () => {
+      bookOverrides = new Map(); updateReviewInfo(); updateBookSummary();
+    }));
+    bookFigureThinEl?.addEventListener("sl-change", () => { renderFigureList(); updateImmediate(); updateBookSummary(); });
     restoreBookSettings();
+    syncProfileUI();
     updateThemeActionUI();
     bookPagesEl.addEventListener("sl-input", updateBookSummary);
-    // Mostrar/ocultar el input de texto cuando se marca el checkbox de página de frase
-    if (bookQuotePageEl && bookQuoteTextEl) {
-      bookQuotePageEl.addEventListener("sl-change", () => {
-        bookQuoteTextEl.style.display = bookQuotePageEl.checked ? "inline-block" : "none";
-      });
-    }
     updateBookSummary();
   }
 
@@ -2848,35 +2885,7 @@ function bindUI() {
       id: currentProjectId,
       name: currentProjectName,
       state: JSON.parse(JSON.stringify(state)),
-      bookSettings: {
-        title: bookTitleEl?.value || "",
-        subtitle: bookSubtitleEl?.value || "",
-        author: bookAuthorEl?.value || "",
-        pages: bookPagesEl?.value || 50,
-        difficulty: bookDifficultyEl?.value || "progresiva",
-        productProfile: bookProductProfileEl?.value || "none",
-        theme: bookThemeEl?.value || "none",
-        back: bookBackEl?.value || "blanco",
-        dpi: bookDpiEl?.value || "300",
-        language: bookLanguageEl?.value || "es",
-        titlePage: !!bookTitlePageEl?.checked,
-        copyright: !!bookCopyrightEl?.checked,
-        belongsPage: !!bookBelongsPageEl?.checked,
-        welcomePage: !!bookWelcomePageEl?.checked,
-        reviewPage: !!bookReviewPageEl?.checked,
-        quotePage: !!bookQuotePageEl?.checked,
-        quoteText: bookQuoteTextEl?.value || "",
-        colorTest: !!bookColorTestEl?.checked,
-        pageNumbers: !!bookPageNumbersEl?.checked,
-        growth: bookGrowthEl?.value || "0",
-        mystery: bookMysteryEl?.value || "0",
-        nature: !!bookNatureEl?.checked,
-        mural: bookMuralEl?.value || "0",
-        vary: !!bookVaryEl?.checked,
-        chapters: !!bookChaptersEl?.checked,
-        figureShare: bookFigureShareEl?.value || "0.5",
-        mixUses: !!bookMixUsesEl?.checked,
-      },
+      bookSettings: collectBookSettings(),
       userFigures: figuresData,
       activeFigure,
       bookOverrides: Array.from(bookOverrides.entries()),
@@ -2902,37 +2911,7 @@ function bindUI() {
       bindUI();
     }
     if (data.bookSettings) {
-      const bs = data.bookSettings;
-      if (bs.title !== undefined && bookTitleEl) bookTitleEl.value = bs.title;
-      if (bs.subtitle !== undefined && bookSubtitleEl) bookSubtitleEl.value = bs.subtitle;
-      if (bs.author !== undefined && bookAuthorEl) bookAuthorEl.value = bs.author;
-      if (bs.pages !== undefined && bookPagesEl) bookPagesEl.value = bs.pages;
-      if (bs.difficulty !== undefined && bookDifficultyEl) bookDifficultyEl.value = bs.difficulty;
-      if (bs.productProfile !== undefined && bookProductProfileEl) bookProductProfileEl.value = bs.productProfile;
-      if (bs.theme !== undefined && bookThemeEl) bookThemeEl.value = bs.theme;
-      if (bs.back !== undefined && bookBackEl) bookBackEl.value = bs.back;
-      if (bs.dpi !== undefined && bookDpiEl) bookDpiEl.value = bs.dpi;
-      if (bs.language !== undefined && bookLanguageEl) bookLanguageEl.value = bs.language;
-      if (bs.titlePage !== undefined && bookTitlePageEl) bookTitlePageEl.checked = bs.titlePage;
-      if (bs.copyright !== undefined && bookCopyrightEl) bookCopyrightEl.checked = bs.copyright;
-      if (bs.belongsPage !== undefined && bookBelongsPageEl) bookBelongsPageEl.checked = bs.belongsPage;
-      if (bs.welcomePage !== undefined && bookWelcomePageEl) bookWelcomePageEl.checked = bs.welcomePage;
-      if (bs.reviewPage !== undefined && bookReviewPageEl) bookReviewPageEl.checked = bs.reviewPage;
-      if (bs.quotePage !== undefined && bookQuotePageEl) {
-        bookQuotePageEl.checked = bs.quotePage;
-        if (bookQuoteTextEl) bookQuoteTextEl.style.display = bs.quotePage ? "inline-block" : "none";
-      }
-      if (bs.quoteText !== undefined && bookQuoteTextEl) bookQuoteTextEl.value = bs.quoteText;
-      if (bs.colorTest !== undefined && bookColorTestEl) bookColorTestEl.checked = bs.colorTest;
-      if (bs.pageNumbers !== undefined && bookPageNumbersEl) bookPageNumbersEl.checked = bs.pageNumbers;
-      if (bs.growth !== undefined && bookGrowthEl) bookGrowthEl.value = bs.growth;
-      if (bs.mystery !== undefined && bookMysteryEl) bookMysteryEl.value = bs.mystery;
-      if (bs.nature !== undefined && bookNatureEl) bookNatureEl.checked = bs.nature;
-      if (bs.mural !== undefined && bookMuralEl) bookMuralEl.value = bs.mural;
-      if (bs.vary !== undefined && bookVaryEl) bookVaryEl.checked = bs.vary;
-      if (bs.chapters !== undefined && bookChaptersEl) bookChaptersEl.checked = bs.chapters;
-      if (bs.figureShare !== undefined && bookFigureShareEl) bookFigureShareEl.value = bs.figureShare;
-      if (bs.mixUses !== undefined && bookMixUsesEl) bookMixUsesEl.checked = bs.mixUses;
+      applyBookSettings(data.bookSettings);
       saveBookSettings();
     }
     if (Array.isArray(data.userFigures)) {

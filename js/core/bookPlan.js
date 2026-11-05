@@ -177,7 +177,7 @@ export const BOOK_THEMES = {
 export const PRODUCT_PROFILES = {
   // Adulto general: tramas continuas (teselados), sin confeti infantil
   mindful_patterns: {
-    name: "Mindful Patterns",
+    name: "Adultos · florales y tramas",
     description: "Adulto general — tramas continuas, jerarquía de trazo, floral + geométrico",
     styles: ["floral", "geometric", "islamico", "yantra"],
     styleWeights: [3, 2, 1, 1],
@@ -187,7 +187,7 @@ export const PRODUCT_PROFILES = {
   },
   // Seniors/principiantes: trazo grueso, celdas grandes, sin fondo
   large_print_easy: {
-    name: "Large Print Easy",
+    name: "Personas mayores · trazo grande",
     description: "Seniors y principiantes — trazo 1.1 mm, celdas ≥ 7 mm², centrado, sin fondo",
     styles: ["floral", "geometric"],
     styleWeights: [2, 1],
@@ -198,7 +198,7 @@ export const PRODUCT_PROFILES = {
   },
   // Adulto experto: geometría sagrada intrincada, tramas
   intricate_sacred: {
-    name: "Intricate Sacred Geometry",
+    name: "Expertos · geometría sagrada",
     description: "Adulto experto — geométrico, yantra, islámico; detalle alto; tramas",
     styles: ["geometric", "yantra", "islamico"],
     styleWeights: [3, 2, 2],
@@ -208,7 +208,7 @@ export const PRODUCT_PROFILES = {
   },
   // Infantil: trazo grueso, figuras amables, fondo de juego (confeti permitido)
   kids_mandalas: {
-    name: "Kids Mandalas",
+    name: "Niños · trazo grueso",
     description: "Niños 6-10 — trazo grueso, figuras amables, fondo de juego",
     styles: ["floral", "sashiko", "celtico"],
     styleWeights: [2, 1, 1],

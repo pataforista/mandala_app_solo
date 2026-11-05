@@ -32,7 +32,7 @@ No bajes el trazo de 0,8 mm en un libro para adultos: en papel de KDP una línea
 
 1. **Número de mandalas:** 40–100 (los libros mejor valorados están en ese rango).
 2. **Dificultad:** «Creciente» (recomendado).
-3. **Patrones:** «Los más vendidos para este formato», con **capítulos temáticos** activados.
+3. **Qué diseños pueden salir:** «Automático según el formato», con **capítulos temáticos** activados.
 4. **Páginas sorprendentes:** opcionales. Los mandalas misteriosos tienen celdas pequeñas por diseño:
    ponlos sólo en libros para adultos con paciencia; quítalos en libros «large print» o infantiles.
 5. **Título, autor e impresión** (en «2 · Páginas extra»): título, autor, **reverso en blanco** (recomendado para marcadores).
