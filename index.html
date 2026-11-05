@@ -139,8 +139,12 @@
 
     #stage svg {
       display: block;
-      width: 100%;
+      /* La hoja entera cabe en la ventana: el alto manda y el ancho se ajusta a la proporción
+         (con width: 100% el dibujo se salía por debajo de la hoja blanca) */
+      width: auto;
       height: auto;
+      max-width: 100%;
+      max-height: calc(100vh - 150px);
       border-radius: 28px;
     }
 

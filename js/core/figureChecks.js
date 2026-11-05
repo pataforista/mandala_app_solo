@@ -67,12 +67,35 @@ export function figureMetrics(fig) {
     sizes.push(n);
   }
   const fragments = sizes.filter(n => n < ink * 0.004).length;
+  // Negro macizo: tinta a más de 1,25 % del lado largo de cualquier hueco blanco, es decir,
+  // trazos de más de ~5 mm con la figura a página completa. No se puede colorear y en el
+  // libro se ve como una mancha (eclipses, agujeros negros, púas de erizo fundidas).
+  const dist = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) dist[i] = cls[i] === 0 ? 1e9 : 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; if (!dist[i]) continue;
+    let v = dist[i];
+    if (x > 0) v = Math.min(v, dist[i - 1] + 1); else v = Math.min(v, 1);
+    if (y > 0) v = Math.min(v, dist[i - w] + 1); else v = Math.min(v, 1);
+    dist[i] = v;
+  }
+  for (let y = h - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--) {
+    const i = y * w + x; if (!dist[i]) continue;
+    let v = dist[i];
+    if (x < w - 1) v = Math.min(v, dist[i + 1] + 1); else v = Math.min(v, 1);
+    if (y < h - 1) v = Math.min(v, dist[i + w] + 1); else v = Math.min(v, 1);
+    dist[i] = v;
+  }
+  const solidThr = Math.max(w, h) * 0.0125;
+  let solid = 0;
+  for (let i = 0; i < w * h; i++) if (cls[i] === 0 && dist[i] > solidThr) solid++;
   fig.metrics = {
     srcLong: fig.srcLong ?? Math.max(w, h),
     inkFrac: ink / figureArea,           // cuánto de la figura es línea (detalle)
     insideFrac: inside / figureArea,     // cuánto se puede rellenar con mandalas
     boxFill,
     fragments,
+    solidFrac: solid / figureArea,       // negro macizo (no coloreable)
     aspect: w / h,
   };
   return fig.metrics;
@@ -109,7 +132,14 @@ export function checkFigure(fig, use, meta = {}) {
   else if (m.inkFrac <= (use === "extra" ? 0.78 : 0.70)) add("warn", `Bastante detalle (${Math.round(m.inkFrac * 100)} % de la figura es línea).`, "Sube «Simplificar».", TOOLS.detail);
   else add("error", `Demasiado detalle (${Math.round(m.inkFrac * 100)} % de la figura es línea).`, "Sube «Simplificar» o usa el tipo «Dibujo / grabado».", TOOLS.detail);
 
-  // 5. Requisitos propios de cada uso
+  // 5. Sin manchas negras: el negro macizo no se colorea y se lee como un error de impresión
+  if (use !== "extra") {
+    if (m.solidFrac > 0.02 || m.inkFrac > 0.5) add("error", `Zonas negras macizas (${Math.round(Math.max(m.solidFrac, m.inkFrac > 0.5 ? m.inkFrac : 0) * 100)} % de la figura): en el libro saldrán como manchas.`, "Usa el tipo «Dibujo / grabado», sube «Simplificar» o elige otra imagen.", TOOLS.detail);
+    else if (m.solidFrac > 0.01) add("warn", "Algunos trazos muy gruesos: quedarán como bandas negras.", "Sube «Simplificar» o revisa la página en «Revisar páginas».", TOOLS.detail);
+    else add("ok", "Sin manchas negras.");
+  }
+
+  // 6. Requisitos propios de cada uso
   if (use === "figura") {
     if (m.insideFrac >= 0.25) add("ok", `Interior rellenable: ${Math.round(m.insideFrac * 100)} %.`);
     else if (m.insideFrac >= 0.04) add("warn", `Poco interior cerrado (${Math.round(m.insideFrac * 100)} %): el relleno quedará escaso.`, "Prueba otro tipo de imagen, o úsala en «Anillos».", TOOLS.closed);
@@ -122,7 +152,7 @@ export function checkFigure(fig, use, meta = {}) {
     else add("warn", "Figura alargada: dentro del círculo quedará pequeña.", "Recórtala para que sea más cuadrada (p. ej. sólo la cabeza).");
   }
 
-  // 6. Derechos de uso
+  // 7. Derechos de uso
   // Basta con confirmarla; la fuente es opcional (si se anota, queda en el registro de fuentes del libro)
   if (meta.rightsConfirmed) add("ok", (meta.source || "").trim() ? "Derechos confirmados y fuente registrada." : "Marcada como propia o de uso libre.");
   else add("error", "Falta confirmar que es de dominio público o propia.", "Marca la casilla (y, si quieres, anota su fuente).", TOOLS.rights);

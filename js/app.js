@@ -702,7 +702,7 @@ function render() {
   if (commercialScoreEl) {
     const { score } = commercialScore(measureSvg(svgStr), { strokeWidthMm: state.strokeWidth, minCellAreaMm2: state.minCellArea });
     commercialScoreEl.textContent = String(score);
-    commercialScoreEl.style.color = score >= 80 ? "#2e7d32" : score >= 60 ? "#f57c00" : "#c62828";
+    commercialScoreEl.style.color = score >= 80 ? "#2e7d32" : score >= 60 ? "#b45309" : "#c62828";
   }
 
   // Track recent seeds
@@ -2110,7 +2110,9 @@ function bindUI() {
       if (!theme) return;
       btnApplyThemePackage.loading = true;
       try {
-        if (theme.titlePreset) {
+        // Los títulos de los temas están en español: en un libro en otro idioma no se
+        // rellenan (sin título, la hoja de título usa el de serie en el idioma del libro)
+        if (theme.titlePreset && (bookLanguageEl?.value || "es") === "es") {
           if (bookTitleEl) bookTitleEl.value = theme.titlePreset.title || "";
           if (bookSubtitleEl) bookSubtitleEl.value = theme.titlePreset.subtitle || "";
         }
@@ -2397,7 +2399,7 @@ function bindUI() {
   const reviewScores = new Map(); // índice → puntuación (o null si no se mide)
   const scorable = (o) => !o.special || o.special.type === "grow" || o.special.type === "mural";
   const scoreSvg = (svg, o) => commercialScore(measureSvg(svg), { strokeWidthMm: o.strokeWidthMm, minCellAreaMm2: o.minCellAreaMm2 });
-  const scoreColor = (n) => (n >= 80 ? "#2e7d32" : n >= WEAK_SCORE ? "#f57c00" : "#c62828");
+  const scoreColor = (n) => (n >= 80 ? "#2e7d32" : n >= WEAK_SCORE ? "#b45309" : "#c62828");
   const reviewQualityEl = document.getElementById("reviewQuality");
   const reviewFixBtn = document.getElementById("reviewFixWeak");
   // Repetición: huella geométrica de cada página (variety.js), medida sobre el dibujo.
@@ -2442,7 +2444,7 @@ function bindUI() {
       }
     }
     reviewQualityEl.innerHTML += "<br><br>Variedad: " + (twins.length
-      ? `<b style="color:#f57c00">${twins.length} par(es) de páginas gemelas</b> (se ven casi iguales al hojear): ` +
+      ? `<b style="color:#b45309">${twins.length} par(es) de páginas gemelas</b> (se ven casi iguales al hojear): ` +
         twins.slice(0, 8).map(t => `págs. ${t.i + 1} y ${t.j + 1}`).join(" · ") + (twins.length > 8 ? "…" : "") + "."
       : "sin páginas gemelas ✅.");
     // Una página floja de un grupo cuenta una vez por grupo (se rehace el grupo entero)
