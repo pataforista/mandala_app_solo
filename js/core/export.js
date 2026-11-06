@@ -45,45 +45,11 @@ export function downloadTextFile(filename, text) {
 /**
  * Convert SVG string to canvas image data URL
  */
-export function svgStringToImageData(svgString, widthPx, heightPx) {
-  return new Promise((resolve, reject) => {
-    try {
-      const img = new Image();
-      const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = widthPx;
-          canvas.height = heightPx;
-          const ctx = canvas.getContext("2d");
-
-          // White background
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, widthPx, heightPx);
-
-          // Draw image
-          ctx.drawImage(img, 0, 0, widthPx, heightPx);
-          URL.revokeObjectURL(url);
-
-          resolve(canvas.toDataURL("image/png"));
-        } catch (e) {
-          URL.revokeObjectURL(url);
-          reject(e);
-        }
-      };
-
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error("No se pudo cargar la imagen SVG"));
-      };
-
-      img.src = url;
-    } catch (e) {
-      reject(e);
-    }
-  });
+export async function svgStringToImageData(svgString, widthPx, heightPx) {
+  const canvas = await svgToCanvas(svgString, widthPx, heightPx);
+  const url = canvas.toDataURL("image/png");
+  canvas.width = canvas.height = 0;
+  return url;
 }
 
 /**
@@ -375,29 +341,114 @@ export function bookPageCount({ mandalas, blankBack = true, titlePage = true, co
   return bookLayout({ mandalas: mandalas + (colorTest ? 1 : 0), blankBack, titlePage, copyrightPage, belongsPage, welcomePage, reviewPage, quotePage, keepBack }).length;
 }
 
-/** Rasteriza un SVG en un canvas con fondo blanco. */
-function svgToCanvas(svgString, widthPx, heightPx) {
+// --- Rasterizado robusto -------------------------------------------------------------
+// Dibujar de una vez un SVG complejo en un lienzo de 2550×3300 px (300 DPI) puede salir
+// corrupto en algunos móviles (el rasterizador por GPU deja manchas negras enormes y
+// franjas cortadas en sitios imprevistos). Tres defensas:
+//  1. lienzo por CPU (willReadFrequently): no depende de la GPU del teléfono;
+//  2. el SVG se dibuja por franjas de ≤ BAND_PX píxeles, en lugar de un lienzo gigante;
+//  3. cada página se compara con una versión pequeña de sí misma; si difiere, se repite
+//     con franjas más pequeñas y, si sigue mal, se avisa en vez de guardar un PDF dañado.
+const BAND_PX = 2_000_000;
+const VERIFY_SCALE = 8;       // la copia de control mide 1/8 por lado
+const VERIFY_MIN_PX = 1_000_000; // por debajo de esto no hace falta controlar
+
+const SVG_ROOT = /<svg\b[^>]*>/;
+
+function svgViewBox(svg) {
+  const root = SVG_ROOT.exec(svg)?.[0];
+  const m = root && /\sviewBox="([^"]+)"/.exec(root);
+  if (!m) return null;
+  const v = m[1].trim().split(/[\s,]+/).map(Number);
+  return v.length === 4 && v.every(Number.isFinite) && v[2] > 0 && v[3] > 0 ? v : null;
+}
+
+/** El mismo SVG, pero mostrando sólo la franja [f0, f1] de su alto y dibujado a wPx×hPx. */
+export function cropSvg(svg, vb, wPx, hPx, f0 = 0, f1 = 1) {
+  const [vx, vy, vw, vh] = vb;
+  const attrs = ` width="${wPx}" height="${hPx}" viewBox="${vx} ${vy + vh * f0} ${vw} ${vh * (f1 - f0)}" preserveAspectRatio="none"`;
+  return svg.replace(SVG_ROOT, (tag) =>
+    tag.replace(/\s(?:width|height|viewBox|preserveAspectRatio)="[^"]*"/g, "").replace(/\s*\/?>$/, (end) => attrs + end));
+}
+
+function loadSvgImage(svgString) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(new Blob([svgString], { type: "image/svg+xml;charset=utf-8" }));
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = widthPx; canvas.height = heightPx;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, widthPx, heightPx);
-      ctx.drawImage(img, 0, 0, widthPx, heightPx);
-      URL.revokeObjectURL(url);
-      resolve(canvas);
-    };
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("No se pudo rasterizar la página")); };
     img.src = url;
   });
 }
 
+/**
+ * ¿Difiere la página grande de su copia de control? Compara píxel a píxel (en gris) y cuenta
+ * los que cambian más de `thr` (0-1): una mancha negra que no está en la copia suma miles;
+ * el antialiasing de las líneas finas, casi ninguno. Devuelve la fracción de píxeles distintos.
+ */
+export function mismatchFraction(a, b, thr = 0.6) {
+  const n = Math.min(a.length, b.length) >> 2;
+  let bad = 0;
+  for (let i = 0; i < n; i++) if (Math.abs(a[i * 4] - b[i * 4]) > thr * 255) bad++;
+  return n ? bad / n : 0;
+}
+export const MISMATCH_LIMIT = 0.0015; // 0,15 % de la página
+
+async function drawBanded(svgString, vb, widthPx, heightPx, bandPx) {
+  const canvas = blankCanvas(widthPx, heightPx);
+  const ctx = canvas.getContext("2d");
+  if (!vb) { // sin viewBox no se puede recortar: una sola pasada
+    ctx.drawImage(await loadSvgImage(svgString), 0, 0, widthPx, heightPx);
+    return canvas;
+  }
+  const rows = Math.max(1, Math.floor(bandPx / widthPx));
+  for (let y0 = 0; y0 < heightPx; y0 += rows) {
+    const y1 = Math.min(heightPx, y0 + rows);
+    const img = await loadSvgImage(cropSvg(svgString, vb, widthPx, y1 - y0, y0 / heightPx, y1 / heightPx));
+    ctx.drawImage(img, 0, y0, widthPx, y1 - y0);
+  }
+  return canvas;
+}
+
+async function controlPixels(svgString, vb, widthPx, heightPx) {
+  const lw = Math.max(8, Math.round(widthPx / VERIFY_SCALE)), lh = Math.max(8, Math.round(heightPx / VERIFY_SCALE));
+  const ref = blankCanvas(lw, lh);
+  const rctx = ref.getContext("2d");
+  rctx.drawImage(await loadSvgImage(vb ? cropSvg(svgString, vb, lw, lh) : svgString), 0, 0, lw, lh);
+  return { lw, lh, data: rctx.getImageData(0, 0, lw, lh).data };
+}
+
+/**
+ * Rasteriza un SVG en un canvas con fondo blanco, por franjas y comprobando el resultado.
+ * Lanza un error si el navegador sigue dibujando la página corrupta tras repetirla.
+ */
+export async function svgToCanvas(svgString, widthPx, heightPx, { verify = true } = {}) {
+  const vb = svgViewBox(svgString);
+  const check = verify && vb && widthPx * heightPx >= VERIFY_MIN_PX;
+  let ref = null;
+  let lastFrac = 0;
+  for (const bandPx of [BAND_PX, BAND_PX / 4, BAND_PX / 16]) {
+    const canvas = await drawBanded(svgString, vb, widthPx, heightPx, bandPx);
+    if (!check) return canvas;
+    ref ||= await controlPixels(svgString, vb, widthPx, heightPx);
+    const small = blankCanvas(ref.lw, ref.lh);
+    const sctx = small.getContext("2d");
+    sctx.imageSmoothingQuality = "high";
+    sctx.drawImage(canvas, 0, 0, ref.lw, ref.lh);
+    lastFrac = mismatchFraction(sctx.getImageData(0, 0, ref.lw, ref.lh).data, ref.data);
+    small.width = small.height = 0;
+    if (lastFrac <= MISMATCH_LIMIT) return canvas;
+    canvas.width = canvas.height = 0;
+    await new Promise(r => setTimeout(r, 50)); // deja que el navegador libere memoria
+  }
+  throw new Error(`El navegador dibujó la página con manchas (${(lastFrac * 100).toFixed(1)} % distinto de la copia de control). ` +
+    "Baja la resolución a 150 DPI, cierra otras pestañas o crea el PDF en un ordenador.");
+}
+
 function blankCanvas(widthPx, heightPx) {
   const canvas = document.createElement("canvas");
   canvas.width = widthPx; canvas.height = heightPx;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true }); // lienzo por CPU: no depende de la GPU
   ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, widthPx, heightPx);
   return canvas;
 }

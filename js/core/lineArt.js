@@ -495,6 +495,15 @@ export function processFigure(rgba, w, h, opts = {}) {
  * de 3000 px impresa a 25 mm tendría líneas de 0.1 mm, invisibles al colorear.
  * Parte de cls (0 = tinta), así no hace falta guardar la imagen gris completa.
  */
+// Versión del algoritmo del sello. Los sellos guardados con otra versión (paquetes .json,
+// proyectos) se vuelven a calcular desde cls: los antiguos engrosaban igual cualquier dibujo
+// y un mandala o una figura con detalle fino salía como una silueta negra dentada.
+export const STAMP_VERSION = 2;
+// Tinta máxima del sello (fracción de su superficie). Por encima, los huecos entre trazos
+// se cierran y el dibujo se imprime como mancha: se afina la línea hasta que baje.
+const STAMP_MAX_INK = 0.30;
+const STAMP_LADDER = [1, 0.8, 0.62, 0.48, 0.36, 0.28]; // × lineFrac, de más a menos grueso
+
 export function stampRaster(cls, w, h, long = 720, lineFrac = 0.016) {
   const k = long / Math.max(w, h);
   const sw = Math.max(4, Math.round(w * k)), sh = Math.max(4, Math.round(h * k));
@@ -509,8 +518,16 @@ export function stampRaster(cls, w, h, long = 720, lineFrac = 0.016) {
       ink[y * sw + x] = hit;
     }
   }
-  const r = Math.max(1, (long * lineFrac) / 2);
   const d = distanceTransform(ink, sw, sh, false);
+  // Grosor adaptado al detalle: el más grueso de la escalera cuya tinta no pasa del tope.
+  // Si ninguno lo cumple, el más fino (el negro ya es del propio dibujo; lo avisa la lista de verificación).
+  let r = 1;
+  for (let s = 0; s < STAMP_LADDER.length; s++) {
+    r = Math.max(1, (long * lineFrac * STAMP_LADDER[s]) / 2);
+    let n = 0;
+    for (let i = 0; i < d.length; i++) if (d[i] < r) n++;
+    if (n / d.length <= STAMP_MAX_INK) break;
+  }
   const gray = new Uint8Array(sw * sh);
   for (let i = 0; i < gray.length; i++) {
     // Rampa de 1 px en el borde de la línea: antialias sin halo gris

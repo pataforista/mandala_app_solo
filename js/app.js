@@ -2878,6 +2878,7 @@ function bindUI() {
       srcLong: m.fig?.srcLong || 0,
       href: m.fig?.href || "",
       stampHref: m.fig?.stampHref || "",
+      stampV: m.fig?.stampV,
       cls: m.fig?.cls ? encodeCls(m.fig.cls) : ""
     }));
 
@@ -2921,21 +2922,24 @@ function bindUI() {
         if (f.cls && f.w && f.h) {
           try { cls = decodeCls(f.cls, f.w * f.h); } catch(e){}
         }
+        const fig = {
+          href: f.href,
+          stampHref: f.stampHref || f.href,
+          stampV: f.stampV,
+          cls: cls || new Uint8Array((f.w || 100) * (f.h || 100)),
+          w: f.w || 100,
+          h: f.h || 100,
+          srcLong: f.srcLong,
+          theme: f.theme || ""
+        };
         userFigures.push({
           name: f.name,
           img: null,
           use: f.use || "ninguno",
           source: f.source || "",
           rightsConfirmed: f.rightsConfirmed ?? true,
-          fig: {
-            href: f.href,
-            stampHref: f.stampHref || f.href,
-            cls: cls || new Uint8Array((f.w || 100) * (f.h || 100)),
-            w: f.w || 100,
-            h: f.h || 100,
-            srcLong: f.srcLong,
-            theme: f.theme || ""
-          }
+          // Un sello guardado con el algoritmo antiguo se rehace (sólo si cls se leyó bien)
+          fig: cls ? await withStamp(fig) : fig
         });
       }
       activeFigure = userFigures.length > 0 ? (typeof data.activeFigure === "number" ? data.activeFigure : 0) : -1;

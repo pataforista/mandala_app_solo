@@ -1,7 +1,7 @@
 // js/core/figureImport.js
 // Del archivo de imagen a una figura lista para la página (navegador).
 // Lo comparten la app y preprocesar.html, así ambas dan exactamente el mismo resultado.
-import { processFigure, stampRaster } from "./lineArt.js";
+import { processFigure, stampRaster, STAMP_VERSION } from "./lineArt.js";
 import { encodeGrayPng, bytesToDataUrl, rgbaToGray } from "./grayPng.js";
 import { thickInkMask } from "./figureChecks.js";
 
@@ -49,11 +49,16 @@ export async function figureFromImage(img, settings = {}, crop = {}, seeds = [])
   return withStamp({ href, cls: fig.cls, w: fig.w, h: fig.h, srcLong: Math.round(Math.max(sw, sh)) });
 }
 
-/** Añade fig.stampHref (versión reducida de trazo grueso) si falta. */
+/**
+ * Añade fig.stampHref (versión reducida de trazo grueso) si falta o si se guardó con una
+ * versión anterior del algoritmo (los sellos viejos convertían el detalle fino en negro macizo).
+ * Se recalcula desde cls, que sí se guarda.
+ */
 export async function withStamp(fig) {
-  if (fig.stampHref) return fig;
+  if (fig.stampHref && fig.stampV === STAMP_VERSION) return fig;
+  if (!fig.cls) return fig;
   const st = stampRaster(fig.cls, fig.w, fig.h);
-  return { ...fig, stampHref: bytesToDataUrl(await encodeGrayPng(st.gray, st.w, st.h)) };
+  return { ...fig, stampHref: bytesToDataUrl(await encodeGrayPng(st.gray, st.w, st.h)), stampV: STAMP_VERSION };
 }
 
 /**
