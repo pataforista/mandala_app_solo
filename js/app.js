@@ -2762,7 +2762,7 @@ function bindUI() {
       // de dibujar el PDF (si ya se hizo en la revisión, no se repite)
       curated = await ensureCurated(progress, signal);
       const { count, baseSeed, makeOpts, sourceLog, generatorFn } = buildBook();
-      const filename = `libro_${state.preset}_${count}mandalas_semilla${baseSeed}.pdf`;
+      const filename = `libro_${state.preset}_${bookCount()}mandalas_semilla${baseSeed}.pdf`;
       await downloadBookPdf(filename, generatorFn, count, {
         preset: state.preset,
         genOpts: makeOpts,
