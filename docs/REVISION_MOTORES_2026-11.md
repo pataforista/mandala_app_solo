@@ -220,3 +220,53 @@ Una sola orden resume el estado: `node scripts/bench-styles.mjs 10`.
 Regla para cerrar una tarea: el indicador alcanza su meta, `npm run check` pasa y alguien mira
 doce páginas del cambio. La cifra sola no basta; el H3 de este informe es justo el caso de una
 cifra que decía lo contrario de lo que se veía.
+
+## 6. Cómo llevarlo a cabo
+
+### 6.1 Orden y dependencias
+
+Un PR por fila de esta tabla. Ninguno mezcla cambios de medida con cambios de dibujo: si la
+puntuación y la página cambian a la vez, no se sabe cuál movió la cifra.
+
+| PR | Tareas | Depende de | Tamaño | Por qué en este orden |
+|---|---|---|---|---|
+| A | 4.1 techo de dificultad por perfil | — | chico | defecto aislado de una línea; da un primer cierre rápido |
+| B | 1.1 + 1.2 puntuación por público y perfiles coherentes | — | medio | desbloquea el nivel experto y dos perfiles |
+| C | 1.3 + 1.4 huecos y trazos finos | B | medio | quita las restas constantes; la puntuación empieza a discriminar |
+| D | 1.5 + 3.4 tinta de las figuras y bloqueo del negro macizo | B | medio | sin esta medida, la fase 3 no se puede demostrar |
+| E | 1.6 monotonía | B | chico | sin esta medida, 4.4 no se puede demostrar |
+| F | 2.4 radial y modular fuera o «experimental» | — | chico | evita vender siete estilos donde hay uno |
+| G1–G5 | 2.1 un estilo por PR: islámico, celta, azteca, sashiko, yantra | C | grande | es el cambio que más se nota en el libro; cada estilo se revisa a ojo por separado |
+| H | 2.2 + 2.3 prueba ciega y mínimos por estilo | G1–G5 | chico | cierra la fase 2 |
+| I | 3.1 + 3.3 peso del contorno y anillos | D | medio | arreglo de proporciones, sin tocar el relleno |
+| J | 3.2 relleno que sigue la forma | D, I | grande | la pieza más difícil de la fase 3 |
+| K | 4.2 + 4.3 tramas nuevas e integradas | E | grande | |
+| L | 4.4 página de trama por parcelas | E, K | medio | |
+| M | 4.5–4.8 crece, misterio, rótulos, página suelta | — | medio | independientes entre sí; se pueden repartir |
+| N | fase 5 (un PR por tarea) | — | variable | 5.1 (prueba de punta a punta) conviene antes de G1 |
+
+Primera tanda recomendada: A, B y F, que no dependen de nada, y 5.1 en paralelo.
+
+### 6.2 Rutina de cada tarea
+
+1. **Antes de tocar nada:** `node scripts/bench-styles.mjs 10 > antes.txt` y, si la tarea afecta
+   al libro, `node scripts/bench-book.mjs 3 50 KDP_8_5x11 adulto >> antes.txt`.
+2. **Escribir primero la prueba que falla** con la meta de la tarea (columna «Cómo se verifica»).
+3. **Hacer el cambio** hasta que esa prueba pase.
+4. **Repetir los bancos** en `despues.txt` y comparar: el indicador de la tarea alcanza su meta y
+   ningún otro del tablero (§ 5) empeora más de 1 punto.
+5. **Mirar doce páginas** del cambio: `node scripts/bench-styles.mjs 10 --html /tmp/laminas` y
+   abrir las láminas en el navegador. Si la cifra mejora y la página empeora, la tarea no está
+   cerrada: se corrige la medida antes de seguir.
+6. `npm run check`, y en el PR pegar el antes y el después del indicador y dos láminas.
+7. **Actualizar la columna «Hoy» del § 5** en el mismo PR.
+
+### 6.3 Reglas de parada
+
+- Una tarea de dibujo que baja la media del libro «más vendidos» por debajo de 81 no entra.
+- Una tarea de medida (fase 1) no puede cambiar ninguna página: `bench-variety.mjs` debe dar las
+  mismas huellas antes y después.
+- Si tras dos intentos un estilo de 2.1 no baja de 0,80 de parecido sin perder puntuación, se
+  detiene y se revisa el vocabulario del estilo sobre papel antes de programar más.
+- La curaduría no se usa para tapar un motivo malo: el mínimo por estilo (2.3) se mide **antes**
+  de curar.
