@@ -1,0 +1,413 @@
+# Roadmap del plan B · Estilos que se reconozcan (14 nov 2026)
+
+**Qué es.** El plan B de `REVISION_MOTORES_2026-11.md` § 3: empezar por la identidad de los siete
+estilos del motor clásico, antes de corregir la puntuación.
+**Audiencia.** Quien programe los estilos y quien revise las páginas.
+**Objetivo.** Que una persona, al ver una página sin rótulo, diga «celta», «islámico» o «azteca»,
+y que eso quede demostrado con medidas y con una prueba a ciegas.
+
+## 0. Premisa, riesgo y cómo se contiene
+
+Hoy el estilo sólo entra al motor por una tabla de pesos (`STYLE_WEIGHTS`,
+`mandalaClassic.js:21`): los siete estilos sortean entre los mismos doce motivos con
+probabilidades distintas. La silueta sale de una lista común (`SILHOUETTE`, línea 34) y el núcleo
+de tres variantes sin estilo (línea 711). Tres motivos declarados (`voluta`, `roseta`, `antemia`)
+están excluidos del sorteo (línea 153): tienen peso y nunca se dibujan.
+
+El riesgo del plan B es conocido: la puntuación comercial arrastra restas constantes (H4 de la
+revisión), de modo que distingue mal una página buena de una excelente. Tres reglas lo contienen:
+
+1. **La puntuación se congela.** Ningún PR de este roadmap toca `commercialMetrics.js`. Si la
+   medida cambia a mitad del trabajo, el antes y el después dejan de ser comparables.
+2. **Se compara contra la línea base de cada estilo, no contra un número absoluto.** La meta es
+   «no bajar», no «llegar a 90».
+3. **La identidad se mide con un instrumento propio** (`scripts/bench-identity.mjs`, ya en el
+   repositorio) y se confirma con personas (§ 6.5).
+
+Lo que este roadmap **no** resuelve: el nivel experto seguirá sin llegar a «Listo para KDP» y las
+figuras, tramas y páginas especiales quedan como están. Eso pertenece a las fases 1, 3 y 4 de la
+revisión.
+
+## 1. Línea base (motor clásico, nivel adulto)
+
+| Estilo | Puntuación media | Mínima | Acierto del clasificador |
+|---|---|---|---|
+| floral | 79,1 | 62 | 35 % |
+| geométrico | 79,6 | 61 | 30 % |
+| islámico | 79,5 | 68 | 15 % |
+| sashiko | 80,0 | 71 | 30 % |
+| celta | 78,0 | 60 | 10 % |
+| azteca | 73,1 | 37 | 10 % |
+| yantra | 75,3 | 42 | 35 % |
+| **Global** | **77,8** | **37** | **24–29 %** (azar: 14 %) |
+
+Fuentes: `node scripts/bench-styles.mjs 10` (puntuación, 10 semillas por estilo) y
+`node scripts/bench-identity.mjs 40 adulto` (acierto; 24 % con 40 páginas por estilo, 28 % con
+80, 29 % en experto).
+
+Lectura. El clasificador acierta poco más que una moneda de siete caras. Celta se confunde con
+floral en 12 de 20 páginas; azteca, con geométrico y yantra en 15 de 20. Los centroides de los
+siete estilos caben dentro de una desviación estándar: son dialectos del mismo idioma.
+
+Límite del instrumento: el clasificador usa siete rasgos de forma y un centroide por estilo. Mide
+separación geométrica, que es condición necesaria para que el ojo distinga, no suficiente. Por eso
+la meta final es la prueba a ciegas.
+
+## 2. Arquitectura de destino
+
+Un estilo deja de ser una fila de pesos y pasa a ser una **gramática**: un módulo que declara qué
+puede dibujarse en cada parte del disco.
+
+```
+js/generators/styles/
+  index.js        registro: STYLE_GRAMMARS, grammarOf(styleMode)
+  common.js       primitivas compartidas (pétalo, círculo, celda polar, cinta entrelazada)
+  floral.js  geometric.js  islamico.js  sashiko.js  celtico.js  azteca.js  yantra.js
+```
+
+Contrato de cada gramática:
+
+| Campo | Qué declara | Sustituye a |
+|---|---|---|
+| `motifs` | motivos de banda permitidos y su peso | fila de `STYLE_WEIGHTS` |
+| `exclusive` | motivos que sólo existen en este estilo, con su función de dibujo | — (nuevo) |
+| `banned` | motivos comunes que este estilo nunca usa | — (nuevo) |
+| `silhouettes` | siluetas exteriores propias y permitidas | `SILHOUETTE` y `SILHOUETTES_BY_STYLE` |
+| `cores` | núcleos propios | `CORE_VARIANTS` |
+| `counts` | números de pétalos naturales del estilo | `petals` del perfil |
+| `line` | reglas de trazo: rectas o curvas, doble línea, jerarquía | — (nuevo) |
+| `quota` | mínimo de bandas con motivo exclusivo por página | — (nuevo) |
+| `backgrounds` | tramas de fondo afines | `BACKGROUND_STYLES` |
+
+Dos reglas de la gramática hacen el trabajo de identidad:
+
+- **Cuota de firma:** cada página lleva al menos una banda con motivo exclusivo, y la silueta o el
+  núcleo propios. Sin cuota, el sorteo puede producir una página «celta» sin un solo nudo.
+- **Vetos:** un estilo también se define por lo que no dibuja. Corazones fuera de islámico,
+  azteca, yantra y geométrico; triángulos y rombos fuera de floral y celta.
+
+Todo motivo exclusivo cumple el contrato del motor clásico: celdas cerradas, simetría exacta con
+conteos armónicos de N, pintado de fuera hacia dentro con relleno blanco, y respeto de la celda y
+el trazo mínimos del nivel.
+
+## 3. Especificación por estilo
+
+Cada ficha dice qué reconoce el ojo, qué se construye y qué restricciones de coloreado aplican.
+Los motivos son construcciones geométricas tradicionales y genéricas; no se copia ninguna pieza
+concreta.
+
+### 3.1 Islámico
+
+| | |
+|---|---|
+| **Lo que se reconoce** | estrellas de muchas puntas hechas de rectas, cintas que se entrelazan, arcos lobulados |
+| **Conteos** | 8, 10, 12, 16, 24 |
+| **Núcleo propio** | roseta de estrella de N puntas: estrella central, anillo de cometas y anillo de pétalos hexagonales |
+| **Silueta propia** | arcos polilobulados; almenas escalonadas |
+| **Banda 1 · estrella** | polígono estrellado {n/k} formado por dos polígonos regulares girados (dos cuadrados dan la estrella de 8) |
+| **Banda 2 · lacería** | cinta de doble línea en zigzag que pasa por encima y por debajo en cada cruce |
+| **Banda 3 · cometas** | anillo de cometas y rombos que teselan la banda sin huecos |
+| **Trazo** | rectas dominantes; la cinta es una celda coloreable |
+| **Vetos** | corazón, pétalo redondo, hoja, llama |
+| **Restricción de coloreado** | ancho de cinta ≥ 2,5 mm; puntas de estrella con ángulo ≥ 30° (más agudo deja celdas que no admiten lápiz) |
+
+### 3.2 Celta
+
+| | |
+|---|---|
+| **Lo que se reconoce** | nudos de cinta sin principio ni fin, trenzas, triquetras |
+| **Conteos** | 6, 9, 12, 18, 24 (múltiplos de 3 para el núcleo) |
+| **Núcleo propio** | triquetra o trísquel dentro de un círculo cuando N es múltiplo de 3; si no, anillo de N lazos |
+| **Silueta propia** | corona de lazos de nudo; borde de cinta cerrada |
+| **Banda 1 · trenza** | trenza de 2 o 3 cabos sobre rejilla polar, con alternancia arriba/abajo |
+| **Banda 2 · nudo** | nudo cerrado por celda (lazo en ocho, nudo de cuatro esquinas), repetido N veces |
+| **Banda 3 · eslabones** | anillos enlazados en cadena |
+| **Trazo** | curvas; toda cinta va en doble línea con cortes limpios en los cruces |
+| **Vetos** | triángulo, rombo, chevrón, llama |
+| **Restricción de coloreado** | ancho de cinta ≥ 2,5 mm; los huecos entre cabos ≥ celda mínima del nivel o se cierran en negro fino, nunca quedan astillas |
+
+Pieza técnica nueva: `ribbon()` en `common.js`, que recibe una línea central y un mapa de cruces y
+devuelve los dos bordes con los cortes del cabo que pasa por debajo. La usan celta e islámico.
+
+### 3.3 Azteca
+
+| | |
+|---|---|
+| **Lo que se reconoce** | grecas escalonadas, rayos triangulares, anillos de casillas, todo anguloso |
+| **Conteos** | 4, 8, 16, 20 |
+| **Núcleo propio** | disco solar: círculo central, cuatro casillas en cruz y anillo de cuentas cuadradas |
+| **Silueta propia** | rayos triangulares que alternan grande y pequeño; almenas en escalón |
+| **Banda 1 · greca** | greca escalonada con gancho, construida con celdas polares rectas |
+| **Banda 2 · dentado** | triángulos dentados enfrentados (dientes de sierra dobles) |
+| **Banda 3 · casillas** | cartuchos rectangulares con un símbolo simple dentro (punto, barra, cruz) |
+| **Trazo** | sólo rectas y arcos concéntricos; esquinas vivas |
+| **Vetos** | corazón, hoja, pétalo redondo, festón |
+| **Restricción de coloreado** | escalón de greca ≥ 2,5 mm de lado; es el estilo con peor mínimo hoy (37), así que cada motivo se prueba primero en banda estrecha |
+
+### 3.4 Sashiko
+
+| | |
+|---|---|
+| **Lo que se reconoce** | tramas japonesas de costura: hoja de cáñamo, olas, círculos enlazados |
+| **Conteos** | 6, 12, 16, 18, 24 |
+| **Núcleo propio** | crisantemo de 16 pétalos redondeados en doble corona |
+| **Silueta propia** | olas apiladas (seigaiha) como borde; festón doble |
+| **Banda 1 · asanoha** | estrella hexagonal de cáñamo adaptada a la celda polar |
+| **Banda 2 · seigaiha** | abanicos de arcos concéntricos solapados |
+| **Banda 3 · shippo** | círculos entrelazados que forman lentes |
+| **Banda 4 · kikko** | hexágonos en panal |
+| **Trazo** | grosor uniforme en toda la página; sin jerarquía de trazo ni pétalo dentro de pétalo |
+| **Vetos** | llama, corazón, chevrón |
+| **Restricción de coloreado** | lente de shippo ≥ celda mínima; arcos de seigaiha separados ≥ 2 mm |
+
+### 3.5 Yantra
+
+| | |
+|---|---|
+| **Lo que se reconoce** | triángulos entrelazados en el centro, coronas de loto, recinto cuadrado con cuatro puertas |
+| **Conteos** | 8, 16 (loto); 3 y 6 en el núcleo |
+| **Núcleo propio** | triángulos entrelazados hacia arriba y hacia abajo (de 2 a 5) con un punto central |
+| **Silueta propia** | corona de 16 pétalos de loto entre tres anillos lisos |
+| **Marco propio** | recinto cuadrado con cuatro puertas en T, alrededor del disco (sustituye al marco de página) |
+| **Banda 1 · loto** | pétalos de loto de 8 y de 16, con pétalo interior |
+| **Banda 2 · anillos** | tres círculos concéntricos lisos (franja coloreable) |
+| **Trazo** | rectas en el núcleo, curvas en los lotos; pocas bandas y amplias |
+| **Vetos** | corazón, festón, cuentas, llama |
+| **Restricción de coloreado** | las intersecciones de los triángulos generan celdas pequeñas: con más de 3 triángulos, el núcleo crece hasta que la menor celda cumpla el mínimo |
+
+El recinto cuadrado toca al compositor de página (`pageComposer.js`), no sólo al disco. Va en un
+PR aparte del resto del estilo.
+
+### 3.6 Floral (depuración)
+
+Floral es el estilo por defecto y el de mayor peso en el libro (3 de cada 6,5 páginas en «más
+vendidos»). No necesita motivos nuevos; necesita dejar de compartir los ajenos.
+
+- **Vetos:** triángulo, rombo, chevrón, antemia.
+- **Firma:** pétalos solapados en dos o tres capas desfasadas, hojas entre pétalos, núcleo de
+  estambres (disco con corona de puntos coloreables).
+- **Silueta propia:** pétalo ancho con muesca; hoja lanceolada.
+
+### 3.7 Geométrico (depuración)
+
+- **Vetos:** corazón, pétalo redondo, hoja, llama, festón.
+- **Firma:** sólo rectas. Bandas de triángulos y rombos que teselan sin huecos, polígonos
+  estrellados simples, núcleo de polígono regular subdividido.
+- **Silueta propia:** puntas de diamante; estrella de N puntas.
+
+### 3.8 Matriz de exclusividad
+
+Un motivo marcado con ● sólo existe en ese estilo. Sirve de lista de comprobación y de prueba
+(§ 6.2).
+
+| Motivo | Floral | Geom. | Islám. | Sashiko | Celta | Azteca | Yantra |
+|---|---|---|---|---|---|---|---|
+| estrella {n/k}, cometas | | | ● | | | | |
+| lacería (cinta en zigzag) | | | ● | | | | |
+| trenza, nudo, eslabones | | | | | ● | | |
+| greca, dentado, casillas | | | | | | ● | |
+| asanoha, seigaiha, shippo, kikko | | | | ● | | | |
+| triángulos entrelazados, recinto | | | | | | | ● |
+| pétalos solapados, estambres | ● | | | | | | |
+| teselado de triángulos y rombos | | ● | | | | | |
+
+## 4. Etapas y entregables
+
+Un PR por etapa. Tamaños relativos: chico (una sesión), medio (dos o tres), grande (más).
+
+| Etapa | Contenido | Depende de | Tamaño |
+|---|---|---|---|
+| **E0** | Instrumentos: `bench-identity.mjs` y `bench-styles.mjs`, y línea base guardada en `docs/lineas-base/estilos-2026-11.txt` (todo en el PR #46) | — | hecho |
+| **E1** | Refactor a gramáticas sin cambiar ningún dibujo: `styles/index.js`, siete módulos con los pesos actuales, `common.js` con las primitivas extraídas | E0 | medio |
+| **E2** | Vetos y cuota de firma con los motivos que ya existen; decidir `voluta`, `roseta` y `antemia` (se rehacen como exclusivos o se borran) | E1 | chico |
+| **E3** | Islámico: estrella, cometas, núcleo de roseta, silueta lobulada | E2 | grande |
+| **E4** | `ribbon()` y lacería islámica | E3 | medio |
+| **E5** | Celta: trenza, nudo, eslabones, triquetra, corona de lazos | E4 | grande |
+| **E6** | Azteca: greca, dentado, casillas, disco solar, rayos alternos | E2 | grande |
+| **E7** | Sashiko: asanoha, seigaiha, shippo, kikko, crisantemo | E2 | grande |
+| **E8** | Yantra, disco: triángulos entrelazados, lotos de 8 y 16, anillos | E2 | medio |
+| **E9** | Yantra, recinto cuadrado en el compositor de página | E8 | medio |
+| **E10** | Floral y geométrico: firmas y siluetas propias | E2 | medio |
+| **E11** | Integración en el libro: capítulos, siluetas por estilo, fondos afines, miniaturas de estilo en la interfaz, textos es/en | E3–E10 | medio |
+| **E12** | Cierre: prueba a ciegas, prueba impresa, actualización de documentos | E11 | chico |
+
+E6, E7, E8 y E10 no dependen entre sí: pueden avanzar en paralelo después de E2.
+E3 va primero entre los estilos porque estrena la plantilla de trabajo (§ 5) con el motivo más
+simple de construir, la estrella de rectas.
+
+### Detalle de E1 (el refactor que sostiene todo)
+
+1. Extraer de `mandalaClassic.js` las primitivas (`petalShape`, `heartShape`, `ogeeShape`,
+   `circle`, `stipple`, `capsuleVein`) a `styles/common.js`, con `cx`, `cy` y `P` como parámetros.
+2. Convertir el `switch` de motivos (líneas 280–620) en un registro `MOTIFS[nombre] = dibujar(ctx, banda)`.
+3. Crear las siete gramáticas con los pesos actuales, sin vetos ni exclusivos.
+4. `pickMotif`, la silueta y el núcleo leen de la gramática.
+5. Conservar el orden exacto de llamadas al generador aleatorio: una llamada de más cambia todas
+   las páginas de todos los libros guardados.
+
+**Verificación de E1:** prueba dorada. Antes del refactor se guarda el hash SHA-256 del SVG de
+7 estilos × 4 niveles × 10 semillas (280 páginas) y de 3 encuadres con fondo. Después, los 280
+hashes coinciden. Cero páginas cambian.
+
+## 5. Plantilla de trabajo por motivo nuevo
+
+Cada motivo exclusivo recorre los mismos seis pasos. Es la unidad mínima de avance.
+
+1. **Boceto en papel o SVG a mano** de una celda: dónde nace, dónde cierra, cuántas celdas
+   coloreables deja.
+2. **Prueba de coloreabilidad primero** (`tests/styles.test.mjs`): el motivo, dibujado en bandas
+   de 6, 10 y 18 mm, con 8, 16 y 24 repeticiones, en los cuatro niveles, cumple § 6.2.
+3. **Implementación** en la gramática del estilo.
+4. **Lámina del motivo solo:** `node scripts/bench-styles.mjs 10 --html /tmp/laminas` y mirar las
+   10 semillas del estilo.
+5. **Bancos:** `bench-styles.mjs` e `bench-identity.mjs`; anotar antes y después.
+6. **Regeneración de proyectos guardados:** una página guardada con ese estilo cambia de dibujo.
+   Se anota en el PR (ver riesgo R3).
+
+## 6. Verificación
+
+Siete capas, de la más barata a la más cara. Una etapa se cierra cuando pasan todas las que le
+aplican.
+
+### 6.1 No regresión (todas las etapas)
+
+| Comprobación | Orden | Criterio |
+|---|---|---|
+| Pruebas y service worker | `npm run check` | todo pasa |
+| Márgenes KDP | `tests/margins.test.mjs` (dentro de `npm test`) | ninguna tinta fuera del área segura, sin tolerancia |
+| Estilos no tocados | prueba dorada de E1, restringida a los estilos que el PR no modifica | hashes idénticos |
+| Puntuación congelada | `git diff main -- js/core/commercialMetrics.js` | vacío |
+
+### 6.2 Coloreabilidad de cada motivo (E3–E10)
+
+Prueba unitaria por motivo, en `tests/styles.test.mjs`:
+
+| Criterio | Umbral |
+|---|---|
+| Celdas cerradas menores que la celda mínima del nivel | 0 |
+| Trazo más fino | ≥ 0,5 mm |
+| Asimetría radial (`measureSvg(...).asimetria`) | 0 |
+| Ancho de cinta (celta, islámico) | ≥ 2,5 mm |
+| Ángulo más agudo de una celda | ≥ 30° |
+| Motivo exclusivo fuera de su estilo (matriz § 3.8) | 0 apariciones en 50 páginas de cada otro estilo |
+| Motivo vetado dentro del estilo | 0 apariciones en 50 páginas |
+| Cuota de firma | 100 % de 50 páginas con ≥ 1 banda exclusiva |
+
+Para las dos últimas filas, el generador expone `doc.meta.motifs` (lista de motivos dibujados por
+banda). Hoy no existe: se añade en E1.
+
+### 6.3 Puntuación por estilo (E2–E10)
+
+`node scripts/bench-styles.mjs 10`, tabla 1, motor clásico:
+
+| Indicador | Línea base | Criterio de la etapa | Meta final (E12) |
+|---|---|---|---|
+| Media del estilo tocado, adulto | ver § 1 | ≥ línea base − 1 | ≥ línea base |
+| Mínima del estilo tocado, adulto | ver § 1 | ≥ línea base | ≥ 60 en los siete |
+| Media en niños y trazo grueso | 89–91 y 83–84 | ≥ línea base − 1 | igual |
+| Tiempo por página | 1–3 ms | ≤ 10 ms | ≤ 10 ms |
+
+El nivel experto se informa y no decide: su puntuación está mal calibrada (H3).
+
+### 6.4 Identidad medida (E2–E12)
+
+`node scripts/bench-identity.mjs 80 adulto`:
+
+| Indicador | Línea base | Criterio de la etapa | Meta final |
+|---|---|---|---|
+| Acierto del estilo recién hecho | 10–35 % | ≥ 65 % | ≥ 70 % |
+| Acierto global | 24–29 % | sube respecto a la etapa anterior | ≥ 80 % |
+| Peor confusión entre dos estilos | celta → floral, 12 de 20 | — | ningún par > 20 % |
+| Parecido de huella entre estilos, misma semilla (`bench-styles.mjs`, tabla 2) | 0,96 | — | ≤ 0,85 |
+
+La última meta es más modesta que la de la revisión (0,80). Motivo: la huella mide dónde caen los
+anillos y cuántas repeticiones tienen, no la forma del motivo; dos estilos con el mismo esqueleto
+de bandas seguirán pareciéndose en esa medida aunque el ojo los distinga.
+
+Trampa a evitar: el clasificador se puede «ganar» con un truco (por ejemplo, dar a cada estilo un
+número de celdas distinto). Por eso los rasgos de `bench-identity.mjs` se congelan igual que la
+puntuación, y la decisión final es de la capa 6.5.
+
+### 6.5 Prueba a ciegas con personas (E12, y un ensayo al cerrar E5)
+
+| Paso | Detalle |
+|---|---|
+| Material | 28 páginas: 4 por estilo, nivel adulto, centradas, sin fondo ni rótulo, orden barajado con semilla anotada |
+| Participantes | 3 personas que no hayan visto el desarrollo; reciben los siete nombres y un ejemplo de referencia externo por estilo |
+| Tarea | escribir el estilo de cada página; sin límite de tiempo |
+| Criterio | media ≥ 22 de 28 (79 %); ningún estilo con menos de 2 de 4 en promedio |
+| Registro | tabla de aciertos por persona y estilo, en `docs/lineas-base/ciega-AAAA-MM.md`, sin datos personales |
+
+Con tres personas el resultado orienta, no demuestra: 84 respuestas no sostienen un intervalo
+estrecho. Sirve para detectar un estilo que nadie reconoce, que es justo lo que hay que saber.
+
+### 6.6 Libro completo (E11)
+
+| Comprobación | Orden | Criterio |
+|---|---|---|
+| Libro «más vendidos» | `node scripts/bench-book.mjs 3 50 KDP_8_5x11 adulto` | media ≥ 81, 0 flojas, 0 gemelas tras curar (hoy 82,8–83,2) |
+| Repetición | `node scripts/bench-variety.mjs 10` | gemelas por libro ≤ 0,2 antes de curar (hoy 0,2) |
+| Libro de un solo estilo, uno por cada uno de los siete | banco nuevo `bench-book.mjs --estilo X` | 40 páginas, ≤ 2 flojas antes de curar, 0 gemelas tras curar |
+| Capítulos | lámina de las portadillas | cada capítulo abre con un mandala de su estilo, con firma visible |
+| Idioma | `tests/pageTexts.test.mjs` | nombres de estilo y capítulo con paridad es/en |
+
+El libro de un solo estilo es la prueba más dura: 40 páginas del mismo estilo sin gemelas exige
+que cada gramática tenga variedad interna (al menos 3 motivos exclusivos, 2 siluetas y 2 núcleos).
+
+### 6.7 Prueba de imprenta (E12)
+
+| Paso | Criterio |
+|---|---|
+| Rasterizar a 300 ppp una página por estilo y medir en píxeles | trazo más fino ≥ 6 px (0,5 mm); ninguna celda cerrada < 2 mm² |
+| Imprimir en casa las 7 páginas en papel de 90 g y colorear una cinta celta y una estrella islámica con lápiz y con marcador | la punta entra en la celda más pequeña sin salirse |
+| Crear un libro real desde la app (un capítulo por estilo) y abrir el PDF | el aviso final dice «Listo para KDP»; se mira la primera página de cada capítulo |
+
+El último paso exige ejecutar la app en un navegador. En la revisión de noviembre no se pudo; aquí
+es obligatorio antes de cerrar.
+
+## 7. Tablero del plan B
+
+| Indicador | Hoy | Tras E2 | Tras E5 | Tras E10 | Meta E12 |
+|---|---|---|---|---|---|
+| Acierto global del clasificador | 24–29 % | ≥ 35 % | ≥ 55 % | ≥ 80 % | ≥ 80 % |
+| Estilos con acierto ≥ 65 % | 0 de 7 | 0 | 2 (islámico, celta) | 7 | 7 |
+| Mínima por estilo, adulto | 37 | ≥ 37 | ≥ 50 | ≥ 60 | ≥ 60 |
+| Media del libro «más vendidos» | 83 | ≥ 81 | ≥ 81 | ≥ 81 | ≥ 81 |
+| Prueba a ciegas | sin medir | — | ensayo | — | ≥ 22 de 28 |
+| Motivos exclusivos dibujables | 0 | 0 | ≥ 7 | ≥ 20 | ≥ 20 |
+
+Las cifras intermedias son hitos esperados, no compromisos: sirven para saber pronto si el camino
+funciona. Si tras E5 el acierto global no pasa de 45 %, se detiene y se revisa la premisa.
+
+## 8. Riesgos y reglas de parada
+
+| # | Riesgo | Señal | Respuesta |
+|---|---|---|---|
+| R1 | Los motivos nuevos bajan la coloreabilidad | mínima del estilo cae bajo su línea base | el motivo no entra; se rehace en banda más ancha o se limita a niveles adulto y experto |
+| R2 | El entrelazado (cinta) genera astillas | celdas < mínimo en la prueba 6.2 | cerrar la astilla o ensanchar la cinta; si persiste, la cinta pasa por encima siempre (sin cruces) |
+| R3 | Los proyectos guardados cambian de dibujo | un proyecto de prueba guardado antes de E2 no reproduce sus páginas | versión de gramática en el proyecto (`grammarVersion`); un proyecto antiguo avisa antes de regenerar |
+| R4 | El estilo gana identidad y pierde variedad interna | gemelas en el libro de un solo estilo | añadir un motivo o una silueta antes de seguir con el estilo siguiente |
+| R5 | La cifra mejora y la página empeora | acierto alto, lámina fea | manda la lámina: la etapa no se cierra sin la mirada de doce páginas |
+| R6 | La puntuación congelada oculta un defecto real | páginas que puntúan bien y se ven empastadas | anotar el caso para la fase 1 de la revisión; no tocar la medida dentro de este roadmap |
+| R7 | Yantra con recinto cuadrado rompe márgenes | `tests/margins.test.mjs` falla | el recinto se dibuja con su borde exterior en el margen, igual que los marcos |
+
+Reglas de parada generales:
+
+- Dos intentos fallidos de un motivo contra la prueba 6.2: se descarta y se elige otro de la
+  ficha del estilo.
+- Una etapa que baja la media del libro «más vendidos» de 81: no entra.
+- Tras E5, acierto global < 45 %: se detiene el roadmap y se revisa si la identidad debe venir
+  también del esqueleto de bandas (proporciones y conteos por estilo), no sólo de los motivos.
+
+## 9. Definición de terminado
+
+El plan B está terminado cuando se cumplen a la vez:
+
+1. Los siete estilos tienen gramática propia con cuota de firma y vetos.
+2. `bench-identity.mjs 80 adulto` da ≥ 80 % global y ≥ 70 % en cada estilo.
+3. La prueba a ciegas da ≥ 22 de 28.
+4. Ningún estilo tiene mínima < 60 en adulto, y el libro «más vendidos» mantiene media ≥ 81 sin
+   flojas ni gemelas.
+5. Un libro de 40 páginas de cada estilo sale sin gemelas tras la curaduría.
+6. Las siete páginas impresas se pueden colorear con lápiz y con marcador.
+7. `REVISION_MOTORES_2026-11.md` § 5 tiene la columna «Hoy» actualizada.
