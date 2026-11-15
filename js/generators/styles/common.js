@@ -63,3 +63,84 @@ export function polarKit(cx, cy) {
   };
   return { P, circle, C, M, L, petalShape, heartShape, ogeeShape };
 }
+
+// ---------- Cintas entrelazadas ----------
+// Una cinta es una franja de ancho fijo dibujada con sus dos bordes. Donde dos cintas se
+// cruzan, la que pasa por debajo interrumpe sus bordes justo en los bordes de la otra: así
+// cada tramo de cinta queda como una celda cerrada que se puede colorear.
+
+/** Recorre t0…t1 y emite en `pb` los tramos donde visible(t) es cierto, con el corte afinado por bisección. */
+function visibleRuns(pb, t0, t1, steps, pointAt, visible) {
+  const cut = (a, b) => { // a visible, b oculto (o al revés): frontera
+    const va = visible(a);
+    for (let i = 0; i < 14; i++) { const m = (a + b) / 2; if (visible(m) === va) a = m; else b = m; }
+    return va ? a : b;
+  };
+  let prevT = t0, prevV = visible(t0);
+  if (prevV) pb.moveTo(...pointAt(t0));
+  for (let i = 1; i <= steps; i++) {
+    const t = t0 + ((t1 - t0) * i) / steps, v = visible(t);
+    if (v && prevV) pb.lineTo(...pointAt(t));
+    else if (v && !prevV) { pb.moveTo(...pointAt(cut(prevT, t))); pb.lineTo(...pointAt(t)); }
+    else if (!v && prevV) pb.lineTo(...pointAt(cut(prevT, t)));
+    prevT = t; prevV = v;
+  }
+}
+
+/**
+ * Trenza de dos cabos alrededor del centro: dos cintas que ondulan en contrafase sobre el
+ * radio `rm` y se cruzan dos veces por periodo, alternando arriba y abajo.
+ *   amp: amplitud de la línea central (mm) · w: ancho de cinta (mm) · periods: ondas por vuelta
+ *   shape: "sin" (curva, celta) | "tri" (zigzag de rectas, lacería islámica)
+ */
+export function braid(pb, P, { rm, amp, w, periods, off = 0, shape = "sin" }) {
+  const K = 0.96, AK = Math.asin(K);
+  const f = shape === "tri" ? (p) => Math.asin(K * Math.cos(p)) / AK : (p) => Math.cos(p);
+  const df = shape === "tri" ? (p) => (-K * Math.sin(p) / Math.sqrt(1 - (K * Math.cos(p)) ** 2)) / AK : (p) => -Math.sin(p);
+  const k = periods / rm; // dφ/du: la fase avanza `periods` vueltas en un perímetro
+  for (const strand of [1, -1]) for (const side of [1, -1]) {
+    // Punto del borde `side` del cabo `strand` en la fase p, en coordenadas de banda (u, v)
+    const edge = (p) => {
+      const s = strand * amp * df(p) * k, n = Math.hypot(1, s);
+      return { u: p / k - (side * (w / 2) * s) / n, v: strand * amp * f(p) + (side * (w / 2)) / n };
+    };
+    const pointAt = (p) => { const e = edge(p); return P(rm + e.v, off + e.u / rm); };
+    const visible = (p) => {
+      const e = edge(p), q = e.u * k;                       // fase del otro cabo bajo este punto
+      const cross = Math.round((q - Math.PI / 2) / Math.PI); // cruce más cercano
+      const over = (((cross % 2) + 2) % 2 === 0) === (strand === 1);
+      if (over) return true;
+      const so = -strand * amp * df(q) * k;
+      return Math.abs(e.v + strand * amp * f(q)) / Math.hypot(1, so) >= w / 2;
+    };
+    visibleRuns(pb, 0, 2 * Math.PI * periods, periods * 64, pointAt, visible);
+  }
+}
+
+/**
+ * Cadena de eslabones: `count` anillos de cinta con centro sobre el radio `rc`, cada uno
+ * enlazado con sus dos vecinos (pasa por encima en el cruce exterior y por debajo en el interior).
+ *   rho: radio de la línea central del anillo · w: ancho de cinta
+ */
+export function ringChain(pb, P, { cx, cy, rc, count, rho, w, off = 0 }) {
+  const step = (2 * Math.PI) / count;
+  const center = (i) => P(rc, off + i * step);
+  for (let i = 0; i < count; i++) {
+    const [x0, y0] = center(i), prev = center(i - 1), next = center(i + 1);
+    for (const side of [1, -1]) {
+      const r = rho + (side * w) / 2;
+      const pointAt = (t) => [x0 + r * Math.cos(t), y0 + r * Math.sin(t)];
+      const inRing = (p, c) => Math.abs(Math.hypot(p[0] - c[0], p[1] - c[1]) - rho) < w / 2;
+      const visible = (t) => {
+        const p = pointAt(t), outer = Math.hypot(p[0] - cx, p[1] - cy) > rc;
+        // Con el siguiente: este anillo pasa por encima fuera y por debajo dentro; con el anterior, al revés
+        if (inRing(p, next) && !outer) return false;
+        if (inRing(p, prev) && outer) return false;
+        return true;
+      };
+      // Empieza mirando al centro del mandala desplazado un cuarto de vuelta: lejos de los cruces
+      const t0 = off + i * step + Math.PI;
+      visibleRuns(pb, t0, t0 + 2 * Math.PI, 96, pointAt, visible);
+    }
+  }
+}

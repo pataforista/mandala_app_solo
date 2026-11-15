@@ -17,7 +17,7 @@ export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 // Dos familias: flor abierta y medallón cerrado (rombo, triángulo: contorno circular).
 // El zigzag (chevron) queda fuera: como silueta deja una corona casi vacía.
 // Las siluetas propias de un estilo (p. ej. «arco», islámico) sólo aparecen en su lista.
-export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle", "arco"];
+export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle", "arco", "eslabones"];
 // Cada lista respeta los vetos de la gramática del estilo (js/generators/styles/*.js):
 // tests/styles.test.mjs falla si una silueta vetada vuelve a entrar aquí.
 export const SILHOUETTES_BY_STYLE = {
@@ -27,7 +27,7 @@ export const SILHOUETTES_BY_STYLE = {
   islamico:  ["arco", "ogee", "diamond", "lotus", "scallop", "petal"],
   yantra:    ["lotus", "petal", "triangle", "diamond", "ogee"],
   sashiko:   ["scallop", "round", "diamond", "lotus", "ogee", "petal"],
-  celtico:   ["round", "heart", "leaf", "scallop", "ogee", "lotus"],
+  celtico:   ["eslabones", "round", "heart", "leaf", "scallop", "ogee", "lotus"],
 };
 
 // Estructura del disco (ver STRUCTURES en mandalaClassic.js) y tema de fondo (ver
@@ -287,7 +287,7 @@ export const SILHOUETTE_FAMILY = {
   scallop: "lobulos", round: "lobulos",
   heart: "corazones", leaf: "rayos",
   diamond: "medallon", triangle: "medallon",
-  arco: "arcos",
+  arco: "arcos", eslabones: "cadena",
 };
 
 /**

@@ -2,8 +2,8 @@
 // Gramática del estilo «islamico»: estrellas de rectas, arcos lobulados y roseta de polígonos.
 // Construcciones geométricas tradicionales y genéricas (estrella de ocho por dos cuadrados
 // girados, arco polilobulado); no se copia ninguna pieza concreta.
-// Etapa E3 de docs/ROADMAP_ESTILOS.md. La lacería (cinta entrelazada) llega en E4.
-import { DEFAULT_CORES } from "./common.js";
+// Etapas E3 y E4 de docs/ROADMAP_ESTILOS.md.
+import { DEFAULT_CORES, braid } from "./common.js";
 
 // Vetos: motivos que este estilo nunca dibuja. Ningún peso de `motifs` puede estar aquí.
 const banned = ["heart", "round", "leaf", "flame"];
@@ -39,6 +39,17 @@ const exclusive = {
         star(m, x, y, rho, rho * 0.56, 8, a);
         if (detail) polygon(d, x, y, rho * 0.44, 8, a + Math.PI / 8);
         if (richDetail) circle(d, x, y, rho * 0.18);
+      }
+      // Los conteos son armónicos de N: a veces las estrellas no llegan a tocarse. El hueco se
+      // llena con un rombo (o una estrella menor si cabe) para que la banda no quede vacía.
+      const gapHalf = rm * Math.sin(step / 2) - rho;
+      if (gapHalf > rho * 0.45) {
+        const q = Math.min(gapHalf * 0.82, h * 0.42);
+        for (let i = 0; i < b.n; i++) {
+          const a = b.off + (i + 0.5) * step, [x, y] = P(rm, a);
+          if (q > rho * 0.6) star(m, x, y, q, q * 0.56, 8, a + Math.PI / 8);
+          else polygon(m, x, y, q, 4, a);
+        }
       }
       const ring = mainPB(); circle(ring, cx, cy, b.r1);
       emit(ring, mainWFor(b), "#fff"); emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b));
@@ -85,6 +96,27 @@ const exclusive = {
       emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b));
     },
   },
+  // Lacería: dos cintas en zigzag de rectas que se entrelazan (arriba, abajo, arriba…).
+  laceria: {
+    aspect: 1.5, minH: 10.5,
+    draw(ctx, b) {
+      const { TAU, P, circle, cx, cy, mainPB, detailPB, emit, mainWFor, detailWFor, detail } = ctx;
+      const h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
+      const w = Math.max(2.5, Math.min(4.5, h * 0.2)), amp = h / 2 - w / 2 - 1.2;
+      const ring = mainPB(); circle(ring, cx, cy, b.r1); emit(ring, mainWFor(b), "#fff");
+      const m = mainPB(); braid(m, P, { rm, amp, w, periods: b.n, off: b.off, shape: "tri" }); emit(m, mainWFor(b));
+      // Un rombo en el hueco entre los dos cabos, si queda sitio para colorearlo
+      const gap = amp - w / 2 - 1;
+      if (detail && gap > 1.5) {
+        const d = detailPB(), half = (TAU / b.n) * 0.25 * (gap / (amp + 0.001));
+        for (let i = 0; i < 2 * b.n; i++) {
+          const a = b.off + (i * TAU) / (2 * b.n);
+          d.moveTo(...P(rm - gap * 0.6, a)).lineTo(...P(rm, a + half)).lineTo(...P(rm + gap * 0.6, a)).lineTo(...P(rm, a - half)).close();
+        }
+        emit(d, detailWFor(b));
+      }
+    },
+  },
 };
 
 // Núcleo: estrella de 2s puntas formada por dos polígonos regulares girados (dos cuadrados dan
@@ -117,7 +149,7 @@ export const islamico = {
   id: "islamico",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 1, lotus: 1, scallop: 1, triangle: 1, diamond: 2, ogee: 2.5, chevron: 1, estrella: 4, arco: 3 },
+  motifs: { petal: 1, lotus: 1, scallop: 1, triangle: 1, diamond: 2, ogee: 2.5, chevron: 1, estrella: 4, arco: 3, laceria: 3 },
   banned,
   exclusive,
   quota: 1,
