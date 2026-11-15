@@ -17,15 +17,15 @@ export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 // Dos familias: flor abierta y medallón cerrado (rombo, triángulo: contorno circular).
 // El zigzag (chevron) queda fuera: como silueta deja una corona casi vacía.
 // Las siluetas propias de un estilo (p. ej. «arco», islámico) sólo aparecen en su lista.
-export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle", "arco", "eslabones", "rayos", "greca", "seigaiha"];
+export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle", "arco", "eslabones", "rayos", "greca", "seigaiha", "padma", "facetas", "corola"];
 // Cada lista respeta los vetos de la gramática del estilo (js/generators/styles/*.js):
 // tests/styles.test.mjs falla si una silueta vetada vuelve a entrar aquí.
 export const SILHOUETTES_BY_STYLE = {
-  floral:    ["lotus", "petal", "round", "heart", "leaf", "scallop", "ogee"],
-  geometric: ["diamond", "triangle", "petal", "lotus", "ogee"],
+  floral:    ["corola", "lotus", "petal", "round", "heart", "leaf", "scallop", "ogee"],
+  geometric: ["facetas", "diamond", "triangle"],
   azteca:    ["rayos", "greca", "triangle", "diamond", "petal", "lotus"],
   islamico:  ["arco", "ogee", "diamond", "lotus", "scallop", "petal"],
-  yantra:    ["lotus", "petal", "triangle", "diamond", "ogee"],
+  yantra:    ["padma", "lotus", "petal", "triangle", "ogee"],
   sashiko:   ["seigaiha", "scallop", "round", "diamond", "lotus", "ogee", "petal"],
   celtico:   ["eslabones", "round", "heart", "leaf", "scallop", "ogee", "lotus"],
 };
@@ -33,6 +33,9 @@ export const SILHOUETTES_BY_STYLE = {
 // Estructura del disco (ver STRUCTURES en mandalaClassic.js) y tema de fondo (ver
 // BACKGROUNDS en pageComposer.js). Se reparten igual que la silueta: sin repetir en
 // páginas seguidas y equilibrados en el libro.
+// Conteos de pétalos propios de un estilo. Yantra: 12 deja en el centro los dos triángulos
+// entrelazados (simetría de orden 6); 8 y 16 son los lotos tradicionales del diagrama.
+export const STYLE_PETALS = { yantra: [12, 16, 12, 8] };
 export const BOOK_STRUCTURES = ["corona", "heroe", "equilibrio", "nucleo", "aurea", "doble"];
 const STRUCTURE_WEIGHTS = [1.2, 1.1, 1.1, 1, 1, 0.9]; // muy equilibrado para evitar repeticiones
 export const SCATTER_BACKGROUNDS = ["jardin", "cielo", "hojas", "dulce", "estrellas", "vinas"];
@@ -291,6 +294,9 @@ export const SILHOUETTE_FAMILY = {
   rayos: "solar",
   greca: "almenas",
   seigaiha: "olas",
+  padma: "medallon_loto",
+  facetas: "gemas",
+  corola: "muesca",
 };
 
 /**
@@ -593,7 +599,9 @@ export function planBook(opts) {
       background: nextBackground(composition, styleMode),
       composition,
       frameStyle: nextFrame(),
-      petals: nextPetals(),
+      // El sorteo se consume siempre (no altera el resto del libro); un estilo con conteos
+      // propios los toma por turno
+      petals: ((drawn) => STYLE_PETALS[styleMode] ? STYLE_PETALS[styleMode][i % STYLE_PETALS[styleMode].length] : drawn)(nextPetals()),
       complexity,
       centerArt,
       ...(cp ? { chapter: { key: cp.ch.key, title: cp.ch.title, n: cp.k + 1, size: cp.ch.size, first: cp.j === 0 } } : {}),
