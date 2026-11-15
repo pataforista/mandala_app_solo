@@ -136,33 +136,57 @@ export function generateMandalaClassic(doc, opts) {
   // ---------- Elección de motivos ----------
   const grammar = grammarOf(styleMode);
   const W = grammar.motifs;
-  const pickMotif = (exclude) => {
+  // Motivos exclusivos del estilo: { nombre: { aspect, minH, band, silhouette, draw(ctx, b) } }
+  const EX = grammar.exclusive || {};
+  const aspectOf = (m) => ASPECT[m] ?? EX[m]?.aspect ?? 1;
+  const pickMotif = (exclude, h = Infinity) => {
     // Las cuentas (beads) se colocan aparte; voluta, roseta y antemia no se sortean porque su
     // simetría local no coincide con la radial: por eso ninguna gramática les da peso.
     const keys = Object.keys(W).filter(m => m !== exclude
+      && !(EX[m] && (EX[m].band === false || h < (EX[m].minH ?? 0)))
       && !(outlineMode && (m === "chevron" || m === "flame")));
     let t = rng() * keys.reduce((s, m) => s + W[m], 0);
     for (const m of keys) { t -= W[m]; if (t <= 0) return m; }
     return keys[0];
   };
   const harmonics = (outlineMode ? [0.5, 1, 2] : [0.5, 1, 2, 3, 4, 6]).map(f => N * f).filter(n => Number.isInteger(n) && n >= 4 && n <= 128);
+  const setCount = (b) => {
+    const rm = (b.r0 + b.r1) / 2;
+    const minArc = Math.max(4.5 * (R / 90), 3.2);
+    const ok = harmonics.filter(n => TAU * rm / n >= minArc);
+    const pool = ok.length ? ok : [harmonics[0]];
+    b.n = fitBandCount({ r0: b.r0, r1: b.r1, candidates: pool, aspect: aspectOf(b.motif), minArea: minCell });
+    b.off = -Math.PI / 2 + ((b.k % 2) ? Math.PI / b.n : 0);
+  };
   let prev = null;
   for (const b of bands) {
-    const h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
+    const h = b.r1 - b.r0;
     if (b.k === B - 1) {
       const drawn = grammar.silhouettes[Math.floor(rng() * grammar.silhouettes.length)];
-      b.motif = opts.silhouette && MOTIFS_OK(opts.silhouette) ? opts.silhouette : drawn;
+      // La silueta pedida (el plan del libro) vale si el motor la conoce y el estilo no la veta
+      const asked = opts.silhouette && (MOTIFS_OK(opts.silhouette) || EX[opts.silhouette]?.silhouette) && !grammar.banned.includes(opts.silhouette);
+      b.motif = asked ? opts.silhouette : drawn;
     }
     // Cuentas sólo en bandas de 5 mm o más: en una más estrecha cada cuenta quedaba por
     // debajo de 6 mm² y pegada a los anillos (26 % de las celdas de cuentas eran diminutas)
     else if (beadSlots.has(b.k) && h >= 5 && !grammar.banned.includes("beads")) b.motif = "beads";
-    else b.motif = pickMotif(prev);
+    else b.motif = pickMotif(prev, h);
     prev = b.motif;
-    const minArc = Math.max(4.5 * (R / 90), 3.2);
-    const ok = harmonics.filter(n => TAU * rm / n >= minArc);
-    const pool = ok.length ? ok : [harmonics[0]];
-    b.n = fitBandCount({ r0: b.r0, r1: b.r1, candidates: pool, aspect: ASPECT[b.motif], minArea: minCell });
-    b.off = -Math.PI / 2 + ((b.k % 2) ? Math.PI / b.n : 0);
+    setCount(b);
+  }
+  // Cuota de firma: toda página del estilo lleva al menos una banda con motivo exclusivo.
+  // Si el sorteo no dejó ninguna, la banda intermedia más alta que lo admita cambia de motivo.
+  if (grammar.quota && !bands.some(b => EX[b.motif])) {
+    const fits = (b) => Object.keys(EX).filter(m => EX[m].band !== false && W[m] > 0 && (b.r1 - b.r0) >= (EX[m].minH ?? 0)
+      && m !== bands[b.k - 1]?.motif && m !== bands[b.k + 1]?.motif);
+    const target = bands.filter(b => b.k < B - 1 && b.motif !== "beads" && fits(b).length).sort((p, q) => (q.r1 - q.r0) - (p.r1 - p.r0))[0];
+    if (target) {
+      const opts2 = fits(target);
+      let t = rng() * opts2.reduce((s, m) => s + W[m], 0), pick = opts2[0];
+      for (const m of opts2) { t -= W[m]; if (t <= 0) { pick = m; break; } }
+      target.motif = pick;
+      setCount(target);
+    }
   }
 
   // ---------- Primitivas ----------
@@ -207,6 +231,9 @@ export function generateMandalaClassic(doc, opts) {
 
   // Pétalo puntiagudo simétrico: base en r0 (±w), punta en r1
   const fitW = (step, frac) => (step / 2) * frac;
+  // Contexto que reciben los motivos y núcleos exclusivos de una gramática (styles/*.js)
+  const ctx = { cx, cy, R, N, B, TAU, P, M, L, C, circle, petalShape, mainPB, detailPB, emit, mainW, detailW, vestW,
+    mainWFor, detailWFor, vestWFor, detail, richDetail, textures, outlineMode, minCell, rng };
 
   // Punto decorativo entre pétalos
   const gapDots = (pb, b, rr, frac = 0.55) => {
@@ -592,7 +619,7 @@ export function generateMandalaClassic(doc, opts) {
     const b = bands[k];
     const extraRing = includeFrames && detail && k > 0 && b.motif !== "beads" && bands[k - 1].motif !== "beads" && (b.r1 - b.r0) > 9 && rng() < 0.35;
     if (k >= kDraw) continue;
-    MOTIFS[b.motif](b);
+    if (MOTIFS[b.motif]) MOTIFS[b.motif](b); else EX[b.motif].draw(ctx, b);
     const disc = mainPB(); circle(disc, cx, cy, b.r0); emit(disc, mainW, "#fff");
     // Silueta decorada: doble contorno en la banda exterior
     if (k === B - 1 && includeFrames && detail) {
@@ -650,7 +677,9 @@ export function generateMandalaClassic(doc, opts) {
   // ---------- Núcleo: 4 variantes ----------
   {
     const coreVariant = grammar.cores[Math.floor(rng() * grammar.cores.length)];
-    const coreFragments = drawCore(cx, cy, rCore, N, rng, { coreVariant, detail, richDetail, textures, mainW, detailW, vestW, minCell, stroke });
+    // Núcleo propio del estilo: dibuja con el contexto; si no cabe (devuelve false), núcleo común
+    const own = grammar.coreDraw?.[coreVariant];
+    const coreFragments = own && own(ctx, rCore) !== false ? [] : drawCore(cx, cy, rCore, N, rng, { coreVariant: own ? "flor_radiante" : coreVariant, detail, richDetail, textures, mainW, detailW, vestW, minCell, stroke });
     out.push(...coreFragments);
   }
 

@@ -653,9 +653,10 @@ test("motor clásico: respeta la silueta pedida y la cambia sin alterar el inter
     generateMandalaClassic(doc, { ...BASE, seed: 7, petals: 16, composition: "centro", silhouette });
     return doc.meta.discs[0].motifs;
   };
-  const a = draw("heart"), b = draw("diamond");
+  // Dos siluetas que el estilo por defecto (floral) no veta
+  const a = draw("heart"), b = draw("petal");
   assert.equal(a.at(-1), "heart");
-  assert.equal(b.at(-1), "diamond");
+  assert.equal(b.at(-1), "petal");
   assert.deepEqual(a.slice(0, -1), b.slice(0, -1), "las bandas interiores no cambian");
 });
 

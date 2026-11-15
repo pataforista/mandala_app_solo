@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { STYLE_GRAMMARS, grammarOf } from "../js/generators/styles/index.js";
 import { KNOWN_MOTIFS } from "../js/generators/mandalaClassic.js";
-import { BOOK_STYLES } from "../js/core/bookPlan.js";
+import { BOOK_STYLES, BOOK_SILHOUETTES, SILHOUETTES_BY_STYLE, SILHOUETTE_FAMILY } from "../js/core/bookPlan.js";
 
 test("hay una gramática por cada estilo del libro, y ninguna de sobra", () => {
   assert.deepEqual(Object.keys(STYLE_GRAMMARS).sort(), [...BOOK_STYLES].sort());
@@ -19,7 +19,7 @@ test("toda gramática nombra sólo motivos que el motor sabe dibujar, con pesos 
   for (const [id, g] of Object.entries(STYLE_GRAMMARS)) {
     assert.ok(Object.keys(g.motifs).length >= 4, `${id}: pocos motivos`);
     for (const [m, w] of Object.entries(g.motifs)) {
-      assert.ok(KNOWN_MOTIFS.includes(m), `${id}: motivo desconocido «${m}»`);
+      assert.ok(KNOWN_MOTIFS.includes(m) || typeof g.exclusive?.[m]?.draw === "function", `${id}: motivo desconocido «${m}»`);
       assert.ok(w > 0, `${id}: peso no positivo en «${m}»`);
     }
     assert.ok(g.silhouettes.length > 0 && g.cores.length > 0, `${id}: sin siluetas o núcleos`);
@@ -53,9 +53,46 @@ test("vetos: en 60 páginas reales por estilo no aparece ningún motivo vetado",
   for (const [id, g] of Object.entries(STYLE_GRAMMARS)) {
     for (let s = 1; s <= 60; s++) {
       const doc = createDoc({ preset: "KDP_8_5x11", seed: s, marginMm: 12 });
-      generateMandalaClassic(doc, { ...levelToGeneratorOpts(["adulto", "ninos", "letra_grande"][s % 3]), seed: s * 17, petals: [12, 16, 20][s % 3], styleMode: id });
+      // Con y sin la silueta que impone el plan del libro (cualquiera de las del libro, incluso ajena)
+      const silhouette = s % 2 ? BOOK_SILHOUETTES[s % BOOK_SILHOUETTES.length] : undefined;
+      generateMandalaClassic(doc, { ...levelToGeneratorOpts(["adulto", "ninos", "letra_grande"][s % 3]), seed: s * 17, petals: [12, 16, 20][s % 3], styleMode: id, silhouette });
       const used = doc.meta.discs[0].motifs; // todas las bandas, silueta incluida
       for (const m of g.banned) assert.ok(!used.includes(m), `${id} seed ${s}: dibujó el motivo vetado «${m}» (${used.join(",")})`);
     }
+  }
+});
+
+test("libro: las siluetas de cada estilo respetan sus vetos y el motor las sabe dibujar", () => {
+  for (const [id, list] of Object.entries(SILHOUETTES_BY_STYLE)) {
+    const g = STYLE_GRAMMARS[id];
+    for (const s of list) {
+      assert.ok(!g.banned.includes(s), `${id}: la silueta «${s}» está vetada`);
+      assert.ok(KNOWN_MOTIFS.includes(s) || g.exclusive?.[s]?.silhouette, `${id}: silueta desconocida «${s}»`);
+      assert.ok(SILHOUETTE_FAMILY[s], `«${s}» no tiene familia visual`);
+    }
+  }
+});
+
+test("motivos exclusivos: sólo aparecen en su estilo y la cuota de firma se cumple", async () => {
+  const { createDoc } = await import("../js/core/svgDoc.js");
+  const { generateMandalaClassic } = await import("../js/generators/mandalaClassic.js");
+  const { levelToGeneratorOpts } = await import("../js/core/levels.js");
+  const owner = {};
+  for (const [id, g] of Object.entries(STYLE_GRAMMARS)) for (const m of Object.keys(g.exclusive || {})) {
+    assert.ok(!owner[m] && !KNOWN_MOTIFS.includes(m), `«${m}» está en dos estilos o pisa un motivo común`);
+    owner[m] = id;
+  }
+  for (const [id, g] of Object.entries(STYLE_GRAMMARS)) {
+    let signed = 0;
+    const total = 60;
+    for (let s = 1; s <= total; s++) {
+      const doc = createDoc({ preset: "KDP_8_5x11", seed: s, marginMm: 12 });
+      generateMandalaClassic(doc, { ...levelToGeneratorOpts(["adulto", "ninos", "letra_grande"][s % 3]), seed: s * 23, petals: [12, 16, 20][s % 3], styleMode: id,
+        silhouette: BOOK_SILHOUETTES[s % BOOK_SILHOUETTES.length] });
+      const used = doc.meta.discs[0].motifs;
+      for (const m of used) if (owner[m]) assert.equal(owner[m], id, `${id} dibujó «${m}», exclusivo de ${owner[m]}`);
+      if (used.some(m => owner[m] === id)) signed++;
+    }
+    if (g.quota) assert.ok(signed >= total * 0.95, `${id}: sólo ${signed}/${total} páginas llevan firma`);
   }
 });

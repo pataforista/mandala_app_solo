@@ -16,12 +16,15 @@ export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 // loto: páginas distintas por dentro parecían el mismo dibujo. Ahora la reparte el plan.
 // Dos familias: flor abierta y medallón cerrado (rombo, triángulo: contorno circular).
 // El zigzag (chevron) queda fuera: como silueta deja una corona casi vacía.
-export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle"];
-const SILHOUETTES_BY_STYLE = {
+// Las siluetas propias de un estilo (p. ej. «arco», islámico) sólo aparecen en su lista.
+export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle", "arco"];
+// Cada lista respeta los vetos de la gramática del estilo (js/generators/styles/*.js):
+// tests/styles.test.mjs falla si una silueta vetada vuelve a entrar aquí.
+export const SILHOUETTES_BY_STYLE = {
   floral:    ["lotus", "petal", "round", "heart", "leaf", "scallop", "ogee"],
-  geometric: ["diamond", "triangle", "petal", "lotus", "ogee", "scallop"],
-  azteca:    ["triangle", "diamond", "petal", "lotus", "scallop"],
-  islamico:  ["ogee", "scallop", "diamond", "lotus", "petal", "round"],
+  geometric: ["diamond", "triangle", "petal", "lotus", "ogee"],
+  azteca:    ["triangle", "diamond", "petal", "lotus"],
+  islamico:  ["arco", "ogee", "diamond", "lotus", "scallop", "petal"],
   yantra:    ["lotus", "petal", "triangle", "diamond", "ogee"],
   sashiko:   ["scallop", "round", "diamond", "lotus", "ogee", "petal"],
   celtico:   ["round", "heart", "leaf", "scallop", "ogee", "lotus"],
@@ -284,6 +287,7 @@ export const SILHOUETTE_FAMILY = {
   scallop: "lobulos", round: "lobulos",
   heart: "corazones", leaf: "rayos",
   diamond: "medallon", triangle: "medallon",
+  arco: "arcos",
 };
 
 /**
