@@ -36,3 +36,26 @@ test("prueba dorada: ningún estilo cambia una página sin que se regenere a pro
   const out = execFileSync("node", ["scripts/golden-styles.mjs"], { encoding: "utf8", timeout: 240000 });
   assert.match(out, /(\d+)\/\1 páginas idénticas/);
 });
+
+test("vetos: ningún peso de un estilo está en su lista de vetados, ni su silueta por defecto", () => {
+  for (const [id, g] of Object.entries(STYLE_GRAMMARS)) {
+    for (const m of g.banned) {
+      assert.ok(!(m in g.motifs), `${id}: «${m}» está vetado y tiene peso`);
+      assert.ok(!g.silhouettes.includes(m), `${id}: «${m}» está vetado y es silueta`);
+    }
+  }
+});
+
+test("vetos: en 60 páginas reales por estilo no aparece ningún motivo vetado", async () => {
+  const { createDoc } = await import("../js/core/svgDoc.js");
+  const { generateMandalaClassic } = await import("../js/generators/mandalaClassic.js");
+  const { levelToGeneratorOpts } = await import("../js/core/levels.js");
+  for (const [id, g] of Object.entries(STYLE_GRAMMARS)) {
+    for (let s = 1; s <= 60; s++) {
+      const doc = createDoc({ preset: "KDP_8_5x11", seed: s, marginMm: 12 });
+      generateMandalaClassic(doc, { ...levelToGeneratorOpts(["adulto", "ninos", "letra_grande"][s % 3]), seed: s * 17, petals: [12, 16, 20][s % 3], styleMode: id });
+      const used = doc.meta.discs[0].motifs; // todas las bandas, silueta incluida
+      for (const m of g.banned) assert.ok(!used.includes(m), `${id} seed ${s}: dibujó el motivo vetado «${m}» (${used.join(",")})`);
+    }
+  }
+});

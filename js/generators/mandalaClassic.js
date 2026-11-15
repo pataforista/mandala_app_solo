@@ -137,10 +137,9 @@ export function generateMandalaClassic(doc, opts) {
   const grammar = grammarOf(styleMode);
   const W = grammar.motifs;
   const pickMotif = (exclude) => {
-    // voluta, roseta, antemia excluidos: sus formas tienen simetría local que no
-    // coincide con la simetría radial del mandala (espirales, pétalos locales)
-    const keys = Object.keys(W).filter(m => m !== exclude && m !== "beads"
-      && m !== "voluta" && m !== "roseta" && m !== "antemia"
+    // Las cuentas (beads) se colocan aparte; voluta, roseta y antemia no se sortean porque su
+    // simetría local no coincide con la radial: por eso ninguna gramática les da peso.
+    const keys = Object.keys(W).filter(m => m !== exclude
       && !(outlineMode && (m === "chevron" || m === "flame")));
     let t = rng() * keys.reduce((s, m) => s + W[m], 0);
     for (const m of keys) { t -= W[m]; if (t <= 0) return m; }
@@ -156,7 +155,7 @@ export function generateMandalaClassic(doc, opts) {
     }
     // Cuentas sólo en bandas de 5 mm o más: en una más estrecha cada cuenta quedaba por
     // debajo de 6 mm² y pegada a los anillos (26 % de las celdas de cuentas eran diminutas)
-    else if (beadSlots.has(b.k) && h >= 5) b.motif = "beads";
+    else if (beadSlots.has(b.k) && h >= 5 && !grammar.banned.includes("beads")) b.motif = "beads";
     else b.motif = pickMotif(prev);
     prev = b.motif;
     const minArc = Math.max(4.5 * (R / 90), 3.2);
