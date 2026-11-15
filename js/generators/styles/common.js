@@ -144,3 +144,21 @@ export function ringChain(pb, P, { cx, cy, rc, count, rho, w, off = 0 }) {
     }
   }
 }
+
+// ---------- Polígonos en coordenadas de celda ----------
+/** Polígono en coordenadas de celda: u (0…1 a lo ancho del paso) y v (0…1 del radio interior al
+ *  exterior). Los tramos de radio constante siguen el arco, no la cuerda.
+ *  open: no traza el lado de cierre. Se usa cuando la base descansa sobre un aro: cerrada, su
+ *  cuerda recta dejaría una astilla contra el arco. */
+export function cellPoly(ctx, pb, b, a0, pts, open = false) {
+  const step = ctx.TAU / b.n, h = b.r1 - b.r0;
+  const at = (u, v) => ctx.P(b.r0 + v * h, a0 + u * step);
+  pts.forEach(([u, v], i) => {
+    if (!i) return pb.moveTo(...at(u, v));
+    const [pu, pv] = pts[i - 1];
+    // Mismo radio: se subdivide el arco para que no quede una cuerda recta
+    const n = pv === v ? Math.max(1, Math.ceil(Math.abs(u - pu) * step / 0.07)) : 1;
+    for (let k = 1; k <= n; k++) pb.lineTo(...at(pu + ((u - pu) * k) / n, v));
+  });
+  if (!open) pb.close();
+}

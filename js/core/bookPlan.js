@@ -17,7 +17,7 @@ export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 // Dos familias: flor abierta y medallón cerrado (rombo, triángulo: contorno circular).
 // El zigzag (chevron) queda fuera: como silueta deja una corona casi vacía.
 // Las siluetas propias de un estilo (p. ej. «arco», islámico) sólo aparecen en su lista.
-export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle", "arco", "eslabones", "rayos", "greca"];
+export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle", "arco", "eslabones", "rayos", "greca", "seigaiha"];
 // Cada lista respeta los vetos de la gramática del estilo (js/generators/styles/*.js):
 // tests/styles.test.mjs falla si una silueta vetada vuelve a entrar aquí.
 export const SILHOUETTES_BY_STYLE = {
@@ -26,7 +26,7 @@ export const SILHOUETTES_BY_STYLE = {
   azteca:    ["rayos", "greca", "triangle", "diamond", "petal", "lotus"],
   islamico:  ["arco", "ogee", "diamond", "lotus", "scallop", "petal"],
   yantra:    ["lotus", "petal", "triangle", "diamond", "ogee"],
-  sashiko:   ["scallop", "round", "diamond", "lotus", "ogee", "petal"],
+  sashiko:   ["seigaiha", "scallop", "round", "diamond", "lotus", "ogee", "petal"],
   celtico:   ["eslabones", "round", "heart", "leaf", "scallop", "ogee", "lotus"],
 };
 
@@ -290,6 +290,7 @@ export const SILHOUETTE_FAMILY = {
   arco: "arcos", eslabones: "cadena",
   rayos: "solar",
   greca: "almenas",
+  seigaiha: "olas",
 };
 
 /**

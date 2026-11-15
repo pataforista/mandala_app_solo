@@ -3,27 +3,10 @@
 // que alternan grande y pequeño, y un disco solar en el centro. Son construcciones genéricas de
 // la ornamentación mesoamericana (escalón, diente, cartucho); no se copia ninguna pieza concreta.
 // Etapa E6 de docs/ROADMAP_ESTILOS.md.
-import { DEFAULT_CORES } from "./common.js";
+import { DEFAULT_CORES, cellPoly } from "./common.js";
 
 // Vetos: motivos que este estilo nunca dibuja. Ningún peso de `motifs` puede estar aquí.
 const banned = ["heart", "leaf", "round", "scallop", "ogee"];
-
-/** Polígono en coordenadas de celda: u (0…1 a lo ancho del paso) y v (0…1 del radio interior al
- *  exterior). Los tramos de radio constante siguen el arco, no la cuerda.
- *  open: no traza el lado de cierre. Se usa cuando la base descansa sobre un aro: cerrada, su
- *  cuerda recta dejaría una astilla contra el arco. */
-function cellPoly(ctx, pb, b, a0, pts, open = false) {
-  const step = ctx.TAU / b.n, h = b.r1 - b.r0;
-  const at = (u, v) => ctx.P(b.r0 + v * h, a0 + u * step);
-  pts.forEach(([u, v], i) => {
-    if (!i) return pb.moveTo(...at(u, v));
-    const [pu, pv] = pts[i - 1];
-    // Mismo radio: se subdivide el arco para que no quede una cuerda recta
-    const n = pv === v ? Math.max(1, Math.ceil(Math.abs(u - pu) * step / 0.07)) : 1;
-    for (let k = 1; k <= n; k++) pb.lineTo(...at(pu + ((u - pu) * k) / n, v));
-  });
-  if (!open) pb.close();
-}
 
 const exclusive = {
   // Greca escalonada: una pirámide de tres escalones por celda; entre dos pirámides queda su

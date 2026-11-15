@@ -143,7 +143,7 @@ export function generateMandalaClassic(doc, opts) {
     // Las cuentas (beads) se colocan aparte; voluta, roseta y antemia no se sortean porque su
     // simetría local no coincide con la radial: por eso ninguna gramática les da peso.
     const keys = Object.keys(W).filter(m => m !== exclude
-      && !(EX[m] && (EX[m].band === false || h < (EX[m].minH ?? 0)))
+      && !(EX[m] && (EX[m].band === false || h < (EX[m].minH ?? 0) || (outlineMode && EX[m].outline === false)))
       && !(outlineMode && (m === "chevron" || m === "flame")));
     let t = rng() * keys.reduce((s, m) => s + W[m], 0);
     for (const m of keys) { t -= W[m]; if (t <= 0) return m; }
@@ -177,7 +177,7 @@ export function generateMandalaClassic(doc, opts) {
   // Cuota de firma: toda página del estilo lleva al menos una banda con motivo exclusivo.
   // Si el sorteo no dejó ninguna, la banda intermedia más alta que lo admita cambia de motivo.
   if (grammar.quota && !bands.some(b => EX[b.motif])) {
-    const fits = (b) => Object.keys(EX).filter(m => EX[m].band !== false && W[m] > 0 && (b.r1 - b.r0) >= (EX[m].minH ?? 0)
+    const fits = (b) => Object.keys(EX).filter(m => EX[m].band !== false && W[m] > 0 && !(outlineMode && EX[m].outline === false) && (b.r1 - b.r0) >= (EX[m].minH ?? 0)
       && m !== bands[b.k - 1]?.motif && m !== bands[b.k + 1]?.motif);
     const target = bands.filter(b => b.k < B - 1 && b.motif !== "beads" && fits(b).length).sort((p, q) => (q.r1 - q.r0) - (p.r1 - p.r0))[0];
     if (target) {
