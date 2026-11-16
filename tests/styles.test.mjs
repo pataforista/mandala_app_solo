@@ -96,3 +96,31 @@ test("motivos exclusivos: sólo aparecen en su estilo y la cuota de firma se cum
     if (g.quota) assert.ok(signed >= total * 0.95, `${id}: sólo ${signed}/${total} páginas llevan firma`);
   }
 });
+
+test("puntuación por estilo: ningún estilo baja de su suelo (adulto, 24 semillas)", async () => {
+  // Suelos = medida tras E10 (docs/lineas-base/estilos-E10.txt) menos 3 puntos de holgura.
+  // Si un cambio de dibujo baja un estilo de aquí, se mide y se decide; no se sube la holgura.
+  const FLOOR = { floral: 77, geometric: 78, islamico: 79, sashiko: 77, celtico: 81, azteca: 75, yantra: 80 };
+  const { createDoc } = await import("../js/core/svgDoc.js");
+  const { renderDocToSvgString } = await import("../js/core/svgRender.js");
+  const { generateMandalaClassic } = await import("../js/generators/mandalaClassic.js");
+  const { measureSvg, commercialScore } = await import("../js/core/commercialMetrics.js");
+  const { levelToGeneratorOpts } = await import("../js/core/levels.js");
+  for (const id of BOOK_STYLES) {
+    let sum = 0;
+    const n = 24;
+    for (let s = 1; s <= n; s++) {
+      const o = { ...levelToGeneratorOpts("adulto"), organicLevel: 0.2, textures: false, pageBorder: true, seed: s * 31 + 7, petals: [12, 16, 18, 20, 24][s % 5], styleMode: id };
+      const doc = createDoc({ preset: "KDP_8_5x11", seed: o.seed, marginMm: 12 });
+      generateMandalaClassic(doc, o);
+      sum += commercialScore(measureSvg(renderDocToSvgString(doc)), { strokeWidthMm: o.strokeWidthMm, minCellAreaMm2: o.minCellAreaMm2 }).score;
+    }
+    assert.ok(sum / n >= FLOOR[id], `${id}: media ${(sum / n).toFixed(1)} < suelo ${FLOOR[id]}`);
+  }
+});
+
+test("capítulos: cada estilo del libro pertenece a un capítulo y sólo a uno", async () => {
+  const { CHAPTERS } = await import("../js/core/bookPlan.js");
+  for (const id of BOOK_STYLES) assert.equal(CHAPTERS.filter(c => c.styles.includes(id)).length, 1, `estilo «${id}»`);
+  for (const c of CHAPTERS) assert.ok(CHAPTERS.some(o => o.key === c.near), `capítulo «${c.key}»: afín desconocido`);
+});

@@ -456,9 +456,14 @@ export function shuffleBag(rng, options, weights = null) {
 // ---------- Capítulos temáticos ----------
 // Los libros más vendidos agrupan los diseños por tema (p. ej. 125 Mandalas: vitral,
 // étnico, gemas). Cada capítulo reúne estilos afines y abre con una portadilla.
+// Desde que cada estilo tiene gramática propia (js/generators/styles), celta y sashiko abren
+// capítulo aparte: un nudo celta dentro de «Jardín» o unas olas japonesas dentro de «Arabescos»
+// rompían el tono del capítulo. Un capítulo corto se sigue uniendo a su afín (near).
 export const CHAPTERS = [
-  { key: "floral", title: "Jardín de mandalas", styles: ["floral", "celtico"], near: "arabesco" },
-  { key: "arabesco", title: "Arabescos y vitrales", styles: ["islamico", "sashiko"], near: "geometrico" },
+  { key: "floral", title: "Jardín de mandalas", styles: ["floral"], near: "oriente" },
+  { key: "celta", title: "Nudos y trenzas", styles: ["celtico"], near: "floral" },
+  { key: "oriente", title: "Olas y tramas", styles: ["sashiko"], near: "floral" },
+  { key: "arabesco", title: "Arabescos y vitrales", styles: ["islamico"], near: "geometrico" },
   { key: "geometrico", title: "Geometría sagrada", styles: ["geometric", "yantra"], near: "solar" },
   { key: "solar", title: "Soles y piedras", styles: ["azteca"], near: "geometrico" },
 ];

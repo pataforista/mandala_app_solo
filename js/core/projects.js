@@ -75,6 +75,15 @@ function withStore(mode, fn) {
   });
 }
 
+/**
+ * ¿Se guardó este proyecto con otra versión del dibujo de los estilos? Un proyecto sin el campo
+ * es anterior a las gramáticas (versión 1). Si devuelve true, sus páginas se verán distintas.
+ */
+export function stylesChangedSince(projectData, currentVersion) {
+  if (!projectData) return false;
+  return (projectData.grammarVersion ?? 1) !== currentVersion;
+}
+
 /** Formato estándar de un proyecto */
 export const PROJECT_FORMAT = "mandala-project";
 export const PROJECT_VERSION = 1;

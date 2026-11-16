@@ -411,3 +411,95 @@ El plan B está terminado cuando se cumplen a la vez:
 5. Un libro de 40 páginas de cada estilo sale sin gemelas tras la curaduría.
 6. Las siete páginas impresas se pueden colorear con lápiz y con marcador.
 7. `REVISION_MOTORES_2026-11.md` § 5 tiene la columna «Hoy» actualizada.
+
+## 10. Estado a 16 nov 2026
+
+### 10.1 Etapas
+
+| Etapa | Estado | Nota |
+|---|---|---|
+| E0 instrumentos y línea base | hecho | `bench-styles.mjs`, `bench-identity.mjs`, `docs/lineas-base/` |
+| E1 gramáticas sin cambiar páginas | hecho | 343 de 343 páginas idénticas (`golden-styles.mjs`) |
+| E2 vetos | hecho | los vetos valen también para la silueta que impone el plan del libro |
+| E3 islámico | hecho | cadena de estrellas, arquería lobulada, núcleo de polígonos girados |
+| E4 cinta entrelazada | hecho | `braid()` y `ringChain()`; lacería islámica |
+| E5 celta | hecho | trenza, eslabones, núcleo de trenza anular |
+| E6 azteca | hecho | greca, sierra doble, casillas, rayos, disco solar |
+| E7 sashiko | hecho | seigaiha, asanoha, shippo, kikko, crisantemo |
+| E8 yantra (disco) | hecho | loto encerrado, anillos, triángulos entrelazados con 6 o 12 pétalos |
+| E9 yantra (recinto cuadrado) | **pendiente** | toca al compositor de página |
+| E10 floral y geométrico | hecho | corola y estambres; teselado, facetas y polígono (sólo rectas) |
+| E11 integración | hecho en parte | capítulos por estilo, siluetas propias en el plan, aviso al abrir proyectos anteriores, `npm run e2e`. Faltan miniaturas de estilo en la interfaz y fondos afines por estilo |
+| E12 cierre | **pendiente** | prueba a ciegas con personas y prueba impresa: no se pueden hacer desde aquí |
+
+### 10.2 Medidas (motor clásico; línea base → hoy)
+
+Puntuación media y, entre paréntesis, mínima. Nivel adulto, 40 semillas hoy; la línea base de
+noviembre usó 10 semillas, así que las mínimas no son comparables una a una.
+
+| Estilo | Línea base | Tras E2 (40 semillas) | Hoy | Acierto del clasificador: base → hoy |
+|---|---|---|---|---|
+| floral | 79,1 (62) | 77,5 (58) | 80,5 (52) | 35 → 65 % |
+| geométrico | 79,6 (61) | 81,8 (66) | 82,8 (70) | 30 → 68 % |
+| islámico | 79,5 (68) | 80,4 (66) | 82,7 (66) | 15 → 50 % |
+| sashiko | 80,0 (71) | 80,8 (62) | 81,6 (68) | 30 → 73 % |
+| celta | 78,0 (60) | 78,9 (63) | 84,8 (71) | 10 → 75 % |
+| azteca | 73,1 (37) | 75,7 (50) | 78,1 (49) | 10 → 60 % |
+| yantra | 75,3 (42) | 79,9 (64) | 84,0 (74) | 35 → 70 % |
+
+| Indicador | Línea base | Hoy | Meta | ¿Cumple? |
+|---|---|---|---|---|
+| Acierto global del clasificador | 24–29 % | 65,7 % | ≥ 80 % | no |
+| Estilos con acierto ≥ 65 % | 0 de 7 | 5 de 7 | 7 | no |
+| Parecido de huella entre estilos, misma semilla (adulto) | 0,96 | 0,89 | ≤ 0,85 | no |
+| Pares de estilos gemelos, misma semilla (adulto) | 94 % | 51 % | — | — |
+| Mínima por estilo, adulto | 37 | 49 (azteca) | ≥ 60 | no |
+| Media del libro «más vendidos» antes de curar | 82,2 | 85,3 | ≥ 81 | sí |
+| Libro «más vendidos» tras curar | 82,8–83,2 | 84,0–86,1, 0 flojas, 0 gemelas | 0 flojas, 0 gemelas | sí |
+| Gemelas por libro antes de curar | 0,2 | 0,3 | ≤ 0,2 | no, por poco |
+| Motivos exclusivos dibujables | 0 | 21 | ≥ 20 | sí |
+| Libro real creado en la app (`npm run e2e`) | sin probar | 106 páginas, «Listo para KDP», media 84–85, sin errores, en es y en | pasa | sí |
+| Pruebas | 110 | 122 de 122 | todas | sí |
+
+Los 21 motivos: islámico (estrella, arco, lacería, roseta de polígonos), celta (trenza,
+eslabones, trenza anular), azteca (greca, dentado, casillas, rayos, disco solar), sashiko
+(seigaiha, asanoha, shippo, kikko, crisantemo), yantra (padma, anillos, triángulos), floral
+(corola, estambres), geométrico (teselado, facetas, polígono). Suman 25 con los núcleos de
+respaldo; 21 sin contarlos.
+
+### 10.3 Lo que no se cumplió y por qué
+
+- **Acierto del clasificador: 66 % frente a la meta de 80 %.** Islámico (50 %) y azteca (60 %)
+  se confunden entre sí y con geométrico: los tres son estilos de rectas, y los siete rasgos del
+  clasificador (proporción de rectas, esquinas, redondez…) no ven la diferencia entre una
+  estrella de ocho y una greca. A la vista se distinguen; la medida no alcanza. La prueba a
+  ciegas (§ 6.5) decide. No se añadieron rasgos al clasificador para subir la cifra: sería
+  ajustar el termómetro a la fiebre.
+- **Mínima por estilo: 49 (azteca) frente a 60.** Las páginas más bajas no vienen de los motivos
+  nuevos sino de motivos comunes en bandas estrechas (rombos y llamas con conteos altos). Es el
+  trabajo de la tarea 2.3 de la revisión, aún abierta.
+- **Niños baja entre 1 y 2 puntos en azteca, sashiko, geométrico y floral** (por ejemplo sashiko
+  90,1 → 87,7), fuera del criterio de «línea base − 1». A cambio la mínima sube o se mantiene
+  salvo en azteca. Motivo probable: los motivos nuevos tienen más vértices próximos entre sí, que
+  la medida cuenta como huecos (H4 de la revisión, sin verificar).
+- **Nivel experto: sigue sin llegar a «Listo para KDP»** (70 de 80 páginas flojas). Estaba fuera
+  del alcance del plan B.
+
+### 10.4 Pendientes nuevos encontrados por el camino
+
+| Pendiente | Dónde | Efecto |
+|---|---|---|
+| El núcleo «flor de la vida» se dibuja como un disco vacío: su aro blanco se pinta encima | `mandalaClassic.js`, variante `flor_vida` | uno de cada tres núcleos comunes sale vacío. Destaparlo sin rediseñar deja un ovillo de astillas en núcleos pequeños |
+| Rombos y llamas en bandas estrechas con conteos altos | motivos comunes `diamond`, `flame` | origen de las mínimas de 49–52 |
+| El libro de 28 mandalas «más vendidos» sólo abre 2 capítulos | `chapterLayout` | con los pesos actuales, celta, sashiko, islámico y azteca no llegan al tamaño mínimo de capítulo |
+| Miniaturas de estilo en la interfaz | `index.html`, `app.js` | el selector sigue siendo una lista de nombres |
+
+### 10.5 Cómo comprobarlo todo
+
+```bash
+npm install            # una vez: trae Shoelace y jsPDF para la prueba de punta a punta
+npm run check          # service worker + 122 pruebas (incluye la prueba dorada de 343 páginas)
+npm run bench:estilos  # puntuación por estilo, parecido e identidad
+npm run e2e            # crea un libro real en Chromium, en español y en inglés
+node scripts/style-sheet.mjs celtico /tmp/laminas   # lámina de un estilo para mirarla
+```

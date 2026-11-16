@@ -20,7 +20,8 @@ import { kdpSafeMarginMm, kdpChecklist, bookLayout, kdpCoverDimensions } from ".
 import { loadImageFile, figureFromImage, withStamp, withThinInk } from "./core/figureImport.js";
 import { fitOf } from "./generators/pageComposer.js";
 import { packFigures, unpackFigures, encodeCls, decodeCls } from "./core/figurePack.js";
-import { autoSaveProject, loadAutoSave, saveNamedProject, listProjects, loadProject, deleteProject, duplicateProject, serializeProject, deserializeProject } from "./core/projects.js";
+import { autoSaveProject, loadAutoSave, saveNamedProject, listProjects, loadProject, deleteProject, duplicateProject, serializeProject, deserializeProject, stylesChangedSince } from "./core/projects.js";
+import { STYLE_GRAMMAR_VERSION } from "./generators/styles/index.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
 import { pageFingerprint, similarPairs } from "./core/variety.js";
@@ -2883,6 +2884,7 @@ function bindUI() {
     }));
 
     return {
+      grammarVersion: STYLE_GRAMMAR_VERSION,
       id: currentProjectId,
       name: currentProjectName,
       state: JSON.parse(JSON.stringify(state)),
@@ -2907,6 +2909,10 @@ function bindUI() {
 
   async function applyProjectPayload(data, projName = null) {
     if (!data) return;
+    // Proyecto guardado antes de un cambio en el dibujo de los estilos: se avisa, sin bloquear
+    if (stylesChangedSince(data, STYLE_GRAMMAR_VERSION) && (data.state || data.bookSettings)) {
+      showToast("Los estilos se han renovado desde que guardaste este proyecto: sus páginas se han redibujado. Revísalas antes de crear el libro.", "warning", "exclamation-triangle", 12000);
+    }
     if (data.state) {
       Object.assign(state, data.state);
       bindUI();
