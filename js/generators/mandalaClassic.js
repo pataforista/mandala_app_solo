@@ -603,9 +603,27 @@ export function generateMandalaClassic(doc, opts) {
       pb.moveTo(x0 + rc, y0).lineTo(x1 - rc, y0).quadTo(x1, y0, x1, y0 + rc).lineTo(x1, y1 - rc).quadTo(x1, y1, x1 - rc, y1)
         .lineTo(x0 + rc, y1).quadTo(x0, y1, x0, y1 - rc).lineTo(x0, y0 + rc).quadTo(x0, y0, x0 + rc, y0).close();
     };
-    rect(pb, m, m, page.wMm - m, page.hMm - m, rr);
-    emit(pb, mainW);
-    if (includeFrames) { const p2 = mainPB(); rect(p2, m + 2.5, m + 2.5, page.wMm - m - 2.5, page.hMm - m - 2.5, rr * 0.6); emit(p2, detailW); }
+    if (grammar.recinto) {
+      // Recinto cuadrado con cuatro puertas en T (yantra): el mismo margen que el marco redondeado,
+      // para que las pruebas de márgenes KDP sigan valiendo. Cada puerta es un hueco centrado en
+      // el lado y un tabique corto hacia dentro; los vértices van rectos.
+      const x0 = m, y0 = m, x1 = page.wMm - m, y1 = page.hMm - m, gx = (x1 - x0) * 0.09, gy = (y1 - y0) * 0.09;
+      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, door = 4.5;
+      pb.moveTo(x0, y0).lineTo(mx - gx, y0).moveTo(mx + gx, y0).lineTo(x1, y0).lineTo(x1, my - gy).moveTo(x1, my + gy).lineTo(x1, y1)
+        .lineTo(mx + gx, y1).moveTo(mx - gx, y1).lineTo(x0, y1).lineTo(x0, my + gy).moveTo(x0, my - gy).lineTo(x0, y0);
+      emit(pb, mainW);
+      const tabs = mainPB();
+      tabs.moveTo(mx - gx, y0).lineTo(mx - gx, y0 + door).moveTo(mx + gx, y0).lineTo(mx + gx, y0 + door)
+        .moveTo(mx - gx, y1).lineTo(mx - gx, y1 - door).moveTo(mx + gx, y1).lineTo(mx + gx, y1 - door)
+        .moveTo(x0, my - gy).lineTo(x0 + door, my - gy).moveTo(x0, my + gy).lineTo(x0 + door, my + gy)
+        .moveTo(x1, my - gy).lineTo(x1 - door, my - gy).moveTo(x1, my + gy).lineTo(x1 - door, my + gy);
+      emit(tabs, mainW);
+      if (includeFrames) { const p2 = mainPB(); p2.moveTo(x0 + 2.5, y0 + 2.5).lineTo(x1 - 2.5, y0 + 2.5).lineTo(x1 - 2.5, y1 - 2.5).lineTo(x0 + 2.5, y1 - 2.5).close(); emit(p2, detailW); }
+    } else {
+      rect(pb, m, m, page.wMm - m, page.hMm - m, rr);
+      emit(pb, mainW);
+      if (includeFrames) { const p2 = mainPB(); rect(p2, m + 2.5, m + 2.5, page.wMm - m - 2.5, page.hMm - m - 2.5, rr * 0.6); emit(p2, detailW); }
+    }
   }
 
   let kDraw = B;

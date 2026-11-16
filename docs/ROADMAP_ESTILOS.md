@@ -427,10 +427,10 @@ El plan B está terminado cuando se cumplen a la vez:
 | E6 azteca | hecho | greca, sierra doble, casillas, rayos, disco solar |
 | E7 sashiko | hecho | seigaiha, asanoha, shippo, kikko, crisantemo |
 | E8 yantra (disco) | hecho | loto encerrado, anillos, triángulos entrelazados con 6 o 12 pétalos |
-| E9 yantra (recinto cuadrado) | **pendiente** | toca al compositor de página |
+| E9 yantra (recinto cuadrado) | hecho, primera versión | recinto con cuatro puertas en el mismo margen KDP; las puertas se ven como huecos con pestañas, no como puertas en T: pendiente de revisión visual |
 | E10 floral y geométrico | hecho | corola y estambres; teselado, facetas y polígono (sólo rectas) |
 | E11 integración | hecho en parte | capítulos por estilo, siluetas propias en el plan, aviso al abrir proyectos anteriores, `npm run e2e`. Faltan miniaturas de estilo en la interfaz y fondos afines por estilo |
-| E12 cierre | **pendiente** | prueba a ciegas con personas y prueba impresa: no se pueden hacer desde aquí |
+| E12 cierre | preparado, sin ejecutar | `scripts/blind-test.mjs` crea las 28 páginas y la hoja de respuestas; la clave sale con `--clave` y no debe entregarse a quien responde. Falta que 3 personas la hagan y la prueba impresa |
 
 ### 10.2 Medidas (motor clásico; línea base → hoy)
 
@@ -502,3 +502,9 @@ npm run bench:estilos  # puntuación por estilo, parecido e identidad
 npm run e2e            # crea un libro real en Chromium, en español y en inglés
 node scripts/style-sheet.mjs celtico /tmp/laminas   # lámina de un estilo para mirarla
 ```
+
+### 10.6 Actualización (16 nov, tarde)
+
+- Azteca: se quitó la llama y se bajó el chevrón. Mínima adulto 49 → 64 (meta ≥ 60, cumplida).
+- E9: recinto del yantra (primera versión).
+- E12: generador de la prueba a ciegas; la prueba en sí no se ha hecho.

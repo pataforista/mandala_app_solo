@@ -79,6 +79,8 @@ function lotoBindu(ctx, rCore) {
 
 export const yantra = {
   id: "yantra",
+  // Recinto cuadrado con cuatro puertas en lugar del marco redondeado (mandalaClassic.js).
+  recinto: true,
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
   motifs: { petal: 1, lotus: 2, triangle: 1.2, ogee: 0.8, padma: 5, anillos: 3 },

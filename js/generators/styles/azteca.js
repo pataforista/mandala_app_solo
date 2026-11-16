@@ -6,7 +6,7 @@
 import { DEFAULT_CORES, cellPoly } from "./common.js";
 
 // Vetos: motivos que este estilo nunca dibuja. Ningún peso de `motifs` puede estar aquí.
-const banned = ["heart", "leaf", "round", "scallop", "ogee"];
+const banned = ["heart", "leaf", "round", "scallop", "ogee", "flame"];
 
 const exclusive = {
   // Greca escalonada: una pirámide de tres escalones por celda; entre dos pirámides queda su
@@ -118,7 +118,7 @@ export const azteca = {
   id: "azteca",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 0.8, lotus: 0.5, triangle: 2, diamond: 1.5, chevron: 2, flame: 1, greca: 4, dentado: 3, casillas: 3 },
+  motifs: { petal: 0.8, lotus: 0.5, triangle: 2, diamond: 1.5, chevron: 0.2, greca: 4, dentado: 3, casillas: 3 },
   banned,
   exclusive,
   quota: 1,
