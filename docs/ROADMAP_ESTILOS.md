@@ -457,15 +457,14 @@ noviembre usó 10 semillas, así que las mínimas no son comparables una a una.
 | Media del libro «más vendidos» antes de curar | 82,2 | 85,3 | ≥ 81 | sí |
 | Libro «más vendidos» tras curar | 82,8–83,2 | 84,0–86,1, 0 flojas, 0 gemelas | 0 flojas, 0 gemelas | sí |
 | Gemelas por libro antes de curar | 0,2 | 0,3 | ≤ 0,2 | no, por poco |
-| Motivos exclusivos dibujables | 0 | 21 | ≥ 20 | sí |
+| Piezas exclusivas dibujables | 0 | 25 (18 motivos de banda o silueta y 7 núcleos) | ≥ 20 | sí |
 | Libro real creado en la app (`npm run e2e`) | sin probar | 106 páginas, «Listo para KDP», media 84–85, sin errores, en es y en | pasa | sí |
 | Pruebas | 110 | 122 de 122 | todas | sí |
 
-Los 21 motivos: islámico (estrella, arco, lacería, roseta de polígonos), celta (trenza,
+Las 25 piezas: islámico (estrella, arco, lacería, roseta de polígonos), celta (trenza,
 eslabones, trenza anular), azteca (greca, dentado, casillas, rayos, disco solar), sashiko
 (seigaiha, asanoha, shippo, kikko, crisantemo), yantra (padma, anillos, triángulos), floral
-(corola, estambres), geométrico (teselado, facetas, polígono). Suman 25 con los núcleos de
-respaldo; 21 sin contarlos.
+(corola, estambres), geométrico (teselado, facetas, polígono).
 
 ### 10.3 Lo que no se cumplió y por qué
 
