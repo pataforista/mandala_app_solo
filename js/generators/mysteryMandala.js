@@ -136,6 +136,53 @@ export const MYSTERY_SHAPES = {
     },
   },
 };
+// Figuras originales de temas genéricos (comida tierna y objetos rústicos), hechas con formas simples.
+Object.assign(MYSTERY_SHAPES, {
+  pera: {
+    name: "pera",
+    test: (x, y) => inEllipse(x, y, 0, -0.35, 0.56, 0.52) || inEllipse(x, y, 0, 0.18, 0.34, 0.42)
+      || (x >= -0.06 && x <= 0.06 && y >= 0.5 && y <= 0.9) || inEllipse(x, y, 0.24, 0.78, 0.2, 0.09, 0.5),
+  },
+  cerezas: {
+    name: "cerezas",
+    test: (x, y) => {
+      const stem = (ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy), t = ((x - ax) * dx + (y - ay) * dy) / (L * L); return t >= 0 && t <= 1 && Math.abs((x - ax) * dy - (y - ay) * dx) / L <= 0.07; };
+      return inEllipse(x, y, -0.38, -0.45, 0.32, 0.32) || inEllipse(x, y, 0.38, -0.45, 0.32, 0.32)
+        || stem(-0.38, -0.2, 0.05, 0.75) || stem(0.38, -0.2, 0.05, 0.75) || inEllipse(x, y, 0.32, 0.76, 0.28, 0.12, -0.3);
+    },
+  },
+  limon: {
+    name: "limón",
+    test: (x, y) => inEllipse(x, y, 0, -0.05, 0.78, 0.55) || inPoly(x, y, [[0.7, 0.12], [0.98, -0.05], [0.7, -0.22]])
+      || inPoly(x, y, [[-0.7, 0.12], [-0.98, -0.05], [-0.7, -0.22]]) || inEllipse(x, y, 0.15, 0.62, 0.26, 0.11, 0.4),
+  },
+  donut: { name: "dónut", test: (x, y) => inEllipse(x, y, 0, 0, 0.82, 0.82) && !inEllipse(x, y, 0, 0, 0.3, 0.3) },
+  taza: {
+    name: "taza",
+    test: (x, y) => inPoly(x, y, [[-0.6, 0.42], [0.42, 0.42], [0.32, -0.58], [-0.5, -0.58]])
+      || (inEllipse(x, y, 0.5, -0.04, 0.34, 0.3) && !inEllipse(x, y, 0.5, -0.04, 0.17, 0.14))
+      || inEllipse(x, y, -0.08, -0.72, 0.85, 0.15),
+  },
+  magdalena: {
+    name: "magdalena",
+    // Base estrecha y, separada por una franja blanca, la crema en tres pisos con una cereza arriba
+    test: (x, y) => inPoly(x, y, [[-0.4, -0.92], [0.4, -0.92], [0.58, -0.25], [-0.58, -0.25]])
+      || (y >= -0.08 && (inEllipse(x, y, 0, 0.06, 0.82, 0.22) || inEllipse(x, y, 0, 0.36, 0.6, 0.2) || inEllipse(x, y, 0, 0.6, 0.38, 0.16)))
+      || inEllipse(x, y, 0, 0.86, 0.13, 0.13),
+  },
+  lazo: {
+    name: "lazo",
+    test: (x, y) => inPoly(x, y, [[-0.1, 0.02], [-0.92, 0.55], [-0.92, -0.38]]) || inPoly(x, y, [[0.1, 0.02], [0.92, 0.55], [0.92, -0.38]])
+      || inEllipse(x, y, 0, 0, 0.2, 0.22) || inPoly(x, y, [[-0.1, -0.08], [-0.5, -0.88], [-0.26, -0.92], [0.04, -0.15]])
+      || inPoly(x, y, [[0.1, -0.08], [0.5, -0.88], [0.26, -0.92], [-0.04, -0.15]]),
+  },
+  sandia: {
+    name: "sandía",
+    // Cuña de sandía: triángulo con la punta arriba y la corteza curva abajo (las pepitas rompían
+    // la silueta en la rejilla y se quitaron)
+    test: (x, y) => inPoly(x, y, [[0, 0.82], [-0.8, -0.5], [0.8, -0.5]]) || (inEllipse(x, y, 0, -0.5, 0.8, 0.32) && y <= -0.5),
+  },
+});
 // Siluetas de boceto (mysteryMasks.js): sustituyen a las geométricas del mismo nombre y suman 15.
 for (const [k, name] of Object.entries({"perro": "perro", "gato": "gato", "colibri": "colibrí", "caballo": "caballo", "jirafa": "jirafa", "pino": "pino", "tulipan": "tulipán", "montana": "sol y montaña", "nube": "nube", "mariposa": "mariposa", "buho": "búho", "pez": "pez", "oso": "oso", "saturno": "Saturno", "cohete": "cohete", "ovni": "ovni", "avion": "avión", "torre_eiffel": "torre Eiffel", "ubicacion": "ubicación", "gota": "gota"})) MYSTERY_SHAPES[k] = { name, test: maskTest(k) };
 export const MYSTERY_KEYS = Object.keys(MYSTERY_SHAPES);
