@@ -143,19 +143,6 @@ Object.assign(MYSTERY_SHAPES, {
     test: (x, y) => inEllipse(x, y, 0, -0.35, 0.56, 0.52) || inEllipse(x, y, 0, 0.18, 0.34, 0.42)
       || (x >= -0.06 && x <= 0.06 && y >= 0.5 && y <= 0.9) || inEllipse(x, y, 0.24, 0.78, 0.2, 0.09, 0.5),
   },
-  cerezas: {
-    name: "cerezas",
-    test: (x, y) => {
-      const stem = (ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy), t = ((x - ax) * dx + (y - ay) * dy) / (L * L); return t >= 0 && t <= 1 && Math.abs((x - ax) * dy - (y - ay) * dx) / L <= 0.07; };
-      return inEllipse(x, y, -0.38, -0.45, 0.32, 0.32) || inEllipse(x, y, 0.38, -0.45, 0.32, 0.32)
-        || stem(-0.38, -0.2, 0.05, 0.75) || stem(0.38, -0.2, 0.05, 0.75) || inEllipse(x, y, 0.32, 0.76, 0.28, 0.12, -0.3);
-    },
-  },
-  limon: {
-    name: "limón",
-    test: (x, y) => inEllipse(x, y, 0, -0.05, 0.78, 0.55) || inPoly(x, y, [[0.7, 0.12], [0.98, -0.05], [0.7, -0.22]])
-      || inPoly(x, y, [[-0.7, 0.12], [-0.98, -0.05], [-0.7, -0.22]]) || inEllipse(x, y, 0.15, 0.62, 0.26, 0.11, 0.4),
-  },
   donut: { name: "dónut", test: (x, y) => inEllipse(x, y, 0, 0, 0.82, 0.82) && !inEllipse(x, y, 0, 0, 0.3, 0.3) },
   taza: {
     name: "taza",

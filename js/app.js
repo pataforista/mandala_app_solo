@@ -1989,7 +1989,7 @@ function bindUI() {
     const mural = muralFromUI();
     return {
       growth: Math.max(0, Math.min(3, parseInt(bookGrowthEl?.value, 10) || 0)),
-      mystery: Math.max(0, Math.min(43, parseInt(bookMysteryEl?.value, 10) || 0)), // 43 figuras distintas
+      mystery: Math.max(0, Math.min(41, parseInt(bookMysteryEl?.value, 10) || 0)), // 41 figuras distintas
       nature: !!bookNatureEl?.checked,
       mural,
     };

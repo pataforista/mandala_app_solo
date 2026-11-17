@@ -647,7 +647,7 @@ export const GROWTH_STAGES = 4;
 // tests/book.test.mjs comprueba que las dos listas coinciden.
 export const MYSTERY_ORDER = ["corazon", "estrella", "gato", "mariposa", "luna", "pez", "casa", "arbol", "flor", "hoja", "gota", "campana", "ancla", "barco", "pajaro", "trebol", "manzana", "seta", "nube", "sol",
   "perro", "colibri", "caballo", "jirafa", "pino", "tulipan", "montana", "buho", "oso", "saturno", "cohete", "ovni", "avion", "torre_eiffel", "ubicacion",
-  "pera", "cerezas", "limon", "donut", "taza", "magdalena", "lazo", "sandia"];
+  "pera", "donut", "taza", "magdalena", "lazo", "sandia"];
 const NATURE_ORDER = ["girasol", "estrella", "copo", "diatomea"];
 
 /** Cuántas páginas añaden las opciones especiales (sin contar los reversos). */
