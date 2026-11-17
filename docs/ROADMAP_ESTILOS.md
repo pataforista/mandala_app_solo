@@ -604,3 +604,28 @@ nivel experto. La mínima de niños en azteca era 37 y ahora es 70.
 El tamaño del póster recortable ya se controla desde «Libro KDP»: 2×1, 2×2, 3×2, 3×3, 4×4 o «Otro
 tamaño…» con columnas y filas de 1 a 6 (de 2 a 36 hojas, más la guía). Verificado en la app real:
 4×2 crea 104 páginas (3×3 crea 106), la guía rotula A1–D2 y el tamaño sobrevive a recargar.
+
+### 10.11 Nivel experto: motivos orgánicos, puntos de contraste y puntuación propia
+
+Origen: cuatro mandalas de referencia de libro intrincado (sólo para medir; no se copian ni se
+guardan). Su estructura de celdas, medida con `scripts/analiza-estructura.py`, se compara con la
+de nuestras páginas de experto.
+
+| Punto | Qué | Efecto medido |
+|---|---|---|
+| 1 · Motivos orgánicos | gota con rizo, pluma, abanico y rizo, sólo en experto, con peso propio en cada estilo | celdas por mandala 730–1.370 → 1.080–1.370; superficie vacía en celdas grandes 18–31 % → 2,6–23 % |
+| 2 · Puntos de contraste | anillo de puntos negros (radio 0,75 mm) en bandas de ≥ 7 mm, separación ≥ 2 mm | se leen como acentos sin formar manchas; sólo experto |
+| 3 · Puntuación propia | `expertScore()`: celdas dentro del disco, astillas aparte, vacío y contraste | ver `bench-styles.mjs`, tabla 4 |
+
+Adulto y niños no cambian: la prueba dorada sólo mueve páginas de experto.
+
+**Qué no se puede afirmar todavía**
+
+- La puntuación experta es una construcción propia, ajustada con criterio y con las cuatro
+  referencias como única muestra. No está validada con personas; el juicio decisivo sigue siendo
+  el de quien colorea.
+- Las astillas (huecos de menos de 0,6 mm entre dos trazos casi pegados) son lo que más se
+  separa: islámico tiene ~1.000 por mandala y sashiko ~0. No se sabe si las referencias las tienen,
+  porque a la resolución de sus imágenes no se ven. Por eso se informan aparte y no restan.
+- El nivel experto sigue sin llegar a «Listo para KDP» en la puntuación comercial, que no
+  corresponde a este nivel.
