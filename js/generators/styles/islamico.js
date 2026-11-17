@@ -129,7 +129,12 @@ function rosetaPoligonos(ctx, rCore) {
   if (!pts) return false;
   const s = pts / 2, Rp = rCore * 0.92;
   // Área de una punta: triángulo entre los dos polígonos (aprox.). Si no se puede colorear, núcleo común.
-  const tip = Rp * Rp * Math.sin(Math.PI / s) * (1 - Math.cos(Math.PI / s) / Math.cos(Math.PI / pts) ** 2 * Math.cos(Math.PI / pts)) * 0.5;
+  // Área exacta de una punta (triángulo vértice–muesca–muesca, con las muescas a
+  // Rp·cos(π/s)/cos(π/2s)): Rp²·cos(π/s)·tan(π/2s)·(1 − cos(π/s)). Comprobada con Wolfram|Alpha
+  // para la estrella de ocho (0,0858 Rp²). La fórmula anterior sobrestimaba un 27 % la estrella
+  // de seis (dejaba pasar puntas demasiado pequeñas) y subestimaba entre un 3 y un 19 % las de
+  // ocho a catorce (descartaba núcleos que sí cabían).
+  const tip = Rp * Rp * Math.cos(Math.PI / s) * Math.tan(Math.PI / pts) * (1 - Math.cos(Math.PI / s));
   if (tip < minCell * 1.2) return false;
   const rim = mainPB(); circle(rim, cx, cy, rCore); emit(rim, mainW, "#fff");
   const a0 = -Math.PI / 2;
