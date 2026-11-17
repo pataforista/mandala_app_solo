@@ -55,13 +55,13 @@ const exclusive = {
 
 // Núcleo: polígono regular subdividido. Un polígono, otro girado dentro y radios a los vértices.
 function poligono(ctx, rCore) {
-  const { N, P, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCell } = ctx;
+  const { N, P, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCoreCell } = ctx;
   const sym = N % 2 === 0 ? N / 2 : N;
   const n = [sym, N].find(k => k >= 5 && k <= 12) ?? (sym === 4 || sym === 3 ? N : 0);
   if (!n) return false;
   const step = (2 * Math.PI) / n, a0 = -Math.PI / 2, Ro = rCore * 0.94, Ri = Ro * Math.cos(step / 2) * 0.62;
   // Celda entre los dos polígonos (un trapecio por lado)
-  if (((Ro + Ri) / 2) * step * (Ro - Ri) * 0.5 < minCell * 1.2) return false;
+  if (((Ro + Ri) / 2) * step * (Ro - Ri) * 0.5 < minCoreCell) return false;
   const rim = mainPB(); circle(rim, cx, cy, rCore); emit(rim, mainW, "#fff");
   const outer = mainPB();
   for (let i = 0; i < n; i++) (i ? outer.lineTo : outer.moveTo).call(outer, ...P(Ro, a0 + i * step));

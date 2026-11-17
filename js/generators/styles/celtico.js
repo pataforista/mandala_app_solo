@@ -64,12 +64,12 @@ const exclusive = {
 
 // Núcleo: trenza anular alrededor de un botón central.
 function trenzaAnular(ctx, rCore) {
-  const { N, P, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCell } = ctx;
+  const { N, P, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCoreCell } = ctx;
   const sym = N % 2 === 0 ? N / 2 : N;
   const rm = rCore * 0.62, h = rCore * 0.68, w = Math.max(2.5, Math.min(3.5, h * 0.22)), amp = h / 2 - w / 2 - 0.9;
   const periods = sym >= 3 && (2 * Math.PI * rm) / sym >= 8 ? sym : 0; // sólo la simetría del mandala
   // El ojo de la trenza debe poder colorearse; si no cabe, núcleo común
-  if (!periods || (amp - w / 2) * 2 < 2.2 || (amp - w / 2) * ((Math.PI * rm) / periods - w) < minCell * 0.8) return false;
+  if (!periods || (amp - w / 2) * 2 < 2.2 || (amp - w / 2) * ((Math.PI * rm) / periods - w) < minCoreCell) return false;
   const rim = mainPB(); circle(rim, cx, cy, rCore); emit(rim, mainW, "#fff");
   const m = mainPB(); braid(m, P, { rm, amp, w, periods, off: -Math.PI / 2 }); emit(m, mainW);
   const c = mainPB(); circle(c, cx, cy, Math.max(rm - h / 2 - 0.4, 1.5)); emit(c, mainW, "#fff");

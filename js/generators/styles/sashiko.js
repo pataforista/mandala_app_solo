@@ -109,11 +109,11 @@ const exclusive = {
 
 // Núcleo: crisantemo. Dos coronas de pétalos largos y redondeados alrededor de un botón.
 function crisantemo(ctx, rCore) {
-  const { N, TAU, cx, cy, circle, petalShape, mainPB, emit, mainW, minCell, outlineMode } = ctx;
+  const { N, TAU, cx, cy, circle, petalShape, mainPB, emit, mainW, minCoreCell, outlineMode } = ctx;
   const sym = N % 2 === 0 ? N / 2 : N;
   // Un pétalo largo y estrecho no se puede colorear: se pide que su ancho medio sea al menos
   // un tercio de su largo. Con contornos gruesos (niveles infantiles) se prefiere la mitad de pétalos.
-  const fits = (k) => k >= 5 && (TAU / k) * rCore * 0.6 >= rCore * 0.65 * 0.34 && (TAU / k) * rCore * 0.6 * rCore * 0.5 * 0.45 >= minCell * 1.2;
+  const fits = (k) => k >= 5 && (TAU / k) * rCore * 0.6 >= rCore * 0.65 * 0.34 && (TAU / k) * rCore * 0.6 * rCore * 0.5 * 0.45 >= minCoreCell;
   const n = (outlineMode ? [sym, N] : [N, sym]).find(fits);
   if (!n) return false;
   const step = TAU / n, w = (step / 2) * 0.92;

@@ -122,7 +122,7 @@ const exclusive = {
 // Núcleo: estrella de 2s puntas formada por dos polígonos regulares girados (dos cuadrados dan
 // la estrella de ocho), con otra estrella menor dentro.
 function rosetaPoligonos(ctx, rCore) {
-  const { N, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCell } = ctx;
+  const { N, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCoreCell } = ctx;
   // Las puntas respetan la simetría del mandala: un múltiplo de N (o de N/2 si N es par)
   const sym = N % 2 === 0 ? N / 2 : N;
   const pts = [6, 8, 10, 12, 14].find(n => n % sym === 0);
@@ -135,7 +135,7 @@ function rosetaPoligonos(ctx, rCore) {
   // de seis (dejaba pasar puntas demasiado pequeñas) y subestimaba entre un 3 y un 19 % las de
   // ocho a catorce (descartaba núcleos que sí cabían).
   const tip = Rp * Rp * Math.cos(Math.PI / s) * Math.tan(Math.PI / pts) * (1 - Math.cos(Math.PI / s));
-  if (tip < minCell * 1.2) return false;
+  if (tip < minCoreCell) return false;
   const rim = mainPB(); circle(rim, cx, cy, rCore); emit(rim, mainW, "#fff");
   const a0 = -Math.PI / 2;
   // Los dos polígonos van en un mismo trazo: por separado cada uno sólo tendría la mitad de la
@@ -147,7 +147,7 @@ function rosetaPoligonos(ctx, rCore) {
     star(d, cx, cy, inner * 0.74, inner * 0.74 * 0.56, pts, a0 + Math.PI / pts);
     emit(d, detailW);
   }
-  const c = mainPB(); circle(c, cx, cy, Math.max(inner * 0.2, 1.2)); emit(c, mainW, "#fff");
+  const c = mainPB(); circle(c, cx, cy, Math.max(inner * 0.2, 1.45)); emit(c, mainW, "#fff");
 }
 
 export const islamico = {

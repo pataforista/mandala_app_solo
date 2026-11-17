@@ -45,11 +45,11 @@ const exclusive = {
 // Núcleo: dos triángulos entrelazados (uno hacia arriba, otro hacia abajo) con un punto en el
 // centro. Sólo cuando su simetría de orden 6 es la del mandala (6 o 12 pétalos); si no, un loto.
 function triangulos(ctx, rCore) {
-  const { N, P, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCell } = ctx;
+  const { N, P, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCoreCell } = ctx;
   if (N !== 6 && N !== 12) return lotoBindu(ctx, rCore);
   const Rt = rCore * 0.9;
   // Área de una punta de la estrella de seis (triángulo equilátero de lado Rt/√3)
-  if ((Math.sqrt(3) / 4) * (Rt / Math.sqrt(3)) ** 2 < minCell * 1.2) return false;
+  if ((Math.sqrt(3) / 4) * (Rt / Math.sqrt(3)) ** 2 < minCoreCell) return false;
   const rim = mainPB(); circle(rim, cx, cy, rCore); emit(rim, mainW, "#fff");
   const tri = mainPB();
   for (const a0 of [-Math.PI / 2, Math.PI / 2]) {
@@ -59,14 +59,14 @@ function triangulos(ctx, rCore) {
   emit(tri, mainW, "#fff"); // los dos en un mismo trazo: juntos tienen simetría de orden 6
   const rin = Rt / 2; // radio inscrito del hexágono central
   if (detail && rin > 5) { const d = detailPB(); circle(d, cx, cy, rin * 0.72); emit(d, detailW); }
-  const c = mainPB(); circle(c, cx, cy, Math.max(rin * 0.26, 1.2)); emit(c, mainW, "#fff");
+  const c = mainPB(); circle(c, cx, cy, Math.max(rin * 0.26, 1.45)); emit(c, mainW, "#fff");
 }
 
 // Núcleo de respaldo: loto pequeño de pétalos anchos alrededor del punto central.
 function lotoBindu(ctx, rCore) {
-  const { N, TAU, cx, cy, circle, petalShape, mainPB, emit, mainW, minCell } = ctx;
+  const { N, TAU, cx, cy, circle, petalShape, mainPB, emit, mainW, minCoreCell } = ctx;
   const sym = N % 2 === 0 ? N / 2 : N;
-  const n = [sym, N].find(k => k >= 4 && (TAU / k) * rCore * 0.6 * rCore * 0.55 * 0.5 >= minCell * 1.3);
+  const n = [sym, N].find(k => k >= 4 && (TAU / k) * rCore * 0.6 * rCore * 0.55 * 0.5 >= minCoreCell);
   if (!n) return false;
   const step = TAU / n;
   const rim = mainPB(); circle(rim, cx, cy, rCore); emit(rim, mainW, "#fff");
@@ -74,7 +74,7 @@ function lotoBindu(ctx, rCore) {
   for (let i = 0; i < n; i++) petalShape(m, rCore * 0.3, rCore * 0.94, -Math.PI / 2 + i * step, (step / 2) * 0.96, 1.2);
   emit(m, mainW, "#fff");
   const c = mainPB(); circle(c, cx, cy, rCore * 0.32); emit(c, mainW, "#fff");
-  const dot = mainPB(); circle(dot, cx, cy, Math.max(rCore * 0.1, 1.2)); emit(dot, mainW);
+  const dot = mainPB(); circle(dot, cx, cy, Math.max(rCore * 0.1, 1.45)); emit(dot, mainW);
 }
 
 export const yantra = {

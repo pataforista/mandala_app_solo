@@ -562,3 +562,45 @@ confirmaron con Wolfram|Alpha (el evaluador de código de Wolfram no respondió)
 | Recinto del yantra | primera versión: las puertas se leen como huecos con pestañas |
 | Núcleo «flor de la vida» vacío, miniaturas de estilo, fondos afines | fuera del alcance de esta tanda |
 | Nivel experto | 70 de 80 páginas flojas; depende de la puntuación por público (fase 1 de la revisión) |
+
+### 10.9 Revisión final (17 nov 2026, tarde)
+
+Fuente: `docs/lineas-base/estilos-final.txt` (sustituye a la versión de esa mañana). Cambios desde
+§ 10.6:
+
+- **Núcleo «disco solar» del azteca:** sus dientes medían 5,96 mm², justo por debajo de los 6 mm²
+  que la métrica cuenta como celda pequeña; con tres bandas (niveles infantiles) 12 dientes
+  diminutos hundían la página a 0–11 puntos. Todos los núcleos propios comparan ahora contra un
+  único umbral del motor, `minCoreCell` (≥ 6,5 mm²), y los botones centrales tienen radio ≥ 1,45 mm.
+- **Rayos del azteca:** los rayos pequeños se apilaban detrás de los grandes y asomaban como cuñas
+  finas. Ahora los dientes alternan altura compartiendo la base: cada uno es un triángulo limpio.
+- **Floral:** se veta la llama (no es un motivo floral y era el de peor nota, 71 frente a 80+).
+
+| Estilo | Niños | Trazo grueso | Adulto | Acierto del clasificador |
+|---|---|---|---|---|
+| floral | 87,1 (73) | 84,9 (73) | 82,4 (71) | 68 % |
+| geométrico | 90,5 (79) | 85,2 (75) | 82,8 (70) | 65 % |
+| islámico | 93,9 (74) | 85,3 (71) | 82,7 (66) | 40 % |
+| sashiko | 86,5 (73) | 83,2 (70) | 81,8 (68) | 73 % |
+| celta | 92,9 (80) | 87,3 (74) | 84,8 (71) | 73 % |
+| azteca | 89,6 (70) | 84,4 (67) | 81,9 (64) | 65 % |
+| yantra | 91,0 (85) | 86,5 (79) | 84,4 (74) | 70 % |
+
+| Indicador | Línea base | Final | Meta | ¿Cumple? |
+|---|---|---|---|---|
+| Acierto global del clasificador | 24–29 % | 64,6 % | ≥ 80 % | no |
+| Parecido de huella entre estilos (adulto) | 0,96 | 0,85 | ≤ 0,85 | sí |
+| **Mínima por estilo, adulto** | 37 | **64 (azteca)** | ≥ 60 | **sí** |
+| Media por estilo, adulto | 73–80 | 81,8–84,8 | no bajar | sí |
+| Libro «más vendidos» tras curar | 82,8–83,2 | 85,0–86,2; 0 flojas; 0 gemelas | 0 flojas, 0 gemelas | sí |
+| Libro real en la app (`npm run e2e`) | sin probar | 106 páginas, «Listo para KDP», sin errores, es y en | pasa | sí |
+| Pruebas | 110 | 124 de 124 | todas | sí |
+
+Queda sin cumplir el clasificador (islámico, 40 %: comparte rectas con azteca y geométrico) y el
+nivel experto. La mínima de niños en azteca era 37 y ahora es 70.
+
+### 10.10 Mural para armar
+
+El tamaño del póster recortable ya se controla desde «Libro KDP»: 2×1, 2×2, 3×2, 3×3, 4×4 o «Otro
+tamaño…» con columnas y filas de 1 a 6 (de 2 a 36 hojas, más la guía). Verificado en la app real:
+4×2 crea 104 páginas (3×3 crea 106), la guía rotula A1–D2 y el tamaño sobrevive a recargar.

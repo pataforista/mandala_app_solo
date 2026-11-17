@@ -6,7 +6,7 @@
 import { DEFAULT_SILHOUETTES, DEFAULT_CORES } from "./common.js";
 
 // Vetos: motivos que este estilo nunca dibuja. Ningún peso de `motifs` puede estar aquí.
-const banned = ["triangle", "diamond", "chevron"];
+const banned = ["triangle", "diamond", "chevron", "flame"];
 
 const exclusive = {
   // Corola: pétalos anchos con una muesca en la punta. Como silueta, son el borde del mandala.
@@ -39,11 +39,11 @@ const exclusive = {
 
 // Núcleo: estambres. Un botón central y una corona de anteras unidas a él por filamentos.
 function estambres(ctx, rCore) {
-  const { N, TAU, P, cx, cy, circle, mainPB, emit, mainW, minCell } = ctx;
+  const { N, TAU, P, cx, cy, circle, mainPB, emit, mainW, minCoreCell } = ctx;
   const sym = N % 2 === 0 ? N / 2 : N;
   const rA = rCore * 0.68; // radio de la corona de anteras
   const size = (k) => Math.min(rCore * 0.2, rA * Math.sin(Math.PI / k) * 0.8);
-  const n = [N, sym].find(k => k >= 5 && Math.PI * size(k) ** 2 >= minCell * 1.2);
+  const n = [N, sym].find(k => k >= 5 && Math.PI * size(k) ** 2 >= minCoreCell);
   if (!n) return false;
   const rho = size(n), r0 = rCore * 0.3;
   const rim = mainPB(); circle(rim, cx, cy, rCore); emit(rim, mainW, "#fff");
@@ -61,7 +61,7 @@ export const floral = {
   id: "floral",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 2.5, round: 2.5, lotus: 3, leaf: 3, scallop: 1.5, heart: 1.5, ogee: 1, flame: 0.6, corola: 4 },
+  motifs: { petal: 2.5, round: 2.5, lotus: 3, leaf: 3, scallop: 1.5, heart: 1.5, ogee: 1, corola: 4 },
   banned,
   exclusive,
   quota: 1,

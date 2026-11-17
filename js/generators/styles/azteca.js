@@ -69,32 +69,38 @@ const exclusive = {
       emit(ring, mainWFor(b), "#fff"); emit(m, mainWFor(b)); emit(d, detailWFor(b));
     },
   },
-  // Rayos: triángulos que alternan grande y pequeño, como una corona solar. Sólo silueta.
-  // Los grandes se tocan por la base y los pequeños asoman por detrás, entre dos grandes: así
-  // no quedan cuñas afiladas donde un rayo nace pegado al otro.
+  // Rayos: dientes triangulares que alternan grande y pequeño, como una corona solar. Sólo
+  // silueta. Todos comparten la base con sus vecinos y ninguno tapa a otro: cada diente es un
+  // triángulo limpio. La versión anterior apilaba un rayo pequeño detrás de dos grandes y
+  // asomaba entre ellos como una cuña fina; con trazo grueso esas cuñas son celdas de menos de
+  // 6 mm² (azteca para niños llegó a puntuar 0 con 3 bandas).
   rayos: {
     aspect: 1.3, minH: 9, silhouette: true, band: false,
     draw(ctx, b) {
-      const { TAU, mainPB, detailPB, emit, mainWFor, detailWFor, detail } = ctx;
-      const step = TAU / b.n;
-      const back = mainPB(), m = mainPB(), d = detailPB();
+      const { TAU, mainPB, detailPB, emit, mainWFor, detailWFor, detail, minCell } = ctx;
+      const step = TAU / b.n, h = b.r1 - b.r0;
+      const m = mainPB(), d = detailPB();
+      // El triángulo interior de un rayo grande sólo si cabe una celda coloreable
+      const inner = detail && 0.5 * (0.26 * step * b.r0) * (0.5 * h) >= minCell * 1.5;
       for (let i = 0; i < b.n; i++) {
         const a0 = b.off + (i - 0.5) * step;
-        cellPoly(ctx, back, b, a0 + step / 2, [[0.14, 0], [0.5, 0.68], [0.86, 0]], true); // rayo pequeño, detrás
-        cellPoly(ctx, m, b, a0, [[0, 0], [0.5, 1], [1, 0]], true);                          // rayo grande
-        if (detail) cellPoly(ctx, d, b, a0, [[0.26, 0.1], [0.5, 0.6], [0.74, 0.1]]);
+        cellPoly(ctx, m, b, a0, [[0, 0], [0.25, 1], [0.5, 0]], true);    // rayo grande
+        cellPoly(ctx, m, b, a0, [[0.5, 0], [0.75, 0.55], [1, 0]], true); // rayo pequeño
+        if (inner) cellPoly(ctx, d, b, a0, [[0.12, 0.1], [0.25, 0.62], [0.38, 0.1]]);
       }
-      emit(back, mainWFor(b), "#fff"); emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b));
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b));
     },
   },
 };
 
 // Núcleo: disco solar. Botón central, corona de dientes y anillo de cuentas cuadradas.
 function discoSolar(ctx, rCore) {
-  const { N, TAU, P, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCell } = ctx;
+  const { N, TAU, P, cx, cy, circle, mainPB, detailPB, emit, mainW, detailW, detail, minCoreCell } = ctx;
   const sym = N % 2 === 0 ? N / 2 : N;
   // Dientes: los que quepan con celda coloreable, respetando la simetría del mandala
-  const n = [N, sym].find(k => k >= 4 && (TAU * rCore * 0.5 / k) * (rCore * 0.32) * 0.5 >= minCell * 1.1);
+  // Área exacta de un diente: triángulo con base en r0 = 0,42·rCore (a ±π/k) y punta en r1 = 0,74·rCore
+  const tooth = (k) => 0.42 * rCore * Math.sin(Math.PI / k) * (0.74 - 0.42 * Math.cos(Math.PI / k)) * rCore;
+  const n = [N, sym].find(k => k >= 4 && tooth(k) >= minCoreCell);
   if (!n) return false;
   const rim = mainPB(); circle(rim, cx, cy, rCore); emit(rim, mainW, "#fff");
   const step = TAU / n, r0 = rCore * 0.42, r1 = rCore * 0.74;
@@ -104,7 +110,7 @@ function discoSolar(ctx, rCore) {
     m.moveTo(...P(r0, a - step / 2)).lineTo(...P(r1, a)).lineTo(...P(r0, a + step / 2)).close();
     // Cuenta cuadrada entre dos dientes, junto al borde
     const q = Math.min((rCore - r1) * 0.5, rCore * 0.82 * step * 0.3);
-    if (detail && q * q * 2 >= minCell) {
+    if (detail && q * q * 2 >= minCoreCell) {
       const [x, y] = P(rCore * 0.84, a + step / 2), c = Math.cos(a + step / 2), s = Math.sin(a + step / 2);
       d.moveTo(x + c * q, y + s * q).lineTo(x - s * q, y + c * q).lineTo(x - c * q, y - s * q).lineTo(x + s * q, y - c * q).close();
     }

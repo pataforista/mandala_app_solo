@@ -232,7 +232,12 @@ export function generateMandalaClassic(doc, opts) {
   // Pétalo puntiagudo simétrico: base en r0 (±w), punta en r1
   const fitW = (step, frac) => (step / 2) * frac;
   // Contexto que reciben los motivos y núcleos exclusivos de una gramática (styles/*.js)
-  const ctx = { cx, cy, R, N, B, TAU, P, M, L, C, circle, petalShape, mainPB, detailPB, emit, mainW, detailW, vestW,
+  // Área mínima de una celda de núcleo. La métrica de calidad cuenta como pequeña toda celda de menos
+  // de 6 mm² sea cual sea el nivel, y una circunferencia aplanada en curvas mide ~2 % menos que la
+  // teórica: comprobar «cabe una celda» contra el mínimo del nivel (5 mm² en adulto) daba por buenas
+  // celdas de 5,9 mm². Los núcleos propios de cada estilo usan este valor.
+  const minCoreCell = Math.max(minCell * 1.25, 6.5);
+  const ctx = { cx, cy, R, N, B, TAU, P, M, L, C, circle, petalShape, mainPB, detailPB, emit, mainW, detailW, vestW, minCoreCell,
     mainWFor, detailWFor, vestWFor, detail, richDetail, textures, outlineMode, minCell, rng };
 
   // Punto decorativo entre pétalos
