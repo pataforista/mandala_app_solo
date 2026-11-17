@@ -12,7 +12,7 @@ import { PathBuilder, coloringCullArea, coloringMinCell } from "../core/pathBuil
 import { wantsComposition, composePage } from "./pageComposer.js";
 import { drawMedallionWeb } from "./figureFill.js";
 import { fitBandCount } from "../core/bandMetrics.js";
-import { polarKit } from "./styles/common.js";
+import { polarKit, echoPaths } from "./styles/common.js";
 import { grammarOf } from "./styles/index.js";
 
 const TAU = Math.PI * 2;
@@ -86,9 +86,19 @@ export function generateMandalaClassic(doc, opts) {
 
   const { P, circle, C, M, L, petalShape, heartShape, ogeeShape } = polarKit(cx, cy);
   const out = [];
+  // Ecos (contornos interiores de las celdas grandes): sólo en el nivel experto (simplificación
+  // de detalle ≤ 0,3) y mientras se dibuja el motivo de una banda. Con simplificación ≤ 0,45
+  // (nivel intermedio) sólo un eco en las celdas muy grandes.
+  const echoScales = detailSimplification <= 0.3 ? [0.68, 0.38] : detailSimplification <= 0.45 ? [0.62] : null;
+  let echoing = false;
   const emit = (pb, w, fill = "none") => {
     const p = pb.toPath({ stroke, strokeWidthMm: w, fill });
-    if (p) out.push(p);
+    if (!p) return;
+    out.push(p);
+    if (echoing && echoScales && fill === "#fff") {
+      const d = echoPaths(pb.d, { scales: echoScales, minGap: 1.7, minArea: detailSimplification <= 0.3 ? 22 : 60, minCell: Math.max(minCell * 1.3, 6.5), centre: [cx, cy], keepOut: R * 0.12 });
+      if (d) out.push(`<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${Math.max(MIN_LINE_MM, Math.round(strokeWidthMm * 0.55 * 100) / 100)}" stroke-linecap="round" stroke-linejoin="round" />`);
+    }
   };
   const mainPB = () => new PathBuilder();
   const detailPB = () => new PathBuilder({ minClosedArea: minCell });
@@ -642,7 +652,9 @@ export function generateMandalaClassic(doc, opts) {
     const b = bands[k];
     const extraRing = includeFrames && detail && k > 0 && b.motif !== "beads" && bands[k - 1].motif !== "beads" && (b.r1 - b.r0) > 9 && rng() < 0.35;
     if (k >= kDraw) continue;
+    echoing = true;
     if (MOTIFS[b.motif]) MOTIFS[b.motif](b); else EX[b.motif].draw(ctx, b);
+    echoing = false;
     const disc = mainPB(); circle(disc, cx, cy, b.r0); emit(disc, mainW, "#fff");
     // Silueta decorada: doble contorno en la banda exterior
     if (k === B - 1 && includeFrames && detail) {

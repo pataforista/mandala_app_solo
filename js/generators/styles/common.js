@@ -3,6 +3,8 @@
 // Todo dibuja sobre un PathBuilder en coordenadas polares (radio mm, ángulo rad) alrededor de (cx, cy).
 // Extraído sin cambios de mandalaClassic.js: la prueba dorada (scripts/golden-styles.mjs) exige
 // que ninguna página cambie.
+import { flattenSubpaths } from "../../core/commercialMetrics.js";
+
 export const TAU = Math.PI * 2;
 
 // La silueta es lo que se reconoce al hojear: más peso en lotus, la forma más reconocible.
@@ -161,4 +163,61 @@ export function cellPoly(ctx, pb, b, a0, pts, open = false) {
     for (let k = 1; k <= n; k++) pb.lineTo(...at(pu + ((u - pu) * k) / n, v));
   });
   if (!open) pb.close();
+}
+
+// ---------- Ecos: contornos interiores de las celdas grandes ----------
+// Los mandalas de libro intrincado no dejan una celda grande vacía: cada pétalo o escama lleva
+// dentro uno o dos contornos concéntricos, como una ondulación. Medido sobre cuatro referencias
+// (disco normalizado a 600 px): las celdas mayores del 0,4 % del disco ocupan entre 0 y 19 % de
+// la superficie; las de mis páginas de nivel experto, entre 18 y 31 %.
+function hullArea(pts) {
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (list) => { const h = []; for (const q of list) { while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], q) <= 0) h.pop(); h.push(q); } return h; };
+  const lo = half(p), up = half(p.slice().reverse());
+  const hull = lo.slice(0, -1).concat(up.slice(0, -1));
+  let a = 0; for (let i = 0; i < hull.length; i++) { const [x, y] = hull[i], [u, v] = hull[(i + 1) % hull.length]; a += x * v - u * y; }
+  return Math.abs(a) / 2;
+}
+
+/**
+ * Contornos interiores («ecos») de las formas cerradas de un trazo SVG (atributo d, con el
+ * formato de PathBuilder). Cada forma cerrada y casi convexa se copia escalada hacia su centro
+ * si el hueco entre un contorno y el siguiente se puede colorear (`minGap` mm) y la copia más
+ * pequeña conserva `minCell` mm² de área. Se omiten las formas cuyo centro cae junto al centro
+ * del mandala (anillos que lo rodean). Devuelve el atributo d de los ecos, o "" si no hay.
+ *   scales: factores de escala de fuera adentro, p. ej. [0.66, 0.36]
+ */
+export function echoPaths(d, { scales, minGap = 1.6, minArea = 20, minCell = 6.5, centre = null, keepOut = 0 }) {
+  const out = [];
+  for (const sub of d.split(/(?=M )/)) {
+    if (!/ Z\s*$/.test(sub.trim())) continue;                    // sólo formas cerradas
+    const flat = flattenSubpaths(sub)[0];
+    if (!flat || flat.pts.length < 4) continue;
+    const pts = flat.pts, n = pts.length;
+    let A = 0, P = 0, gx = 0, gy = 0;
+    for (let i = 0; i < n; i++) {
+      const [x, y] = pts[i], [u, v] = pts[(i + 1) % n], k = x * v - u * y;
+      A += k; gx += (x + u) * k; gy += (y + v) * k; P += Math.hypot(u - x, v - y);
+    }
+    A = Math.abs(A) / 2;
+    if (A < minArea || A / hullArea(pts) < 0.9) continue;       // pequeña o cóncava: el eco se saldría
+    const sg = Math.sign((pts.reduce((s2, [x, y], i) => s2 + (x * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * y), 0)) || 1);
+    const cx = gx / (6 * A * sg), cy = gy / (6 * A * sg);
+    if (centre && Math.hypot(cx - centre[0], cy - centre[1]) < keepOut) continue;
+    const r = (2 * A) / P;                                       // radio inscrito aproximado
+    let prev = 1;
+    for (const k of scales) {
+      if ((prev - k) * r < minGap || k * k * A < minCell) break;
+      const tok = sub.trim().split(/\s+/), res = [];
+      for (let i = 0; i < tok.length; i++) {
+        if (/^[MLCQZ]$/.test(tok[i])) { res.push(tok[i]); continue; }
+        const x = parseFloat(tok[i]), y = parseFloat(tok[++i]);
+        res.push((cx + (x - cx) * k).toFixed(2), (cy + (y - cy) * k).toFixed(2));
+      }
+      out.push(res.join(" "));
+      prev = k;
+    }
+  }
+  return out.join(" ");
 }
