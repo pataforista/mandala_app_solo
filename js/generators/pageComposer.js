@@ -17,7 +17,10 @@ const TAU = Math.PI * 2;
 
 export const COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio", "trama"];
 // "figura" (imagen del usuario rellena de mandalas) sólo existe si opts.figure trae datos
-export const FRAME_STYLES = ["redondeado", "doble", "feston", "ninguno"];
+// Marcos: redondeado, doble con rombos, festón hacia fuera, sin marco y cuatro nuevos:
+//   cordón (dos líneas con rombos entre ambas), ondas (línea sinusoidal), gotas (festón hacia
+//   dentro) y esquinas (sólo ornamentos en las cuatro esquinas, la hoja queda abierta).
+export const FRAME_STYLES = ["redondeado", "doble", "feston", "ninguno", "cordon", "ondas", "gotas", "esquinas"];
 
 // Motivos de relleno que mejor acompañan cada estilo del mandala
 // Nuevos: butterfly, feather, shell, bird, crown — más variedad visual
@@ -152,6 +155,61 @@ export function composePage(doc, opts, drawMandala) {
     }
     emit(frameItems, d, detailW, stroke);
     inset = 3;
+  } else if (style === "cordon") {
+    // Dos líneas de trazo fino separadas 3 mm, con un rombo cada 3 mm entre ambas (como un cordón)
+    const pb = new PathBuilder(); rect(pb, m, m, page.wMm - m, page.hMm - m, 2); emit(frameItems, pb, mainW);
+    const x0 = m + 3, y0 = m + 3, x1 = page.wMm - m - 3, y1 = page.hMm - m - 3;
+    const p2 = new PathBuilder(); rect(p2, x0, y0, x1, y1, 1); emit(frameItems, p2, detailW);
+    const d = new PathBuilder(), rhomb = (x, y) => { d.moveTo(x, y - 0.55).lineTo(x + 0.55, y).lineTo(x, y + 0.55).lineTo(x - 0.55, y).close(); };
+    const mid = m + 1.5;
+    for (let x = m + 4.5; x <= page.wMm - m - 4.5; x += 3) { rhomb(x, mid); rhomb(x, page.hMm - mid); }
+    for (let y = m + 4.5; y <= page.hMm - m - 4.5; y += 3) { rhomb(mid, y); rhomb(page.wMm - mid, y); }
+    emit(frameItems, d, detailW, stroke);
+    inset = 3;
+  } else if (style === "ondas") {
+    // Línea sinusoidal a lo largo de los cuatro lados, amplitud 1,4 mm, periodo 6 mm
+    const amp = 1.4, per = 6, base = m + amp;
+    const x0 = base, y0 = base, x1 = page.wMm - base, y1 = page.hMm - base;
+    const pb = new PathBuilder(); pb.moveTo(x0, y0);
+    const wave = (ax, ay, bx, by, nx, ny) => {
+      const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len * 4));
+      for (let i = 1; i <= n; i++) {
+        const t = i / n, ph = Math.sin((2 * Math.PI * (len * t)) / per) * amp;
+        pb.lineTo(ax + (bx - ax) * t + nx * ph, ay + (by - ay) * t + ny * ph);
+      }
+    };
+    wave(x0, y0, x1, y0, 0, -1); wave(x1, y0, x1, y1, 1, 0); wave(x1, y1, x0, y1, 0, 1); wave(x0, y1, x0, y0, -1, 0);
+    pb.close(); emit(frameItems, pb, mainW);
+    inset = amp + 1;
+  } else if (style === "gotas") {
+    // Festón hacia dentro: arcos que bajan desde el rectángulo exterior, sin salir del margen
+    const bump = 3.2, x0 = m, y0 = m, x1 = page.wMm - m, y1 = page.hMm - m;
+    const pb = new PathBuilder(); pb.moveTo(x0, y0);
+    const side = (ax, ay, bx, by, nx, ny) => {
+      const len = Math.hypot(bx - ax, by - ay), n = Math.max(3, Math.round(len / (bump * 2)));
+      for (let i = 0; i < n; i++) {
+        const t0 = i / n, t1 = (i + 1) / n, tm = (t0 + t1) / 2;
+        const px = ax + (bx - ax) * tm + nx * bump, py = ay + (by - ay) * tm + ny * bump;
+        pb.quadTo(px, py, ax + (bx - ax) * t1, ay + (by - ay) * t1);
+      }
+    };
+    // Normales hacia dentro de la hoja (el festón usa las de fuera)
+    side(x0, y0, x1, y0, 0, 1); side(x1, y0, x1, y1, -1, 0); side(x1, y1, x0, y1, 0, -1); side(x0, y1, x0, y0, 1, 0);
+    pb.close(); emit(frameItems, pb, mainW);
+    inset = bump + 1;
+  } else if (style === "esquinas") {
+    // Sólo ornamentos en las cuatro esquinas: una L con una voluta y un punto. La hoja queda abierta.
+    const L = 13, cs = [[m + 1, m + 1, 1, 1], [page.wMm - m - 1, m + 1, -1, 1], [page.wMm - m - 1, page.hMm - m - 1, -1, -1], [m + 1, page.hMm - m - 1, 1, -1]];
+    const pb = new PathBuilder(), dots = new PathBuilder();
+    for (const [x, y, sx, sy] of cs) {
+      pb.moveTo(x, y + sy * L).lineTo(x, y).lineTo(x + sx * L, y);
+      // Voluta: un cuarto de vuelta hacia dentro desde el extremo de cada brazo
+      pb.moveTo(x + sx * L, y).quadTo(x + sx * (L - 3), y + sy * 1.2, x + sx * (L - 3), y + sy * 3.6);
+      pb.moveTo(x, y + sy * L).quadTo(x + sx * 1.2, y + sy * (L - 3), x + sx * 3.6, y + sy * (L - 3));
+      dots.moveTo(x + sx * 4.5, y + sy * 4.5).lineTo(x + sx * 5.1, y + sy * 4.5 + 0.6).lineTo(x + sx * 5.7, y + sy * 4.5).lineTo(x + sx * 5.1, y + sy * 4.5 - 0.6).close();
+    }
+    emit(frameItems, pb, mainW); emit(frameItems, dots, detailW, stroke);
+    inset = 2;
   } else if (style === "feston") {
     // Festones hacia afuera sobre un rectángulo interior; nunca salen del margen
     const bump = 4.5, x0 = m + bump, y0 = m + bump, x1 = page.wMm - m - bump, y1 = page.hMm - m - bump;

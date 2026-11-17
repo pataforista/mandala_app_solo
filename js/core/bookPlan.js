@@ -8,7 +8,7 @@ import { mulberry32 } from "./prng.js";
 
 export const BOOK_STYLES = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
 export const BOOK_COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio", "trama"];
-export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno"];
+export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno", "cordon", "ondas", "gotas", "esquinas"];
 export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 
 // Silueta: la banda exterior del mandala, lo primero que se reconoce al hojear. Antes la

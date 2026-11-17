@@ -897,6 +897,8 @@ function drawCore(cx, cy, rCore, N, rng, opts) {
     // Flor de la vida: N círculos entrelazados (respeta la simetría del mandala)
     const nPetals = N >= 6 ? (N % 2 === 0 ? N / 2 : N) : N;
     const rPet = rCore * (nPetals <= 6 ? 0.42 : 0.38);
+    // El aro del núcleo va primero: pintado después, su relleno blanco tapaba la flor entera
+    const rim = mainPB(); circle(rim, cx, cy, rCore * 0.92); emit(rim, mainW, "#fff");
     const m = mainPB(), d = detailPB(), v = detailPB();
     for (let i = 0; i < nPetals; i++) {
       const a = (i * TAU) / nPetals;
@@ -906,7 +908,6 @@ function drawCore(cx, cy, rCore, N, rng, opts) {
       if (richDetail && rPet > 5) circle(v, px, py, rPet * 0.3);
     }
     emit(m, mainW, "#fff"); emit(d, detailW); emit(v, vestW);
-    const rim = mainPB(); circle(rim, cx, cy, rCore * 0.92); emit(rim, mainW, "#fff");
     const coreDiskR = Math.max(rPet * 0.52, 1.2);
     const c = mainPB(); circle(c, cx, cy, coreDiskR); emit(c, mainW, "#fff");
     if (detail && coreDiskR > 2) { const c2 = detailPB(); circle(c2, cx, cy, coreDiskR * 0.5); emit(c2, detailW); }

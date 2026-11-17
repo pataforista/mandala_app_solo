@@ -6,6 +6,7 @@ import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
 import { generateMandalaRadial } from "./generators/mandalaRadial.js";
 import { generateMandalaClassic } from "./generators/mandalaClassic.js";
+import { BOOK_STYLES as THUMB_STYLES } from "./core/bookPlan.js";
 import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
@@ -25,7 +26,7 @@ import { STYLE_GRAMMAR_VERSION } from "./generators/styles/index.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
 import { pageFingerprint, similarPairs } from "./core/variety.js";
-import { COLORING_PRESETS } from "./core/levels.js";
+import { COLORING_PRESETS, levelToGeneratorOpts } from "./core/levels.js";
 
 // Helper de notificaciones no intrusivas usando Shoelace Toast
 export function showToast(message, variant = "primary", icon = "info-circle", duration = 3000) {
@@ -1909,6 +1910,46 @@ function bindUI() {
   const bookPaperEl = document.getElementById("bookPaper");
   const bookFigureThinEl = document.getElementById("bookFigureThin");
   const checkedValues = (sel) => [...document.querySelectorAll(sel)].filter(b => b.checked).map(b => b.value);
+  // Miniaturas de cada estilo: una página pequeña del motor clásico, generada al abrir la pestaña.
+  // Cada miniatura marca (o desmarca) su casilla; no se guarda nada, se calcula en el navegador.
+  const STYLE_LABELS = { sashiko: "Sashiko", floral: "Floral", geometric: "Geométrico", islamico: "Islámico", azteca: "Azteca", yantra: "Yantra", celtico: "Céltico" };
+  const renderStyleThumbs = () => {
+    const box = document.getElementById("styleThumbs");
+    if (!box || box.dataset.ready) return;
+    box.dataset.ready = "1";
+    for (const st of THUMB_STYLES) {
+      const doc = createDoc({ preset: "KDP_8_5x11", seed: 4242, marginMm: 12 });
+      try { generateMandalaClassic(doc, { ...levelToGeneratorOpts("adulto"), organicLevel: 0.2, textures: false, pageBorder: true, seed: 4242, petals: 16, styleMode: st }); } catch (e) { continue; }
+      // El SVG del motor trae su viewBox en mm; sólo hay que quitarle el tamaño fijo para que escale
+      const svg = renderDocToSvgString(doc).replace(/(<svg\b[^>]*?)\swidth="[^"]*"/, "$1").replace(/(<svg\b[^>]*?)\sheight="[^"]*"/, "$1");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "style-thumb";
+      btn.setAttribute("aria-pressed", "true");
+      btn.dataset.style = st;
+      btn.title = STYLE_LABELS[st] || st;
+      btn.innerHTML = `<span class="style-thumb-art">${svg.replace("<svg ", '<svg style="width:100%;height:auto;display:block" ')}</span><span class="style-thumb-name">${STYLE_LABELS[st] || st}</span>`;
+      btn.addEventListener("click", () => {
+        const cb = document.querySelector(`.bookStyle[value="${st}"]`);
+        if (!cb) return;
+        cb.checked = !cb.checked;
+        btn.setAttribute("aria-pressed", String(cb.checked));
+        btn.classList.toggle("off", !cb.checked);
+        cb.dispatchEvent(new CustomEvent("sl-change", { bubbles: true }));
+      });
+      box.appendChild(btn);
+    }
+  };
+  const syncStyleThumbs = () => document.querySelectorAll(".style-thumb").forEach(btn => {
+    const cb = document.querySelector(`.bookStyle[value="${btn.dataset.style}"]`);
+    if (!cb) return;
+    btn.setAttribute("aria-pressed", String(cb.checked));
+    btn.classList.toggle("off", !cb.checked);
+  });
+  renderStyleThumbs();
+  syncStyleThumbs();
+  document.querySelectorAll(".bookStyle").forEach(cb => cb.addEventListener("sl-change", syncStyleThumbs));
+
   const setChecked = (sel, values) => {
     if (!Array.isArray(values)) return;
     document.querySelectorAll(sel).forEach(b => { b.checked = values.includes(b.value); });
