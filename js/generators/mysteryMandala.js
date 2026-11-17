@@ -11,6 +11,7 @@ import { mulberry32 } from "../core/prng.js";
 import { pageTexts } from "../core/pageTexts.js";
 import { PathBuilder } from "../core/pathBuilder.js";
 import { svgText, wrapLines } from "../core/svgText.js";
+import { maskTest } from "./mysteryMasks.js";
 
 const TAU = Math.PI * 2;
 
@@ -135,6 +136,8 @@ export const MYSTERY_SHAPES = {
     },
   },
 };
+// Siluetas de boceto (mysteryMasks.js): sustituyen a las geométricas del mismo nombre y suman 15.
+for (const [k, name] of Object.entries({"perro": "perro", "gato": "gato", "colibri": "colibrí", "caballo": "caballo", "jirafa": "jirafa", "pino": "pino", "tulipan": "tulipán", "montana": "sol y montaña", "nube": "nube", "mariposa": "mariposa", "buho": "búho", "pez": "pez", "oso": "oso", "saturno": "Saturno", "cohete": "cohete", "ovni": "ovni", "avion": "avión", "torre_eiffel": "torre Eiffel", "ubicacion": "ubicación", "gota": "gota"})) MYSTERY_SHAPES[k] = { name, test: maskTest(k) };
 export const MYSTERY_KEYS = Object.keys(MYSTERY_SHAPES);
 /** Máximo de mandalas misteriosos por libro: uno por figura distinta. */
 export const MYSTERY_MAX = MYSTERY_KEYS.length;

@@ -972,14 +972,14 @@ test("mural: cada tamaño da cols×filas hojas más la guía, rotuladas sin repe
   }
 });
 
-test("mandala misterioso: 20 figuras, la lista del libro coincide con la del dibujo y todas tienen nombre en es y en", async () => {
+test("mandala misterioso: 35 figuras, la lista del libro coincide con la del dibujo y todas tienen nombre en es y en", async () => {
   const { MYSTERY_ORDER } = await import("../js/core/bookPlan.js");
   const { PAGE_TEXTS } = await import("../js/core/pageTexts.js");
-  assert.equal(MYSTERY_KEYS.length, 20);
+  assert.equal(MYSTERY_KEYS.length, 35);
   assert.deepEqual([...MYSTERY_ORDER].sort(), [...MYSTERY_KEYS].sort());
   for (const k of MYSTERY_KEYS) for (const lang of ["es", "en"]) assert.ok(PAGE_TEXTS[lang].shapes[k], `${lang}: falta el nombre de «${k}»`);
-  // Un libro con 20 misteriosos usa las 20 figuras, sin repetir
-  const plan = addSpecialPages(planBook({ count: 30, seed: 9 }), { seed: 9, mystery: 20 });
+  // Un libro con 35 misteriosos usa las 35 figuras, sin repetir
+  const plan = addSpecialPages(planBook({ count: 40, seed: 9 }), { seed: 9, mystery: 35 });
   const used = plan.filter(p => p.special?.type === "mystery").map(p => p.special.shape);
-  assert.equal(new Set(used).size, 20);
+  assert.equal(new Set(used).size, 35);
 });
