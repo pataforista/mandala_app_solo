@@ -86,7 +86,7 @@ export const yantra = {
   motifs: { petal: 1, lotus: 2, triangle: 1.2, ogee: 0.8, padma: 5, anillos: 3 },
   banned,
   exclusive,
-  quota: 1,
+  quota: 2,
   silhouettes: ["padma", "padma", "lotus"],
   cores: ["triangulos", "triangulos", ...DEFAULT_CORES.filter(c => c === "estrella_compuesta")],
   coreDraw: { triangulos },

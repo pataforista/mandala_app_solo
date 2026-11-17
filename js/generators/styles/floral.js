@@ -64,7 +64,7 @@ export const floral = {
   motifs: { petal: 2.5, round: 2.5, lotus: 3, leaf: 3, scallop: 1.5, heart: 1.5, ogee: 1, corola: 4 },
   banned,
   exclusive,
-  quota: 1,
+  quota: 2,
   // La silueta exterior también respeta los vetos.
   silhouettes: ["corola", "corola", ...DEFAULT_SILHOUETTES.filter(s => !banned.includes(s))],
   cores: ["estambres", ...DEFAULT_CORES.filter(c => c === "flor_radiante")],

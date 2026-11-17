@@ -184,13 +184,17 @@ export function generateMandalaClassic(doc, opts) {
     prev = b.motif;
     setCount(b);
   }
-  // Cuota de firma: toda página del estilo lleva al menos una banda con motivo exclusivo.
-  // Si el sorteo no dejó ninguna, la banda intermedia más alta que lo admita cambia de motivo.
-  if (grammar.quota && !bands.some(b => EX[b.motif])) {
+  // Cuota de firma: toda página del estilo lleva al menos `quota` bandas con motivo exclusivo
+  // (como mucho la mitad de las bandas, y la silueta cuenta). Mientras falte, la banda intermedia
+  // más alta que lo admita cambia de motivo. Con quota 1 se comporta como antes.
+  const signed = () => bands.filter(b => EX[b.motif]).length;
+  const wantSigned = grammar.quota ? Math.min(grammar.quota, Math.max(1, Math.floor(B / 2))) : 0;
+  for (let guard = 0; guard < 4 && signed() < wantSigned; guard++) {
     const fits = (b) => Object.keys(EX).filter(m => EX[m].band !== false && W[m] > 0 && !(outlineMode && EX[m].outline === false) && (b.r1 - b.r0) >= (EX[m].minH ?? 0) && (b.r1 - b.r0) <= (EX[m].maxH ?? Infinity)
       && m !== bands[b.k - 1]?.motif && m !== bands[b.k + 1]?.motif);
-    const target = bands.filter(b => b.k < B - 1 && b.motif !== "beads" && fits(b).length).sort((p, q) => (q.r1 - q.r0) - (p.r1 - p.r0))[0];
-    if (target) {
+    const target = bands.filter(b => b.k < B - 1 && !EX[b.motif] && b.motif !== "beads" && fits(b).length).sort((p, q) => (q.r1 - q.r0) - (p.r1 - p.r0))[0];
+    if (!target) break;
+    {
       const opts2 = fits(target);
       let t = rng() * opts2.reduce((s, m) => s + W[m], 0), pick = opts2[0];
       for (const m of opts2) { t -= W[m]; if (t <= 0) { pick = m; break; } }

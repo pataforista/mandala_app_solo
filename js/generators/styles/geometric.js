@@ -86,7 +86,7 @@ export const geometric = {
   motifs: { triangle: 2, diamond: 2, chevron: 1.5, teselado: 4, facetas: 4 },
   banned,
   exclusive,
-  quota: 1,
+  quota: 2,
   silhouettes: ["facetas", "facetas", "triangle", "diamond"],
   cores: ["poligono", "poligono", ...DEFAULT_CORES.filter(c => c === "estrella_compuesta")],
   coreDraw: { poligono },

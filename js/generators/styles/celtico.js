@@ -17,12 +17,22 @@ const exclusive = {
       const { TAU, P, circle, cx, cy, mainPB, detailPB, emit, mainWFor, detailWFor, detail } = ctx;
       const h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
       const w = ribbonW(h), amp = h / 2 - w / 2 - 1.2;
+      // El «ojo» entre dos cruces de la trenza debe poder colorearse: si no, se usa la mitad de
+      // periodos (sigue siendo múltiplo de la simetría de N). Largo ≈ medio periodo menos la cinta;
+      // ancho ≈ el hueco entre los dos cabos.
+      const sym = ctx.N % 2 === 0 ? ctx.N / 2 : ctx.N;
+      let n = b.n;
+      const eyeArea = (k) => 0.5 * ((TAU * rm) / k / 2 - w) * (2 * amp - w);
+      while (eyeArea(n) < ctx.minCoreCell && n % 2 === 0 && (n / 2) % sym === 0) n /= 2;
       const ring = mainPB(); circle(ring, cx, cy, b.r1); emit(ring, mainWFor(b), "#fff");
-      const m = mainPB(); braid(m, P, { rm, amp, w, periods: b.n, off: b.off }); emit(m, mainWFor(b));
+      const m = mainPB(); braid(m, P, { rm, amp, w, periods: n, off: b.off }); emit(m, mainWFor(b));
       const eye = amp - w / 2 - 1; // medio alto del ojo entre los dos cabos
-      if (detail && eye > 1.6) {
+      // Punto en cada ojo, sólo si su área supera el umbral de celda (un círculo de 1,4 mm de
+      // radio mide 6,2 mm², y aplanado en curvas 5,9: la métrica lo cuenta como celda pequeña)
+      const rDot = Math.min(eye * 0.6, 2.6);
+      if (detail && Math.PI * rDot * rDot >= ctx.minCoreCell) {
         const d = detailPB();
-        for (let i = 0; i < 2 * b.n; i++) circle(d, ...P(rm, b.off + (i * TAU) / (2 * b.n)), Math.min(eye * 0.55, 2.6));
+        for (let i = 0; i < 2 * n; i++) circle(d, ...P(rm, b.off + (i * TAU) / (2 * n)), rDot);
         emit(d, detailWFor(b));
       }
     },
@@ -83,7 +93,7 @@ export const celtico = {
   motifs: { petal: 1, round: 2, lotus: 1.5, leaf: 1.5, scallop: 2, heart: 1.5, ogee: 1.5, trenza: 5, eslabones: 3 },
   banned,
   exclusive,
-  quota: 1,
+  quota: 2,
   silhouettes: ["eslabones", ...DEFAULT_SILHOUETTES.filter(s => !banned.includes(s))],
   // Sin «flor_vida»: en el motor se dibuja como un disco vacío (su aro la tapa) y destapada deja
   // astillas; pendiente de rediseño (docs/ROADMAP_ESTILOS.md, riesgos).

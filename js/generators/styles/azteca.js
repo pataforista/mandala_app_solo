@@ -127,7 +127,7 @@ export const azteca = {
   motifs: { petal: 0.8, lotus: 0.5, triangle: 2, diamond: 1.5, chevron: 0.2, greca: 4, dentado: 3, casillas: 3 },
   banned,
   exclusive,
-  quota: 1,
+  quota: 2,
   silhouettes: ["rayos", "rayos", "greca", "lotus"],
   cores: ["disco_solar", "disco_solar", ...DEFAULT_CORES.filter(c => c === "estrella_compuesta")],
   coreDraw: { disco_solar: discoSolar },

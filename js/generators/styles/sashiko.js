@@ -135,7 +135,7 @@ export const sashiko = {
   motifs: { petal: 0.8, round: 1.5, lotus: 0.8, leaf: 0.6, scallop: 2, diamond: 0.8, ogee: 0.6, seigaiha: 4, asanoha: 3.5, shippo: 3, kikko: 3 },
   banned,
   exclusive,
-  quota: 1,
+  quota: 2,
   silhouettes: ["seigaiha", "seigaiha", "scallop", "lotus"],
   cores: ["crisantemo", "crisantemo", ...DEFAULT_CORES.filter(c => c === "flor_radiante")],
   coreDraw: { crisantemo },

@@ -103,14 +103,21 @@ const exclusive = {
       const { TAU, P, circle, cx, cy, mainPB, detailPB, emit, mainWFor, detailWFor, detail } = ctx;
       const h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
       const w = Math.max(2.5, Math.min(4.5, h * 0.2)), amp = h / 2 - w / 2 - 1.2;
+      // El «ojo» entre dos cruces de la lacería debe poder colorearse: si no, se usa la mitad de
+      // periodos (sigue siendo múltiplo de la simetría de N). Largo ≈ medio periodo menos la cinta;
+      // ancho ≈ el hueco entre los dos cabos.
+      const sym = ctx.N % 2 === 0 ? ctx.N / 2 : ctx.N;
+      let n = b.n;
+      const eyeArea = (k) => 0.5 * ((TAU * rm) / k / 2 - w) * (2 * amp - w);
+      while (eyeArea(n) < ctx.minCoreCell && n % 2 === 0 && (n / 2) % sym === 0) n /= 2;
       const ring = mainPB(); circle(ring, cx, cy, b.r1); emit(ring, mainWFor(b), "#fff");
-      const m = mainPB(); braid(m, P, { rm, amp, w, periods: b.n, off: b.off, shape: "tri" }); emit(m, mainWFor(b));
+      const m = mainPB(); braid(m, P, { rm, amp, w, periods: n, off: b.off, shape: "tri" }); emit(m, mainWFor(b));
       // Un rombo en el hueco entre los dos cabos, si queda sitio para colorearlo
       const gap = amp - w / 2 - 1;
       if (detail && gap > 1.5) {
-        const d = detailPB(), half = (TAU / b.n) * 0.25 * (gap / (amp + 0.001));
-        for (let i = 0; i < 2 * b.n; i++) {
-          const a = b.off + (i * TAU) / (2 * b.n);
+        const d = detailPB(), half = (TAU / n) * 0.25 * (gap / (amp + 0.001));
+        for (let i = 0; i < 2 * n; i++) {
+          const a = b.off + (i * TAU) / (2 * n);
           d.moveTo(...P(rm - gap * 0.6, a)).lineTo(...P(rm, a + half)).lineTo(...P(rm + gap * 0.6, a)).lineTo(...P(rm, a - half)).close();
         }
         emit(d, detailWFor(b));
@@ -157,7 +164,7 @@ export const islamico = {
   motifs: { petal: 1, lotus: 1, scallop: 1, triangle: 1, diamond: 2, ogee: 2.5, chevron: 1, estrella: 4, arco: 3, laceria: 3 },
   banned,
   exclusive,
-  quota: 1,
+  quota: 2,
   silhouettes: ["arco", "arco", "ogee", "ogee", "lotus"],
   cores: ["roseta_poligonos", "roseta_poligonos", ...DEFAULT_CORES.filter(c => c === "estrella_compuesta")],
   coreDraw: { roseta_poligonos: rosetaPoligonos },
