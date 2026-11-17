@@ -61,7 +61,7 @@ export const floral = {
   id: "floral",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 2.5, round: 2.5, lotus: 3, leaf: 3, scallop: 1.5, heart: 1.5, ogee: 1, corola: 4 },
+  motifs: { petal: 2.5, round: 2.5, lotus: 3, leaf: 3, scallop: 1.5, heart: 1.5, ogee: 1, corola: 4, gota: 2, pluma: 1, abanico: 1, rizo: 1 },
   banned,
   exclusive,
   quota: 2,

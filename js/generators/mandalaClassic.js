@@ -22,6 +22,11 @@ const MIN_LINE_MM = 0.55; // por debajo, la imprenta lo reproduce gris o lo pier
 const ASPECT = { petal: 0.75, round: 0.85, lotus: 0.8, leaf: 0.6, scallop: 1.5, heart: 1.0, beads: 1.0, triangle: 0.9, diamond: 1.2, ogee: 0.8, chevron: 1.4, voluta: 0.7, antemia: 0.9, roseta: 1.0, flame: 0.65 };
 
 /** Motivos de banda que el motor sabe dibujar (los que una gramática puede nombrar). */
+// Motivos orgánicos compartidos (nivel experto): gota con rizo, pluma, abanico y voluta. Son las
+// formas que dominan las referencias de libro intrincado; se piden por peso en el nivel experto.
+const ORGANIC = { gota: 1.2, pluma: 1.0, abanico: 1.0, rizo: 0.8 };
+const ORGANIC_ASPECT = { gota: 0.9, pluma: 0.7, abanico: 1.1, rizo: 0.85 };
+Object.assign(ASPECT, ORGANIC_ASPECT);
 export const KNOWN_MOTIFS = Object.keys(ASPECT);
 const MOTIFS_OK = (m) => Object.prototype.hasOwnProperty.call(ASPECT, m);
 
@@ -149,10 +154,11 @@ export function generateMandalaClassic(doc, opts) {
   // Motivos exclusivos del estilo: { nombre: { aspect, minH, band, silhouette, draw(ctx, b) } }
   const EX = grammar.exclusive || {};
   const aspectOf = (m) => ASPECT[m] ?? EX[m]?.aspect ?? 1;
+  const expert = detailSimplification <= 0.3;
   const pickMotif = (exclude, h = Infinity) => {
     // Las cuentas (beads) se colocan aparte; voluta, roseta y antemia no se sortean porque su
     // simetría local no coincide con la radial: por eso ninguna gramática les da peso.
-    const keys = Object.keys(W).filter(m => m !== exclude
+    const keys = Object.keys(W).filter(m => m !== exclude && (expert || !ORGANIC[m])
       && !(EX[m] && (EX[m].band === false || h < (EX[m].minH ?? 0) || h > (EX[m].maxH ?? Infinity) || (outlineMode && EX[m].outline === false)))
       && !(outlineMode && (m === "chevron" || m === "flame")));
     let t = rng() * keys.reduce((s, m) => s + W[m], 0);
@@ -265,6 +271,56 @@ export function generateMandalaClassic(doc, opts) {
 
   // ---------- Motivos (dibujan la banda completa) ----------
   const MOTIFS = {
+    gota(b) {
+      // Gota con rizo: pétalo de punta redonda cuya base se enrolla en una espiral corta
+      const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.92);
+      const m = mainPB(), d = detailPB();
+      for (let i = 0; i < b.n; i++) {
+        const a = b.off + i * step;
+        petalShape(m, b.r0 + h * 0.1, b.r1, a, w, 1.25, true);
+        if (detail) { const rr = b.r0 + h * 0.35; circle(d, ...P(rr, a), Math.min(h * 0.12, w * 0.45)); }
+      }
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b));
+    },
+    pluma(b) {
+      // Pluma: pétalo estrecho y largo con nervio central y dos barbas laterales
+      const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.55);
+      const m = mainPB(), d = detailPB();
+      for (let i = 0; i < b.n; i++) {
+        const a = b.off + i * step;
+        petalShape(m, b.r0, b.r1, a, w, 1.15);
+        if (detail) for (const sgn of [-1, 1]) capsuleVein(d, b.r0 + h * 0.2, b.r1 - h * 0.2, a + sgn * w * 0.35, w * 0.08);
+      }
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b));
+    },
+    abanico(b) {
+      // Abanico: arcos concéntricos apilados por celda; cada celda es un sector de corona
+      const step = TAU / b.n, h = b.r1 - b.r0;
+      const m = mainPB(), d = detailPB();
+      for (let i = 0; i < b.n; i++) {
+        const a = b.off + i * step;
+        M(m, b.r0, a - step / 2);
+        C(m, b.r0 + h * 0.5, a - step * 0.45, b.r1, a - step * 0.4, b.r1, a);
+        C(m, b.r1, a + step * 0.4, b.r0 + h * 0.5, a + step * 0.45, b.r0, a + step / 2);
+        m.close();
+        if (detail) { M(d, b.r0 + h * 0.25, a); L(d, b.r0 + h * 0.25, a + step * 0.3); }
+      }
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b));
+    },
+    rizo(b) {
+      // Voluta: dos espirales opuestas (una a cada lado de la celda), cada una con su ojo
+      const step = TAU / b.n, h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2;
+      const m = mainPB(), d = detailPB();
+      for (let i = 0; i < b.n; i++) {
+        const a = b.off + i * step;
+        for (const sgn of [-1, 1]) {
+          const ac = a + sgn * step * 0.22;
+          circle(m, ...P(rm, ac), h * 0.24);
+          if (detail) circle(d, ...P(rm, ac), h * 0.09);
+        }
+      }
+      emit(m, mainWFor(b), "#fff"); emit(d, detailWFor(b));
+    },
     petal(b) {
       const step = TAU / b.n, h = b.r1 - b.r0, w = fitW(step, 0.96);
       const m = mainPB(), d = detailPB(), v = detailPB();

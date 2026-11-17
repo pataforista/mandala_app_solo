@@ -132,7 +132,7 @@ export const sashiko = {
   id: "sashiko",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 0.8, round: 1.5, lotus: 0.8, leaf: 0.6, scallop: 2, diamond: 0.8, ogee: 0.6, seigaiha: 4, asanoha: 3.5, shippo: 3, kikko: 3 },
+  motifs: { petal: 0.8, round: 1.5, lotus: 0.8, leaf: 0.6, scallop: 2, diamond: 0.8, ogee: 0.6, seigaiha: 4, asanoha: 3.5, shippo: 3, kikko: 3, abanico: 1.5, gota: 1, rizo: 0.8 },
   banned,
   exclusive,
   quota: 2,

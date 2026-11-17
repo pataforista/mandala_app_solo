@@ -83,7 +83,7 @@ export const geometric = {
   id: "geometric",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { triangle: 2, diamond: 2, chevron: 1.5, teselado: 4, facetas: 4 },
+  motifs: { triangle: 2, diamond: 2, chevron: 1.5, teselado: 4, facetas: 4, abanico: 2, rizo: 0.5 },
   banned,
   exclusive,
   quota: 2,

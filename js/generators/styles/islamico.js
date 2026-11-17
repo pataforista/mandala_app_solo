@@ -161,7 +161,7 @@ export const islamico = {
   id: "islamico",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 1, lotus: 1, scallop: 1, triangle: 1, diamond: 2, ogee: 2.5, chevron: 1, estrella: 4, arco: 3, laceria: 3 },
+  motifs: { petal: 1, lotus: 1, scallop: 1, triangle: 1, diamond: 2, ogee: 2.5, chevron: 1, estrella: 4, arco: 3, laceria: 3, rizo: 1.5, gota: 0.8 },
   banned,
   exclusive,
   quota: 2,

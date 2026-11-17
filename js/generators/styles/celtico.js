@@ -90,7 +90,7 @@ export const celtico = {
   id: "celtico",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 1, round: 2, lotus: 1.5, leaf: 1.5, scallop: 2, heart: 1.5, ogee: 1.5, trenza: 5, eslabones: 3 },
+  motifs: { petal: 1, round: 2, lotus: 1.5, leaf: 1.5, scallop: 2, heart: 1.5, ogee: 1.5, trenza: 5, eslabones: 3, rizo: 2, pluma: 1 },
   banned,
   exclusive,
   quota: 2,

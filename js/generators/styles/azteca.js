@@ -124,7 +124,7 @@ export const azteca = {
   id: "azteca",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 0.8, lotus: 0.5, triangle: 2, diamond: 1.5, chevron: 0.2, greca: 4, dentado: 3, casillas: 3 },
+  motifs: { petal: 0.8, lotus: 0.5, triangle: 2, diamond: 1.5, chevron: 0.2, greca: 4, dentado: 3, casillas: 3, pluma: 0.5, gota: 0.5 },
   banned,
   exclusive,
   quota: 2,
