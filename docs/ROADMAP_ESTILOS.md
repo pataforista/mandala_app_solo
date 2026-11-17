@@ -629,3 +629,18 @@ Adulto y niños no cambian: la prueba dorada sólo mueve páginas de experto.
   porque a la resolución de sus imágenes no se ven. Por eso se informan aparte y no restan.
 - El nivel experto sigue sin llegar a «Listo para KDP» en la puntuación comercial, que no
   corresponde a este nivel.
+
+### 10.12 Lo que quedaba del motor (17 nov 2026, última tanda)
+
+| Pendiente | Resultado |
+|---|---|
+| Núcleo «flor de la vida» dibujado como disco vacío | ya no lo usa ningún estilo; el defecto queda sin efecto. La variante sigue en el código sin usarse |
+| Celdas pequeñas en los núcleos | **era un error de medición**: el escáner usaba el radio de la banda 0, no el del núcleo. Lo que queda son celdas de 5–6 mm² en la banda más interior de adulto, dentro de la tolerancia (≤ 5 %) de la puntuación comercial |
+| Fondos de trama afines por estilo (E11) | hecho: cada estilo recibe al menos dos tramas de su familia; el selector nunca devuelve vacío (prueba en `styles.test.mjs`) |
+| Puertas del recinto del yantra (E9) | hecho: puertas en T, con jambas y umbral, dentro del margen KDP |
+
+Sin cambios en adulto y niños: la prueba dorada sólo movió las páginas de yantra (puertas) y de
+experto (motivos orgánicos y contraste).
+
+Queda fuera del motor: las miniaturas de estilo en la interfaz (es trabajo de pantalla) y la
+prueba a ciegas con personas (E12).
