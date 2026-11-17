@@ -12,6 +12,7 @@ import { mulberry32 } from "../core/prng.js";
 import { PathBuilder } from "../core/pathBuilder.js";
 import { drawFigure, drawRingGaps } from "./figureFill.js";
 import { enclosingCircle } from "../core/geometry.js";
+import { recintoPaths } from "./recinto.js";
 
 const TAU = Math.PI * 2;
 
@@ -21,7 +22,6 @@ export const COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gig
 //   cordón (dos líneas con rombos entre ambas), ondas (línea sinusoidal), gotas (festón hacia
 //   dentro) y esquinas (sólo ornamentos en las cuatro esquinas, la hoja queda abierta).
 export const FRAME_STYLES = ["redondeado", "doble", "feston", "ninguno", "cordon", "ondas", "gotas", "esquinas", "recinto"];
-import { recintoPaths } from "./recinto.js";
 
 // Motivos de relleno que mejor acompañan cada estilo del mandala
 // Nuevos: butterfly, feather, shell, bird, crown — más variedad visual

@@ -705,17 +705,20 @@ export function generateMandalaClassic(doc, opts) {
     const b = bands[k];
     const extraRing = includeFrames && detail && k > 0 && b.motif !== "beads" && bands[k - 1].motif !== "beads" && (b.r1 - b.r0) > 9 && rng() < 0.35;
     if (k >= kDraw) continue;
-    // Respiro: una banda de cada tres queda lisa (sin motivo) para descansar la vista. Sólo adulto y
-    // experto, nunca niños (contorno) ni la silueta ni el núcleo. Las bandas lisas siguen cerradas
-    // por los contornos que dibujan las bandas vecinas.
+    // Respiro: una banda de cada tres queda lisa (sin motivo) para descansar la vista. Sólo adulto
+    // (ver respiroOn), nunca la silueta ni el núcleo. Se salta sólo el motivo: el círculo que cierra
+    // la banda por dentro (disc, más abajo) se dibuja igual, porque es la línea que la separa de la
+    // banda interior; sin él la banda lisa se abría hacia los huecos entre pétalos.
     const respiro = respiroOn && k > 0 && k < B - 1 && k % 3 === 1 && b.motif !== "beads" && (b.r1 - b.r0) >= 8;
-    if (respiro) { b.respiro = true; continue; }
-    echoing = true;
-    if (MOTIFS[b.motif]) MOTIFS[b.motif](b); else EX[b.motif].draw(ctx, b);
-    echoing = false;
+    if (respiro) b.respiro = true;
+    else {
+      echoing = true;
+      if (MOTIFS[b.motif]) MOTIFS[b.motif](b); else EX[b.motif].draw(ctx, b);
+      echoing = false;
+    }
     // Punto de contraste: un anillo de puntos negros en el centro de la banda, como las referencias.
     // Sólo en experto, sólo en bandas de al menos 7 mm, y con el paso mínimo de 1,2 mm.
-    if (expert && k % 2 === 1 && b.r1 - b.r0 >= 7 && !grammar.noDots) {
+    if (expert && !respiro && k % 2 === 1 && b.r1 - b.r0 >= 7 && !grammar.noDots) {
       const rm = (b.r0 + b.r1) / 2, arc = 2 * Math.PI * rm, dr = 0.75;
       if (arc / b.n >= 2.0 && rm > R * 0.2) {
         const dots = mainPB();
