@@ -15,21 +15,34 @@ const exclusive = {
   seigaiha: {
     aspect: 1.0, minH: 10, silhouette: true,
     draw(ctx, b) {
-      const { TAU, P, circle, cx, cy, mainPB, emit, mainWFor, minCell, B } = ctx;
-      const step = TAU / b.n, h = b.r1 - b.r0, sil = b.k === B - 1;
-      const rho = Math.min(b.r0 * Math.sin(step / 2), h / 2.05);
-      // Arcos interiores sólo si la franja entre dos arcos se puede colorear
-      const rings = [1, 0.66, 0.33].filter((k, i) => !i || (rho / 3) * rho * k * 1.5 >= minCell);
-      const fan = (pb, r, a, rr = rho) => { const [x, y] = P(r, a); for (const k of rings) circle(pb, x, y, rr * k); };
-      // La fila de fuera está a más radio: sus abanicos crecen para tocarse, sin salirse de la banda
-      const rB = b.r0 + rho * 0.95, rhoB = Math.min(rB * Math.sin(step / 2) * 1.03, b.r1 - rB - (sil ? 0 : 0.4));
-      const back = mainPB(), front = mainPB();
-      for (let i = 0; i < b.n; i++) {
-        fan(back, rB, b.off + (i + 0.5) * step, rhoB);   // fila de fuera, a medio paso
-        fan(front, b.r0, b.off + i * step);              // fila de dentro: su mitad inferior la tapa la banda siguiente
+      const { TAU, N, P, circle, cx, cy, mainPB, emit, mainWFor, minCell, B } = ctx;
+      const h = b.r1 - b.r0, sil = b.k === B - 1, top = b.r1 - (sil ? 0 : 0.4);
+      // El radio de un abanico lo fija la separación entre vecinos (se tocan cuando
+      // radio = r·sen(π/n)); nunca la altura de la banda. Antes el radio se recortaba a la
+      // altura y en una de cada tres bandas los abanicos quedaban sueltos, con huecos de
+      // hasta 9 mm. Si con el conteo de la banda el abanico no cabe en alto, se dobla el
+      // conteo (sigue siendo múltiplo de N: la simetría no cambia).
+      let n = b.n;
+      while (b.r0 * Math.sin(Math.PI / n) > h * 0.98 && n < 8 * N) n *= 2;
+      const step = TAU / n;
+      // Filas de dentro afuera: cada una a medio paso de la anterior, con el radio que la hace
+      // tocarse a su propia distancia del centro. Se apilan mientras quepan en la banda.
+      const rows = [];
+      for (let r = b.r0, k = 0; k < 6; k++) {
+        const rho = r * Math.sin(step / 2) * (k ? 1.03 : 1);
+        if (k && r + rho > top) break;
+        rows.push({ r, rho, off: b.off + (k % 2 ? step / 2 : 0) });
+        r += rho * 0.95;
       }
       if (!sil) { const ring = mainPB(); circle(ring, cx, cy, b.r1); emit(ring, mainWFor(b), "#fff"); }
-      emit(back, mainWFor(b), "#fff"); emit(front, mainWFor(b), "#fff");
+      // De fuera adentro: cada fila tapa la mitad inferior de la que tiene detrás
+      for (const row of rows.reverse()) {
+        // Arcos interiores sólo si la franja entre dos arcos se puede colorear
+        const rings = [1, 0.66, 0.33].filter((q, i) => !i || (row.rho / 3) * row.rho * q * 1.5 >= minCell);
+        const pb = mainPB();
+        for (let i = 0; i < n; i++) { const [x, y] = P(row.r, row.off + i * step); for (const q of rings) circle(pb, x, y, row.rho * q); }
+        emit(pb, mainWFor(b), "#fff");
+      }
     },
   },
   // Hoja de cáñamo: triángulos alternos, cada uno partido en tres desde su centro.
@@ -59,7 +72,11 @@ const exclusive = {
     draw(ctx, b) {
       const { TAU, P, circle, cx, cy, mainPB, emit, mainWFor, detail, minCell } = ctx;
       const step = TAU / b.n, h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2, arc = 2 * rm * Math.sin(step / 2);
-      const rho = Math.min(h * 0.5 - 0.2, arc * 0.98);
+      // Cada círculo pasa cerca del centro de sus vecinos y, como mucho, roza al vecino alterno.
+      // En un anillo los centros alternos distan 2·arc·cos(π/n), no 2·arc (identidad comprobada
+      // con Wolfram|Alpha): con 12 círculos o menos, un radio de 0,98·arc invadía al alterno y
+      // dejaba astillas entre tres círculos.
+      const rho = Math.min(h * 0.5 - 0.2, arc * Math.cos(Math.PI / b.n) * 0.98);
       const m = mainPB(), d = mainPB();
       for (let i = 0; i < b.n; i++) {
         circle(m, ...P(rm, b.off + i * step), rho);

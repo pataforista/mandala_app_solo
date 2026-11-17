@@ -45,7 +45,10 @@ const exclusive = {
       if (arc < 2 * w + 4 && !sil) return exclusive.trenza.draw(ctx, { ...b, n });
       // Radio del eslabón: se cruza con el vecino (deja un ojo coloreable) sin tocar al siguiente,
       // y cabe en la banda
-      const rho = Math.min(h / 2 - w / 2 - (sil ? 0.2 : 1.2), arc - w / 2 - 1, Math.max(arc * 0.75, (arc + w) / 2 + 1.4));
+      // El tope «sin tocar al vecino alterno» usa la distancia real entre centros alternos en un
+      // anillo, 2·arc·cos(π/n) (comprobada con Wolfram|Alpha), no 2·arc: con 10 eslabones o
+      // menos, la cinta de un eslabón montaba sobre la del alterno.
+      const rho = Math.min(h / 2 - w / 2 - (sil ? 0.2 : 1.2), arc * Math.cos(Math.PI / n) - w / 2 - 0.6, Math.max(arc * 0.75, (arc + w) / 2 + 1.4));
       if (!sil) { const ring = mainPB(); circle(ring, cx, cy, b.r1); emit(ring, mainWFor(b), "#fff"); }
       const m = mainPB(); ringChain(m, P, { cx, cy, rc: rm, count: n, rho, w, off: b.off }); emit(m, mainWFor(b));
       // Radio libre en el centro del eslabón: lo que dejan su propia cinta y las de los vecinos

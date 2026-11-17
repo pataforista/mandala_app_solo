@@ -503,8 +503,62 @@ npm run e2e            # crea un libro real en Chromium, en español y en inglé
 node scripts/style-sheet.mjs celtico /tmp/laminas   # lámina de un estilo para mirarla
 ```
 
-### 10.6 Actualización (16 nov, tarde)
+### 10.6 Estado final (17 nov 2026)
 
-- Azteca: se quitó la llama y se bajó el chevrón. Mínima adulto 49 → 64 (meta ≥ 60, cumplida).
-- E9: recinto del yantra (primera versión).
-- E12: generador de la prueba a ciegas; la prueba en sí no se ha hecho.
+Fuente: `docs/lineas-base/estilos-final.txt` (`bench-styles.mjs 40`, `bench-identity.mjs 80 adulto`,
+`bench-book.mjs`). Sustituye a las cifras de § 10.2 donde difieran.
+
+**Corrección.** Una nota anterior de esta sección decía que la mínima de azteca en adulto había
+subido a 64 y cumplía la meta. Esa cifra salió de una configuración de prueba distinta de la del
+banco oficial. Con `bench-styles.mjs` la mínima de azteca es 55 y la más baja de los siete estilos
+es 52 (floral): **la meta de mínima ≥ 60 no se cumple.**
+
+| Estilo | Niños | Trazo grueso | Adulto | Acierto del clasificador |
+|---|---|---|---|---|
+| floral | 87,0 (73) | 83,9 (68) | 80,5 (52) | 60 % |
+| geométrico | 90,5 (79) | 85,2 (75) | 82,8 (70) | 65 % |
+| islámico | 93,9 (74) | 85,3 (71) | 82,7 (66) | 40 % |
+| sashiko | 86,5 (73) | 83,2 (70) | 81,8 (68) | 73 % |
+| celta | 92,9 (80) | 87,3 (74) | 84,8 (71) | 75 % |
+| azteca | 88,0 (37) | 84,3 (67) | 79,5 (55) | 63 % |
+| yantra | 91,0 (85) | 86,5 (79) | 84,4 (74) | 70 % |
+
+Media y, entre paréntesis, mínima de 40 semillas.
+
+| Indicador | Línea base | Final | Meta | ¿Cumple? |
+|---|---|---|---|---|
+| Acierto global del clasificador | 24–29 % | 63,6 % | ≥ 80 % | no |
+| Parecido de huella entre estilos, misma semilla (adulto) | 0,96 | 0,85 | ≤ 0,85 | sí |
+| Pares de estilos gemelos, misma semilla (adulto) | 94 % | 33 % | — | — |
+| Mínima por estilo, adulto | 37 | 52 (floral) | ≥ 60 | no |
+| Media por estilo, adulto | 73–80 | 79,5–84,8 | no bajar | sí |
+| Libro «más vendidos» antes de curar | 82,2 | 85,4 | ≥ 81 | sí |
+| Libro «más vendidos» tras curar | 82,8–83,2 | 84,7–86,0; 0 flojas; 0 gemelas | 0 flojas, 0 gemelas | sí |
+| Libro real en la app (`npm run e2e`) | sin probar | 106 páginas, «Listo para KDP», media 84–85, sin errores, es y en | pasa | sí |
+| Pruebas | 110 | 122 de 122 | todas | sí |
+
+### 10.7 Revisión geométrica de los motivos nuevos
+
+Se repasaron las fórmulas de los motivos con cálculo independiente; dos identidades se
+confirmaron con Wolfram|Alpha (el evaluador de código de Wolfram no respondió).
+
+| Motivo | Qué se comprobó | Resultado | Acción |
+|---|---|---|---|
+| Núcleo islámico (dos polígonos girados) | área de una punta | la fórmula sobrestimaba un 27 % la estrella de seis y subestimaba 3–19 % las de ocho a catorce. Wolfram: 0,0858 R² en la de ocho | corregida; cambian 2 de 343 páginas |
+| Shippo y eslabones | distancia al vecino alterno en un anillo | es 2·arc·cos(π/n), no 2·arc (Wolfram). Con 12 elementos o menos el tope permitía invadir al alterno | corregido; ninguna de las 343 páginas cambia: es una salvaguarda |
+| Seigaiha (olas) | si los abanicos se tocan | en 397 bandas medidas, la fila de dentro se tocaba en el 75 % y la de fuera en el 64 %; huecos de hasta 9 mm | rehecha: el radio lo fija la separación y se apilan las filas que quepan. Adulto 81,7 → 81,8 en el banco oficial |
+| Trenza y lacería | precisión del corte donde una cinta pasa bajo la otra | error máximo 0,08 mm, menos de un píxel a 300 ppp | ninguna |
+| Núcleo del yantra | área de la punta de la estrella de seis | correcta | ninguna |
+| Cadena de estrellas, estambres | condición de contacto entre vecinos | correctas | ninguna |
+
+### 10.8 Qué queda
+
+| Pendiente | Por qué no se cerró |
+|---|---|
+| Prueba a ciegas (E12) | necesita tres personas; el material sale de `node scripts/blind-test.mjs <carpeta>` |
+| Prueba impresa (E12) | necesita papel y lápices |
+| Mínima ≥ 60 | las páginas más bajas vienen de motivos comunes (rombos, pétalos) en bandas estrechas; es la tarea 2.3 de la revisión |
+| Clasificador ≥ 80 % | islámico cae a 40 %: comparte rectas con azteca y geométrico, y los siete rasgos no distinguen una estrella de una greca. Decide la prueba a ciegas |
+| Recinto del yantra | primera versión: las puertas se leen como huecos con pestañas |
+| Núcleo «flor de la vida» vacío, miniaturas de estilo, fondos afines | fuera del alcance de esta tanda |
+| Nivel experto | 70 de 80 páginas flojas; depende de la puntuación por público (fase 1 de la revisión) |
