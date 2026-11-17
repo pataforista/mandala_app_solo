@@ -356,3 +356,104 @@ export function inkBounds(svg) {
   }
   return Number.isFinite(b.x0) ? b : null;
 }
+
+/**
+ * Regiones blancas reales del disco del mandala, medidas sobre una rejilla (como
+ * scripts/analiza-estructura.py): cada trazo visible se pinta en la rejilla y se etiqueta
+ * lo que queda libre. Así las formas solapadas no se cuentan dos veces.
+ * Devuelve { areas: [mm² de cada región], discArea } sólo dentro del disco de dibujo.
+ */
+export function regionAreas(svg, page, { grid = 900, margin = 8 } = {}) {
+  const els = elementsOf(svg);
+  const visible = visibilityOf(els);
+  const w = page?.wMm ?? 210, h = page?.hMm ?? 297;
+  const cx = w / 2, cy = h / 2, rDisc = Math.min(w, h) / 2 - margin;
+  const k = grid / (2 * rDisc);                                  // px por mm
+  const ink = new Uint8Array(grid * grid);
+  const put = (x, y) => { const gx = Math.round((x - cx) * k + grid / 2), gy = Math.round((y - cy) * k + grid / 2); if (gx >= 0 && gy >= 0 && gx < grid && gy < grid) ink[gy * grid + gx] = 1; };
+  els.forEach((el, e) => {
+    if (el.solid) return;
+    const half = Math.max(0.15, el.width / 2) * k;
+    for (const sub of el.subs) {
+      const p2 = sub.pts;
+      for (let i = 0; i + 1 < p2.length; i++) {
+        const [x0, y0] = p2[i], [x1, y1] = p2[i + 1];
+        if (Math.hypot(x0 - cx, y0 - cy) > rDisc + 2 || Math.hypot(x1 - cx, y1 - cy) > rDisc + 2) continue;
+        if (!visible(e, (x0 + x1) / 2, (y0 + y1) / 2)) continue;
+        const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) * k * 2));
+        for (let t = 0; t <= n; t++) {
+          const x = x0 + ((x1 - x0) * t) / n, y = y0 + ((y1 - y0) * t) / n;
+          const gx = (x - cx) * k + grid / 2, gy = (y - cy) * k + grid / 2;
+          for (let dy = -half; dy <= half; dy += 1) for (let dx = -half; dx <= half; dx += 1) put(x + dx / k, y + dy / k);
+          void gx; void gy;
+        }
+      }
+    }
+  });
+  const lab = new Int32Array(grid * grid);
+  const areas = [], minSide = [];
+  const disc = (gx, gy) => (gx - grid / 2) ** 2 + (gy - grid / 2) ** 2 <= (grid / 2 - 1) ** 2;
+  for (let gy = 0; gy < grid; gy++) for (let gx = 0; gx < grid; gx++) {
+    const idx = gy * grid + gx;
+    if (ink[idx] || lab[idx] || !disc(gx, gy)) continue;
+    const stack = [idx]; lab[idx] = 1; let count = 0, touches = false;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    while (stack.length) {
+      const j = stack.pop(); count++;
+      const x = j % grid, y = (j - x) / grid;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      if (x === 0 || y === 0 || x === grid - 1 || y === grid - 1 || !disc(x, y)) touches = true;
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= grid || ny >= grid) continue;
+        const nj = ny * grid + nx;
+        if (!ink[nj] && !lab[nj] && disc(nx, ny)) { lab[nj] = 1; stack.push(nj); }
+      }
+    }
+    if (!touches) { areas.push(count / (k * k)); minSide.push(Math.min(x1 - x0 + 1, y1 - y0 + 1) / k); } // regiones que tocan el borde no son celdas
+  }
+  return { areas, minSide, discArea: Math.PI * rDisc * rDisc };
+}
+
+/**
+ * Puntuación del nivel experto (0–100), medida contra lo que muestran las referencias de libro
+ * intrincado, no contra la métrica comercial (que penaliza el trazo fino y las celdas chicas
+ * que este nivel promete). Mide dentro del disco, con regionAreas:
+ *  - celdas coloreables: pocas celdas por debajo de 2 mm² y ninguna por debajo de 1 mm².
+ *  - cantidad: las referencias tienen 1.300–4.500 celdas en el disco; por debajo de 1.000 el
+ *    dibujo es poco intrincado.
+ *  - vacío: la superficie del disco en celdas de más de 40 mm² no debe pasar de 20 % (las
+ *    referencias van de 0 a 19 %; mis páginas experto, de 18 a 31 %).
+ *  - contraste: puntos negros (formas rellenas pequeñas); las referencias los usan.
+ * Devuelve { score, partes }.
+ */
+export function expertScore(svg, page) {
+  const { areas: all, minSide, discArea } = regionAreas(svg, page);
+  const els = elementsOf(svg);
+  const dots = els.filter(e => e.solid && e.subs.some(s => s.closed)).length;
+  // Astilla: región estrecha (lado menor < 0,6 mm). Es el hueco que queda entre dos trazos casi
+  // pegados; no se puede colorear, pero tampoco es una celda: se informa aparte.
+  const isSliver = (i) => minSide[i] < 0.6;
+  const areas = all.filter((_, i) => !isSliver(i));
+  const astillas = all.length - areas.length;
+  const n = areas.length;
+  const pct = (f) => (n ? (100 * areas.filter(f).length) / n : 0);
+  const pequenas2 = pct(a => a < 2);
+  const diminutas1 = pct(a => a < 1);
+  const grandesVacias = (100 * areas.filter(a => a > 40).reduce((t, a) => t + a, 0)) / discArea;
+  const partes = {
+    "celdas en el disco": n,
+    "pequeñas <2 mm² %": +pequenas2.toFixed(1),
+    "inutilizables <1 mm² %": +diminutas1.toFixed(1),
+    "astillas (lado <0,6 mm)": astillas,
+    "vacío en celdas >40 mm² % del disco": +grandesVacias.toFixed(1),
+    "puntos de contraste": dots,
+  };
+  if (n === 0) return { score: 0, partes };   // sin celdas no hay dibujo que puntuar
+  let score = 100;
+  if (pequenas2 > 4) score -= Math.min(30, (pequenas2 - 4) * 2);
+  if (diminutas1 > 0.5) score -= Math.min(30, (diminutas1 - 0.5) * 6);
+  if (n < 1000) score -= Math.min(30, (1000 - n) / 40);
+  if (grandesVacias > 20) score -= Math.min(25, (grandesVacias - 20) * 1.5);
+  if (dots === 0) score -= 5;
+  return { score: Math.max(0, Math.round(score)), partes };
+}

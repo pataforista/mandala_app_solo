@@ -12,7 +12,7 @@ import { renderDocToSvgString } from "../js/core/svgRender.js";
 import { generateMandalaClassic } from "../js/generators/mandalaClassic.js";
 import { generateMandalaRadial } from "../js/generators/mandalaRadial.js";
 import { generateMandalaLayers } from "../js/generators/mandalaLayers.js";
-import { measureSvg, commercialScore } from "../js/core/commercialMetrics.js";
+import { measureSvg, commercialScore, expertScore } from "../js/core/commercialMetrics.js";
 import { levelToGeneratorOpts, COLORING_PRESETS } from "../js/core/levels.js";
 import { pageFingerprint, fingerprintSimilarity } from "../js/core/variety.js";
 import { planBook, bestSellerProfile, pageStrokeMm, chapterLayout, PRODUCT_PROFILES, BOOK_STYLES } from "../js/core/bookPlan.js";
@@ -91,4 +91,23 @@ if (HTML) {
     `<!doctype html><meta charset="utf-8"><title>${k}</title><body style="margin:0;background:#888;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:6px;font:14px sans-serif">` +
     v.map(p => `<div style="background:#fff"><div style="padding:2px 6px;background:#222;color:#fff">${p.label}</div>${p.svg.replace(/<\?xml[^>]*>/, "").replace("<svg ", '<svg style="width:100%;height:auto;display:block" ')}</div>`).join("") + "</body>");
   console.log(`Láminas en ${HTML}/`);
+}
+
+// ---------- 4: puntuación propia del nivel experto (referencias, no la comercial) ----------
+{
+  const rowsE = [];
+  for (const st of BOOK_STYLES) {
+    const sc = [], parts = [];
+    for (let s = 1; s <= SEEDS; s++) {
+      const seed = s * 31 + 7;
+      const doc = createDoc({ preset: PRESET, seed, marginMm: 12 });
+      ENGINES.classic(doc, { ...levelOpts("experto"), seed, petals: [16, 20][s % 2], styleMode: st });
+      const r = expertScore(renderDocToSvgString(doc), doc.page);
+      sc.push(r.score); parts.push(r.partes);
+    }
+    const avgOf = (k) => +(parts.reduce((t, q) => t + q[k], 0) / parts.length).toFixed(1);
+    rowsE.push({ estilo: st, media: +avg(sc).toFixed(1), min: Math.min(...sc), celdas: avgOf("celdas en el disco"), "astillas": avgOf("astillas (lado <0,6 mm)"), "vacío %": avgOf("vacío en celdas >40 mm² % del disco") });
+  }
+  console.log("4. Nivel experto: puntuación propia (referencias)");
+  console.table(rowsE);
 }
