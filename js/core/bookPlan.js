@@ -227,9 +227,17 @@ export const PRODUCT_PROFILES = {
 // Temas sueltos que no combinan con todos los estilos (corazones alrededor de un mandala
 // geométrico se ven fuera de lugar). Cielo, jardín (figuras del propio estilo) y las
 // tramas van con todos.
+// Fondos con afinidad por estilo. Las tramas continuas (escamas, flor de la vida, sol, ondas,
+// mosaico) antes salían igual con cualquier estilo: un mosaico detrás de un sashiko o unas ondas
+// detrás de un azteca no tienen sentido. Cada estilo recibe al menos dos tramas de su familia.
 const BACKGROUND_STYLES = {
   dulce: ["floral", "celtico", "sashiko"],
   hojas: ["floral", "celtico", "sashiko", "yantra", "islamico"],
+  escamas: ["floral", "celtico", "sashiko"],
+  flor_vida: ["islamico", "geometric", "yantra", "celtico"],
+  sol: ["floral", "azteca", "yantra"],
+  ondas: ["floral", "sashiko", "celtico"],
+  mosaico: ["geometric", "islamico", "azteca", "yantra"],
 };
 // Composiciones con espacio libre que se decora (el resto no usa tema de fondo)
 const FILLED = new Set(["fondo", "constelacion", "esquinas", "medio"]);
@@ -264,7 +272,8 @@ export function backgroundPicker(rng, { fillCentro = false, patternOnly = false,
     // Con patternOnly, usar solo tramas continuas (para perfiles de adulto)
     const basePool = patternOnly ? PATTERN_BACKGROUNDS :
       (composition === "fondo" || centro ? [...SCATTER_BACKGROUNDS, ...PATTERN_BACKGROUNDS] : SCATTER_BACKGROUNDS);
-    const allowed = basePool.filter(b => !style || !BACKGROUND_STYLES[b] || BACKGROUND_STYLES[b].includes(style));
+    const fitted = basePool.filter(b => !style || !BACKGROUND_STYLES[b] || BACKGROUND_STYLES[b].includes(style));
+    const allowed = fitted.length ? fitted : basePool;
     // Cuenta por encuadre: si no, los temas sueltos (que también usan constelación y
     // esquinas) parecían «muy usados» y el fondo decorado repetía siempre las tramas.
     // Primero el menos usado; entre empatados, distinto del de la página anterior

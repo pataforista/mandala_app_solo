@@ -124,3 +124,14 @@ test("capítulos: cada estilo del libro pertenece a un capítulo y sólo a uno",
   for (const id of BOOK_STYLES) assert.equal(CHAPTERS.filter(c => c.styles.includes(id)).length, 1, `estilo «${id}»`);
   for (const c of CHAPTERS) assert.ok(CHAPTERS.some(o => o.key === c.near), `capítulo «${c.key}»: afín desconocido`);
 });
+
+test("fondos afines: cada estilo tiene al menos dos tramas de su familia y el selector nunca devuelve vacío", async () => {
+  const { backgroundPicker, PATTERN_BACKGROUNDS } = await import("../js/core/bookPlan.js");
+  const { mulberry32 } = await import("../js/core/prng.js");
+  for (const id of BOOK_STYLES) {
+    const pick = backgroundPicker(mulberry32(7), { patternOnly: true });
+    const got = new Set();
+    for (let i = 0; i < 80; i++) { const b = pick("fondo", id); assert.ok(b, `${id}: el selector devolvió vacío`); got.add(b); assert.ok(PATTERN_BACKGROUNDS.includes(b), `${id}: «${b}» no es una trama`); }
+    assert.ok(got.size >= 2, `${id}: sólo ${got.size} trama(s)`);
+  }
+});
