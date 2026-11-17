@@ -90,7 +90,7 @@ dibujo: `js/generators/specialPages.js`.
 | **Mandala que crece** (1–3 secuencias) | el mismo mandala en 4 páginas seguidas; cada una añade anillos | `growth` en el motor clásico: misma semilla y motivos; el sorteo de las bandas no dibujadas se consume igual, así el interior es idéntico en cada etapa. Mínimo 8 bandas, primera etapa ≈ 50 % del radio |
 | **Mandala misterioso** (0–7) | rejilla polar que esconde una figura (corazón, estrella, gato, mariposa, luna, pez, casa) | todas las celdas llevan marca: punto = oscuro, raya = claro; si sólo la figura llevara marca se vería antes de colorear. Figuras como predicados geométricos (`mysteryMandala.js`). Página de soluciones al final, con el número de página real |
 | **Simetrías de la naturaleza** | girasol (modelo de Vogel, ángulo áureo), estrella de mar (pentarradial con placa madrepórica), copo de nieve (6 brazos, ramas a ±60°), diatomea | nota científica al pie de cada una, redactada con cautela |
-| **Mural para armar** (2×2 o 3×3) | un mandala gigante repartido en hojas, con guía | cada hoja recorta su rectángulo exacto dentro de los márgenes de KDP; la línea de corte cierra las celdas; rótulo «hoja B2» y vecinas en el margen |
+| **Mural para armar** (de 2 a 36 hojas: 2×1, 2×2, 3×2, 3×3, 4×4 o el tamaño que elijas, hasta 6×6) | un mandala gigante repartido en hojas, con guía | cada hoja recorta su rectángulo exacto dentro de los márgenes de KDP; la línea de corte cierra las celdas; rótulo «hoja B2» y vecinas en el margen |
 
 **Dificultad creciente (por defecto):** la complejidad sube a lo largo del libro completo, páginas
 especiales incluidas. Una secuencia que crece o un mural comparten una sola complejidad (si no,

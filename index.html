@@ -791,9 +791,18 @@
                 <sl-checkbox id="bookNature" checked>Capítulo «Simetrías de la naturaleza» (girasol, estrella de mar, copo de nieve y diatomea, con una nota científica)</sl-checkbox>
                 <sl-select id="bookMural" label="Mural para armar (al final del libro)" size="small" value="3x3" help-text="Un mandala gigante repartido en varias hojas, con guía para unirlas.">
                   <sl-option value="ninguno">Ninguno</sl-option>
-                  <sl-option value="2x2">2×2 hojas</sl-option>
-                  <sl-option value="3x3">3×3 hojas</sl-option>
+                  <sl-option value="2x1">2 hojas (2×1)</sl-option>
+                  <sl-option value="2x2">4 hojas (2×2)</sl-option>
+                  <sl-option value="3x2">6 hojas (3×2)</sl-option>
+                  <sl-option value="3x3">9 hojas (3×3)</sl-option>
+                  <sl-option value="4x4">16 hojas (4×4)</sl-option>
+                  <sl-option value="custom">Otro tamaño…</sl-option>
                 </sl-select>
+                <div id="bookMuralCustom" style="display:none; gap:8px;">
+                  <sl-input id="bookMuralCols" type="number" label="Hojas de ancho" size="small" min="1" max="6" value="3" style="flex:1;"></sl-input>
+                  <sl-input id="bookMuralRows" type="number" label="Hojas de alto" size="small" min="1" max="6" value="2" style="flex:1;"></sl-input>
+                </div>
+                <div class="hint" id="bookMuralTotal"></div>
 
               <div class="hint" style="font-weight:600; margin-top:6px;">Al principio y al final</div>
               <sl-checkbox id="bookTitlePage" checked>Hoja de título</sl-checkbox>

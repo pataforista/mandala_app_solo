@@ -621,6 +621,25 @@ const MYSTERY_ORDER = ["corazon", "estrella", "gato", "mariposa", "luna", "pez",
 const NATURE_ORDER = ["girasol", "estrella", "copo", "diatomea"];
 
 /** Cuántas páginas añaden las opciones especiales (sin contar los reversos). */
+/** Máximo de hojas a lo ancho o a lo alto del mural (el generador rotula columnas con A–H). */
+export const MURAL_MAX_SIDE = 6;
+
+/**
+ * Tamaño del mural desde los controles de la interfaz. «choice» es el valor del selector
+ * («ninguno», «2x2», «3x2»… o «custom»); con «custom» se leen cols y rows. Devuelve
+ * { cols, rows } o null si no hay mural. Cada lado se limita a 1–MURAL_MAX_SIDE y un mural
+ * necesita al menos 2 hojas: una sola hoja no es un mural.
+ */
+export function parseMuralSize(choice, cols = null, rows = null) {
+  if (!choice || choice === "ninguno") return null;
+  const [c0, r0] = choice === "custom" ? [cols, rows] : String(choice).split("x");
+  let c = parseInt(c0, 10), r = parseInt(r0, 10);
+  if (!Number.isInteger(c) || !Number.isInteger(r)) return null;
+  c = Math.min(MURAL_MAX_SIDE, Math.max(1, c));
+  r = Math.min(MURAL_MAX_SIDE, Math.max(1, r));
+  return c * r >= 2 ? { cols: c, rows: r } : null;
+}
+
 export function specialPageCount({ growth = 0, mystery = 0, nature = false, mural = null } = {}) {
   return growth * GROWTH_STAGES + mystery + (nature ? NATURE_ORDER.length : 0)
     + (mural ? mural.cols * mural.rows + 1 : 0) + (mystery > 0 ? 1 : 0);

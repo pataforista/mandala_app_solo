@@ -10,7 +10,7 @@ import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, BOOK_STYLES, BESTSELLER_STYLE_W, chapterLayout, insertChapterDividers, applyPageOverride, PRODUCT_PROFILES, BOOK_THEMES, shuffleBag } from "./core/bookPlan.js";
+import { parseMuralSize, planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, BOOK_STYLES, BESTSELLER_STYLE_W, chapterLayout, insertChapterDividers, applyPageOverride, PRODUCT_PROFILES, BOOK_THEMES, shuffleBag } from "./core/bookPlan.js";
 import { curateBook, attemptChoice, twinTargets as curatorTwinTargets, WEAK_SCORE, CURATE_TRIES } from "./core/bookCurator.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
@@ -1931,13 +1931,26 @@ function bindUI() {
   const bookMysteryEl = document.getElementById("bookMystery");
   const bookNatureEl = document.getElementById("bookNature");
   const bookMuralEl = document.getElementById("bookMural");
+  const bookMuralColsEl = document.getElementById("bookMuralCols");
+  const bookMuralRowsEl = document.getElementById("bookMuralRows");
+  const bookMuralCustomEl = document.getElementById("bookMuralCustom");
+  const bookMuralTotalEl = document.getElementById("bookMuralTotal");
+  const muralFromUI = () => parseMuralSize(bookMuralEl?.value, bookMuralColsEl?.value, bookMuralRowsEl?.value);
+  // Muestra las casillas de «Otro tamaño…» y cuántas hojas saldrán
+  const refreshMuralUI = () => {
+    const custom = bookMuralEl?.value === "custom", m = muralFromUI();
+    if (bookMuralCustomEl) bookMuralCustomEl.style.display = custom ? "flex" : "none";
+    if (bookMuralTotalEl) bookMuralTotalEl.textContent = m
+      ? `Mural de ${m.cols}×${m.rows}: ${m.cols * m.rows} hojas para colorear y recortar, más 1 hoja guía.`
+      : (custom ? "Elige al menos 2 hojas en total (de 1 a 6 por lado)." : "");
+  };
   const specialOpts = () => {
-    const mural = bookMuralEl?.value && bookMuralEl.value !== "ninguno" ? bookMuralEl.value.split("x").map(Number) : null;
+    const mural = muralFromUI();
     return {
       growth: Math.max(0, Math.min(3, parseInt(bookGrowthEl?.value, 10) || 0)),
       mystery: Math.max(0, Math.min(7, parseInt(bookMysteryEl?.value, 10) || 0)),
       nature: !!bookNatureEl?.checked,
-      mural: mural ? { cols: mural[0], rows: mural[1] } : null,
+      mural,
     };
   };
   // Capítulos temáticos: estilos y pesos del libro (los mismos que usa el plan)
@@ -2038,7 +2051,7 @@ function bindUI() {
   const SELECT_SETTINGS = { title: "bookTitle", subtitle: "bookSubtitle", author: "bookAuthor", pages: "bookPages",
     difficulty: "bookDifficulty", productProfile: "bookProductProfile", theme: "bookTheme", back: "bookBack",
     dpi: "bookDpi", language: "bookLanguage", paper: "bookPaper", growth: "bookGrowth", mystery: "bookMystery",
-    mural: "bookMural", figureShare: "bookFigureShare", designs: "bookProfile" };
+    mural: "bookMural", muralCols: "bookMuralCols", muralRows: "bookMuralRows", figureShare: "bookFigureShare", designs: "bookProfile" };
   const CHECK_SETTINGS = { titlePage: "bookTitlePage", copyright: "bookCopyright", belongsPage: "bookBelongsPage",
     welcomePage: "bookWelcomePage", reviewPage: "bookReviewPage", colorTest: "bookColorTest",
     pageNumbers: "bookPageNumbers", nature: "bookNature", vary: "bookVary", chapters: "bookChapters",
@@ -2056,6 +2069,7 @@ function bindUI() {
     for (const [k, id] of Object.entries(SELECT_SETTINGS)) { const el = document.getElementById(id); if (el && s[k] !== undefined) el.value = String(s[k]); }
     for (const [k, id] of Object.entries(CHECK_SETTINGS)) { const el = document.getElementById(id); if (el && s[k] !== undefined) el.checked = !!s[k]; }
     for (const [k, sel] of Object.entries(GROUP_SETTINGS)) setChecked(sel, s[k]);
+    refreshMuralUI();
   };
   const saveBookSettings = () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collectBookSettings())); } catch (e) {}
@@ -2719,9 +2733,11 @@ function bindUI() {
   bookVaryEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateGeneratorUI(); });
   bookChaptersEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateBookSummary(); });
   bookDifficultyEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); });
-  [bookGrowthEl, bookMysteryEl, bookNatureEl, bookMuralEl].forEach(el => el?.addEventListener("sl-change", () => {
-    bookOverrides = new Map(); updateReviewInfo(); updateBookSummary();
+  [bookGrowthEl, bookMysteryEl, bookNatureEl, bookMuralEl, bookMuralColsEl, bookMuralRowsEl].forEach(el => el?.addEventListener("sl-change", () => {
+    refreshMuralUI(); bookOverrides = new Map(); updateReviewInfo(); updateBookSummary();
   }));
+  [bookMuralColsEl, bookMuralRowsEl].forEach(el => el?.addEventListener("sl-input", () => { refreshMuralUI(); updateBookSummary(); }));
+  refreshMuralUI();
   bookMysteryEl?.addEventListener("sl-input", updateBookSummary);
 
   const downloadBook = async () => {

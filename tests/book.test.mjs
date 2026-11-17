@@ -927,3 +927,47 @@ test("rasterizado por franjas: recorte de SVG exacto y detector de manchas", asy
   const c = a.slice(); for (let i = 0; i < n; i++) c[i * 4] = 180;
   assert.equal(mismatchFraction(a, c), 0);
 });
+
+test("mural: el tamaño se lee de los controles, se limita a 1–6 por lado y exige 2 hojas", async () => {
+  const { parseMuralSize, MURAL_MAX_SIDE } = await import("../js/core/bookPlan.js");
+  assert.equal(MURAL_MAX_SIDE, 6);
+  assert.equal(parseMuralSize("ninguno"), null);
+  assert.equal(parseMuralSize(undefined), null);
+  assert.deepEqual(parseMuralSize("3x3"), { cols: 3, rows: 3 }, "valor guardado por versiones anteriores");
+  assert.deepEqual(parseMuralSize("2x1"), { cols: 2, rows: 1 });
+  assert.deepEqual(parseMuralSize("custom", "4", "2"), { cols: 4, rows: 2 });
+  assert.deepEqual(parseMuralSize("custom", 9, 0), { cols: 6, rows: 1 }, "fuera de rango: se limita");
+  assert.equal(parseMuralSize("custom", "1", "1"), null, "una sola hoja no es un mural");
+  assert.equal(parseMuralSize("custom", "", "3"), null, "casilla vacía");
+  assert.equal(parseMuralSize("custom", "abc", "3"), null);
+});
+
+test("mural: cada tamaño da cols×filas hojas más la guía, rotuladas sin repetir y dentro del margen", async () => {
+  const { parseMuralSize } = await import("../js/core/bookPlan.js");
+  const { tileName } = await import("../js/generators/muralPage.js");
+  const { inkBounds } = await import("../js/core/commercialMetrics.js");
+  for (const [cols, rows] of [[2, 1], [1, 2], [3, 2], [2, 3], [4, 4], [6, 6]]) {
+    const m = parseMuralSize("custom", cols, rows);
+    assert.deepEqual(m, { cols, rows });
+    // El plan: hojas + 1 guía
+    const sp = { mural: m };
+    const plan = addSpecialPages(planBook({ count: 8, seed: 3, difficulty: "mixta" }), { seed: 3, ...sp, difficulty: "mixta" });
+    assert.equal(plan.length, 8 + specialPageCount(sp));
+    const tiles = plan.filter(p => p.special?.type === "mural" && !p.special.guide);
+    assert.equal(tiles.length, cols * rows, `${cols}×${rows}: hojas`);
+    assert.equal(plan.filter(p => p.special?.guide).length, 1);
+    assert.equal(new Set(tiles.map(p => tileName(p.special.col, p.special.row))).size, cols * rows, "rótulos únicos");
+    // La hoja de la esquina opuesta: sin NaN y con la tinta dentro del margen de 12 mm. La guía no
+    // se mide así: su miniatura va en un grupo escalado y recortado, y inkBounds no aplica ese
+    // recorte (mediría el ancho de la página aunque la miniatura quepa).
+    const d = special({ type: "mural", cols, rows, col: cols - 1, row: rows - 1 });
+    const svg = renderDocToSvgString(d);
+    assert.doesNotMatch(svg, /NaN|Infinity|undefined/);
+    const bnd = inkBounds(svg);
+    assert.ok(bnd.x0 >= 12 - 0.5 && bnd.y0 >= 12 - 0.5 && bnd.x1 <= d.page.wMm - 12 + 0.5 && bnd.y1 <= d.page.hMm - 12 + 0.5, `${cols}×${rows}: la hoja sale del margen`);
+    assert.doesNotMatch(renderDocToSvgString(special({ type: "mural", cols, rows, guide: true })), /NaN|Infinity|undefined/);
+    // La guía rotula todas las hojas
+    const guide = renderDocToSvgString(special({ type: "mural", cols, rows, guide: true }));
+    for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) assert.match(guide, new RegExp(`>${tileName(c, r)}</text>`), `${cols}×${rows}: falta ${tileName(c, r)} en la guía`);
+  }
+});
