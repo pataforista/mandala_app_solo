@@ -715,6 +715,16 @@ export function generateMandalaClassic(doc, opts) {
     echoing = true;
     if (MOTIFS[b.motif]) MOTIFS[b.motif](b); else EX[b.motif].draw(ctx, b);
     echoing = false;
+    // Punto de contraste: un anillo de puntos negros en el centro de la banda, como las referencias.
+    // Sólo en experto, sólo en bandas de al menos 7 mm, y con el paso mínimo de 1,2 mm.
+    if (expert && k % 2 === 1 && b.r1 - b.r0 >= 7 && !grammar.noDots) {
+      const rm = (b.r0 + b.r1) / 2, arc = 2 * Math.PI * rm, dr = 0.75;
+      if (arc / b.n >= 2.0 && rm > R * 0.2) {
+        const dots = mainPB();
+        for (let i = 0; i < b.n; i++) { const [x, y] = P(rm, b.off + ((i + 0.5) * 2 * Math.PI) / b.n); circle(dots, x, y, dr); }
+        emit(dots, 0.2, "#000");
+      }
+    }
     const disc = mainPB(); circle(disc, cx, cy, b.r0); emit(disc, mainW, "#fff");
     // Silueta decorada: doble contorno en la banda exterior
     if (k === B - 1 && includeFrames && detail) {
