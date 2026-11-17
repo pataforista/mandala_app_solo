@@ -88,20 +88,6 @@ export const BOOK_THEMES = {
       subtitle: "Criaturas Marinas, Arrecifes y Serenidad"
     }
   },
-  // Sin paquete navideño propio: fondos de copos y pinos; las ilustraciones se eligen a mano
-  navidad: {
-    name: "Navidad y Fiestas",
-    description: "Mandalas invernales: copos de nieve, pinos y estrellas (no hay paquete navideño: marca las ilustraciones que quieras abajo)",
-    packages: [],
-    styles: ["geometric", "celtico", "floral"],
-    styleWeights: [2.5, 1.5, 1],
-    backgrounds: ["sol", "flor_vida", "navidad", "estrellas"],
-    scatterTheme: "navidad",
-    titlePreset: {
-      title: "Mándalas de Invierno y Navidad",
-      subtitle: "Diseños Festivos de Copos de Nieve, Estrellas y Magia Invernal"
-    }
-  },
   bosque: {
     name: "Bosque y Vida Silvestre",
     description: "Mandalas del bosque: animales de safari y bosque, hojas botánicas y naturaleza",

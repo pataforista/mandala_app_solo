@@ -2110,6 +2110,8 @@ function bindUI() {
     for (const [k, id] of Object.entries(SELECT_SETTINGS)) { const el = document.getElementById(id); if (el && s[k] !== undefined) el.value = String(s[k]); }
     for (const [k, id] of Object.entries(CHECK_SETTINGS)) { const el = document.getElementById(id); if (el && s[k] !== undefined) el.checked = !!s[k]; }
     for (const [k, sel] of Object.entries(GROUP_SETTINGS)) setChecked(sel, s[k]);
+    // Un tema guardado que ya no existe (p. ej. «navidad», retirado) vuelve a «Sin tema»
+    if (bookThemeEl && !BOOK_THEMES[bookThemeEl.value]) bookThemeEl.value = "none";
     refreshMuralUI();
   };
   const saveBookSettings = () => {

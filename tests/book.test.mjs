@@ -841,7 +841,7 @@ test("trama: cubre la página con un patrón continuo para todos los PATTERN_THE
 
 test("temas y perfiles: estructuras completas y fuentes", () => {
   // Temas
-  assert.ok(BOOK_THEMES.none && BOOK_THEMES.oceano && BOOK_THEMES.navidad && BOOK_THEMES.bosque);
+  assert.ok(BOOK_THEMES.none && BOOK_THEMES.oceano && BOOK_THEMES.bosque);
   for (const [k, t] of Object.entries(BOOK_THEMES)) {
     assert.ok(t.name && t.description, `tema ${k} tiene nombre y descripción`);
     if (t.styles) assert.ok(Array.isArray(t.styles) && t.styles.length > 0);

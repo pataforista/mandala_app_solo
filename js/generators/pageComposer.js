@@ -55,7 +55,6 @@ export const SCATTER_THEMES = {
   mistico: { crescent: 3, star: 2, gem: 2, sun: 1.5, drop: 0.6 },
   mitologia: { flame: 3, sun: 2, crescent: 1.5, gem: 1, star: 1 },
   bosque: { mushroom: 2.5, leaf: 2, daisy: 1.5, acorn: 1.5, pine: 1.2, fern: 0.5 },
-  navidad: { snowflake: 3, pine: 2, star: 2, crescent: 0.6 },
   infantil: { heart: 2, star: 2, daisy: 2, butterfly: 1.5, bubble: 1, fish: 0.8 },
 };
 // Tema de una figura (campo «theme» de los paquetes) → fondo que la acompaña
