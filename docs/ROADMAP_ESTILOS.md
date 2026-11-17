@@ -644,3 +644,25 @@ experto (motivos orgánicos y contraste).
 
 Queda fuera del motor: las miniaturas de estilo en la interfaz (es trabajo de pantalla) y la
 prueba a ciegas con personas (E12).
+
+### 10.13 Pendientes cerrados y marcos (17 nov 2026)
+
+| Pendiente | Estado |
+|---|---|
+| Fondos de trama afines por estilo (E11) | hecho (10.12) |
+| Miniaturas de estilo en la pestaña del libro (E11) | hecho: una página pequeña por estilo; pulsarla marca o desmarca la casilla |
+| Puertas del recinto del yantra (E9) | hecho: puertas en T |
+| Núcleo «flor de la vida» | corregido el orden de pintado; ningún estilo lo usa |
+| Marcos: más opciones | hecho: ocho marcos (redondeado, doble con rombos, festón, sin marco, cordón, ondas, gotas, sólo esquinas) |
+
+Los cuatro marcos nuevos pasan las pruebas de márgenes KDP, igual que los originales.
+
+**Lo que sigue abierto y no puedo cerrar desde aquí**
+
+- **Prueba a ciegas con tres personas y prueba impresa (E12).** El material está listo con
+  `scripts/blind-test.mjs`; hacen falta personas y papel.
+- **Reconocimiento de estilos en 70 %**, por debajo de la meta de 80 %. Islámico es el más
+  confuso; sólo la prueba con personas lo puede resolver.
+- **Nivel experto**: la puntuación propia es una construcción sin validar con personas.
+- **Marcos por estilo**: los marcos no tienen afinidad con el estilo (un festón puede ir con
+  cualquier estilo). Es una opción de diseño que todavía no está decidida.
