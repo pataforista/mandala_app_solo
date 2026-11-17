@@ -2,7 +2,7 @@
 // Gramática del estilo «celtico»: cintas entrelazadas. Trenza de dos cabos, cadena de eslabones
 // y núcleo de trenza anular; construcciones genéricas de nudo, sin copiar ninguna pieza concreta.
 // Etapa E5 de docs/ROADMAP_ESTILOS.md.
-import { DEFAULT_SILHOUETTES, braid, ringChain } from "./common.js";
+import { DEFAULT_SILHOUETTES, braid, ringChain, zarcilloDraw } from "./common.js";
 
 // Vetos: motivos que este estilo nunca dibuja. Ningún peso de `motifs` puede estar aquí.
 const banned = ["triangle", "diamond", "chevron", "flame"];
@@ -11,6 +11,10 @@ const ribbonW = (h) => Math.max(2.5, Math.min(4.5, h * 0.2));
 
 const exclusive = {
   // Trenza de dos cabos que se cruzan arriba y abajo, con una cuenta en cada ojo de la trenza.
+  zarcillo: {
+    aspect: 1.2, minH: 10,
+    draw: (ctx, b) => zarcilloDraw(ctx, b),
+  },
   trenza: {
     aspect: 1.5, minH: 10.5,
     draw(ctx, b) {
@@ -90,7 +94,7 @@ export const celtico = {
   id: "celtico",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 1, round: 2, lotus: 1.5, leaf: 1.5, scallop: 2, heart: 1.5, ogee: 1.5, trenza: 5, eslabones: 3, rizo: 2, pluma: 1 },
+  motifs: { petal: 1, round: 2, lotus: 1.5, leaf: 1.5, scallop: 2, heart: 1.5, ogee: 1.5, trenza: 5, eslabones: 3, rizo: 2, pluma: 1, zarcillo: 2.5 },
   banned,
   exclusive,
   quota: 2,

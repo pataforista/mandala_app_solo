@@ -3,7 +3,7 @@
 // Construcciones geométricas tradicionales y genéricas (estrella de ocho por dos cuadrados
 // girados, arco polilobulado); no se copia ninguna pieza concreta.
 // Etapas E3 y E4 de docs/ROADMAP_ESTILOS.md.
-import { DEFAULT_CORES, braid } from "./common.js";
+import { DEFAULT_CORES, braid, zarcilloDraw } from "./common.js";
 
 // Vetos: motivos que este estilo nunca dibuja. Ningún peso de `motifs` puede estar aquí.
 const banned = ["heart", "round", "leaf", "flame"];
@@ -97,6 +97,10 @@ const exclusive = {
     },
   },
   // Lacería: dos cintas en zigzag de rectas que se entrelazan (arriba, abajo, arriba…).
+  zarcillo: {
+    aspect: 1.2, minH: 10,
+    draw: (ctx, b) => zarcilloDraw(ctx, b),
+  },
   laceria: {
     aspect: 1.5, minH: 10.5,
     draw(ctx, b) {
@@ -161,7 +165,7 @@ export const islamico = {
   id: "islamico",
   // Peso de cada motivo en una banda intermedia. El orden de las claves importa: el sorteo recorre
   // la tabla en ese orden y un cambio altera todas las páginas.
-  motifs: { petal: 1, lotus: 1, scallop: 1, triangle: 1, diamond: 2, ogee: 2.5, chevron: 1, estrella: 4, arco: 3, laceria: 3, rizo: 1.5, gota: 0.8 },
+  motifs: { petal: 1, lotus: 1, scallop: 1, triangle: 1, diamond: 2, ogee: 2.5, chevron: 1, estrella: 4, arco: 3, laceria: 3, rizo: 1.5, gota: 0.8, zarcillo: 2.5 },
   banned,
   exclusive,
   quota: 2,

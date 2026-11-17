@@ -678,3 +678,32 @@ Los cuatro marcos nuevos pasan las pruebas de márgenes KDP, igual que los origi
   en 14 páginas. Ahora hay cero con cualquier marco.
 - **Recinto como marco elegible:** el dibujo del recinto del yantra vive en `generators/recinto.js` y lo
   usan el motor y el compositor, así que el yantra ya no pierde su recinto al cambiar de composición.
+
+### 10.15 Respiro (fase 1) y zarcillo (fase 2) de las referencias
+
+- **Respiro:** una banda de cada tres queda lisa, sólo en nivel adulto (simplificación 0,55–0,65). No
+  se aplica en niños (contorno) ni en experto: una banda lisa en experto son 11 puntos en la puntuación
+  propia. Es **por banda, no por celda**: queda para una segunda iteración la alternancia dentro de cada
+  banda.
+- **Zarcillo:** tallo ondulado con una hoja en cada cresta, en islámico y celta (peso 2,5). Las venas no
+  bajan de 0,55 mm (mínimo imprimible).
+
+**Medido frente a la línea base final (`bench-styles.mjs 40`):**
+
+| Estilo | Adulto (media, mín) antes → ahora | Niños (media) antes → ahora |
+|---|---|---|
+| Floral | 82,4 (71) → 82,5 (71) | 87,1 → 87,0 |
+| Geométrico | 82,8 (70) → 83,6 (70) | 90,5 → 90,7 |
+| Islámico | 82,7 (66) → 83,0 (71) | 93,9 → 93,9 |
+| Sashiko | 81,8 (68) → 81,8 (65) | 86,5 → 86,5 |
+| Celta | 84,8 (71) → 83,6 (72) | 92,9 → 92,8 |
+| Azteca | 81,9 (64) → 82,0 (67) | 89,6 → 89,6 |
+| Yantra | 84,4 (74) → 84,9 (76) | 91,0 → 91,1 |
+
+- Ninguna mínima de adulto baja de 60. Sashiko baja de 68 a 65 y celta sube su mínimo.
+- **El acierto del clasificador baja de 64,6 % a 61,1 %.** Las bandas lisas quitan rasgos de forma que el
+  clasificador usaba. No se ajustó el clasificador para compensarlo: sería cambiar el termómetro.
+- Cambios en la prueba dorada: adulto en todos los estilos (respiro) e islámico y celta en todos los
+  niveles (zarcillo cambia el sorteo de esos estilos).
+- Lo que no mejora: la puntuación no sube. Los dos cambios buscan ritmo y variedad, y eso sólo se
+  puede juzgar a ojo y con la prueba a ciegas.

@@ -221,3 +221,41 @@ export function echoPaths(d, { scales, minGap = 1.6, minArea = 20, minCell = 6.5
   }
   return out.join(" ");
 }
+
+// ---------- Zarcillo: tallo ondulado con hojas ----------
+// Un tallo que ondula alrededor de la banda (una onda por cada cuenta) con una hoja en cada cresta,
+// apuntando hacia fuera. Como las cintas, es un trazo cerrado; las hojas y las ondas cortan la banda
+// en celdas pequeñas, sin cruces. Medido con la regla de coloreabilidad (mínimo de celda del nivel).
+export function zarcilloDraw(ctx, b) {
+  const { TAU, circle, cx, cy, mainPB, detailPB, emit, mainWFor, detailWFor, detail, B, petalShape, minCell } = ctx;
+  const h = b.r1 - b.r0, rm = (b.r0 + b.r1) / 2, n = b.n;
+  const amp = h * 0.28, w = Math.max(0.9, Math.min(2.2, h * 0.09));
+  const N = 96 * n;
+  const rAt = (t) => rm + amp * Math.sin(n * t);
+  const tallo = mainPB();
+  for (let i = 0; i <= N; i++) {
+    const t = b.off + (i / N) * TAU, r = rAt(t - b.off);
+    const [x, y] = [cx + (r + w / 2) * Math.cos(t), cy + (r + w / 2) * Math.sin(t)];
+    (i ? tallo.lineTo : tallo.moveTo).call(tallo, x, y);
+  }
+  for (let i = N; i >= 0; i--) {
+    const t = b.off + (i / N) * TAU, r = rAt(t - b.off);
+    tallo.lineTo(cx + (r - w / 2) * Math.cos(t), cy + (r - w / 2) * Math.sin(t));
+  }
+  tallo.close();
+  // Hojas en cada cresta: sen(n·t) = 1 → t = (π/2 + 2πj)/n
+  const hojas = detailPB(), venas = detailPB();
+  const L = Math.min(h * 0.32, 4.2), aw = Math.min((TAU / n) * 0.2, 0.2);
+  for (let j = 0; j < n; j++) {
+    const t = (Math.PI / 2 + 2 * Math.PI * j) / n;
+    const rc = rAt(t) + w / 2;
+    const a = b.off + t;
+    petalShape(hojas, rc, rc + L, a, aw, 1.15);
+    if (detail && L > 3) venas.moveTo(cx + rc * Math.cos(a), cy + rc * Math.sin(a)).lineTo(cx + (rc + L * 0.8) * Math.cos(a), cy + (rc + L * 0.8) * Math.sin(a));
+  }
+  const ring = mainPB(); circle(ring, cx, cy, b.r1); emit(ring, mainWFor(b), "#fff");
+  emit(tallo, mainWFor(b), "#fff");
+  emit(hojas, detailWFor(b), "#fff");
+  // Las venas no bajan del mínimo imprimible del motor (0,55 mm): más finas se pierden al imprimir
+  if (detail) emit(venas, Math.max(0.55, detailWFor(b) * 0.6));
+}

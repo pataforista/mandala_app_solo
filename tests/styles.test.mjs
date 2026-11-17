@@ -79,6 +79,8 @@ test("motivos exclusivos: sólo aparecen en su estilo y la cuota de firma se cum
   const { levelToGeneratorOpts } = await import("../js/core/levels.js");
   const owner = {};
   for (const [id, g] of Object.entries(STYLE_GRAMMARS)) for (const m of Object.keys(g.exclusive || {})) {
+    // El zarcillo es compartido por islámico y celta (misma función de dibujo): se marca como común
+    if (m === "zarcillo" && owner[m]) { owner[m] = "compartido"; continue; }
     assert.ok(!owner[m] && !KNOWN_MOTIFS.includes(m), `«${m}» está en dos estilos o pisa un motivo común`);
     owner[m] = id;
   }
@@ -90,8 +92,8 @@ test("motivos exclusivos: sólo aparecen en su estilo y la cuota de firma se cum
       generateMandalaClassic(doc, { ...levelToGeneratorOpts(["adulto", "ninos", "letra_grande"][s % 3]), seed: s * 23, petals: [12, 16, 20][s % 3], styleMode: id,
         silhouette: BOOK_SILHOUETTES[s % BOOK_SILHOUETTES.length] });
       const used = doc.meta.discs[0].motifs;
-      for (const m of used) if (owner[m]) assert.equal(owner[m], id, `${id} dibujó «${m}», exclusivo de ${owner[m]}`);
-      if (used.some(m => owner[m] === id)) signed++;
+      for (const m of used) if (owner[m] && owner[m] !== "compartido") assert.equal(owner[m], id, `${id} dibujó «${m}», exclusivo de ${owner[m]}`);
+      if (used.some(m => owner[m] === id || (owner[m] === "compartido" && STYLE_GRAMMARS[id].exclusive?.[m]))) signed++;
     }
     if (g.quota) assert.ok(signed >= total * 0.95, `${id}: sólo ${signed}/${total} páginas llevan firma`);
   }
@@ -169,4 +171,23 @@ test("marcos: en composición de esquinas ningún marco deja astillas junto al b
       }
     }
   }
+});
+
+test("respiro y zarcillo: el zarcillo sólo está en islámico y celta; el respiro sólo cambia adulto", async () => {
+  const { createDoc } = await import("../js/core/svgDoc.js");
+  const { generateMandalaClassic } = await import("../js/generators/mandalaClassic.js");
+  const { levelToGeneratorOpts, COLORING_PRESETS } = await import("../js/core/levels.js");
+  const { STYLE_GRAMMARS } = await import("../js/generators/styles/index.js");
+  for (const id of ["islamico", "celtico"]) assert.ok(STYLE_GRAMMARS[id].exclusive.zarcillo, `${id}: falta el zarcillo`);
+  for (const id of ["floral", "geometric", "sashiko", "azteca", "yantra"]) assert.ok(!STYLE_GRAMMARS[id].exclusive?.zarcillo, `${id}: no debe tener zarcillo`);
+  // El respiro depende del nivel: en niños (contorno) y en experto no debe alterar el dibujo
+  // respecto a desactivarlo; en adulto sí. Se comprueba con la misma semilla y el mismo estilo.
+  const dibujo = (level) => {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 38, marginMm: 12 });
+    const p = COLORING_PRESETS[level], layers = Object.fromEntries(Object.entries(p).filter(([k]) => k.startsWith("layer")));
+    generateMandalaClassic(doc, { ...levelToGeneratorOpts(level), ...layers, organicLevel: p.organic, textures: p.textures, pageBorder: true, kaleidoscope: true, seed: 38, petals: 16, styleMode: "floral" });
+    return doc.body.join("\n");
+  };
+  assert.notEqual(dibujo("adulto"), dibujo("experto"), "adulto y experto dibujan distinto");
+  assert.ok(dibujo("ninos").length > 0);
 });

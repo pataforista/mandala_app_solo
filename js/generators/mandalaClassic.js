@@ -156,6 +156,9 @@ export function generateMandalaClassic(doc, opts) {
   const EX = grammar.exclusive || {};
   const aspectOf = (m) => ASPECT[m] ?? EX[m]?.aspect ?? 1;
   const expert = detailSimplification <= 0.3;
+  // Sólo nivel adulto (simplificación 0,6). En experto una banda lisa es una corona enorme que la
+  // puntuación experta penaliza (página de prueba: 11 puntos), así que no se aplica allí.
+  const respiroOn = !outlineMode && detailSimplification >= 0.55 && detailSimplification <= 0.65;
   const pickMotif = (exclude, h = Infinity) => {
     // Las cuentas (beads) se colocan aparte; voluta, roseta y antemia no se sortean porque su
     // simetría local no coincide con la radial: por eso ninguna gramática les da peso.
@@ -702,6 +705,11 @@ export function generateMandalaClassic(doc, opts) {
     const b = bands[k];
     const extraRing = includeFrames && detail && k > 0 && b.motif !== "beads" && bands[k - 1].motif !== "beads" && (b.r1 - b.r0) > 9 && rng() < 0.35;
     if (k >= kDraw) continue;
+    // Respiro: una banda de cada tres queda lisa (sin motivo) para descansar la vista. Sólo adulto y
+    // experto, nunca niños (contorno) ni la silueta ni el núcleo. Las bandas lisas siguen cerradas
+    // por los contornos que dibujan las bandas vecinas.
+    const respiro = respiroOn && k > 0 && k < B - 1 && k % 3 === 1 && b.motif !== "beads" && (b.r1 - b.r0) >= 8;
+    if (respiro) { b.respiro = true; continue; }
     echoing = true;
     if (MOTIFS[b.motif]) MOTIFS[b.motif](b); else EX[b.motif].draw(ctx, b);
     echoing = false;
