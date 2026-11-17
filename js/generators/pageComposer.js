@@ -20,7 +20,8 @@ export const COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gig
 // Marcos: redondeado, doble con rombos, festón hacia fuera, sin marco y cuatro nuevos:
 //   cordón (dos líneas con rombos entre ambas), ondas (línea sinusoidal), gotas (festón hacia
 //   dentro) y esquinas (sólo ornamentos en las cuatro esquinas, la hoja queda abierta).
-export const FRAME_STYLES = ["redondeado", "doble", "feston", "ninguno", "cordon", "ondas", "gotas", "esquinas"];
+export const FRAME_STYLES = ["redondeado", "doble", "feston", "ninguno", "cordon", "ondas", "gotas", "esquinas", "recinto"];
+import { recintoPaths } from "./recinto.js";
 
 // Motivos de relleno que mejor acompañan cada estilo del mandala
 // Nuevos: butterfly, feather, shell, bird, crown — más variedad visual
@@ -155,6 +156,11 @@ export function composePage(doc, opts, drawMandala) {
     }
     emit(frameItems, d, detailW, stroke);
     inset = 3;
+  } else if (style === "recinto") {
+    // Recinto cuadrado con cuatro puertas en T (el mismo dibujo que el del yantra)
+    const { outline, tabs, inner } = recintoPaths(page, m, { includeFrames });
+    emit(frameItems, outline, mainW); emit(frameItems, tabs, mainW); if (includeFrames) emit(frameItems, inner, detailW);
+    inset = 2;
   } else if (style === "cordon") {
     // Dos líneas de trazo fino separadas 3 mm, con un rombo cada 3 mm entre ambas (como un cordón)
     const pb = new PathBuilder(); rect(pb, m, m, page.wMm - m, page.hMm - m, 2); emit(frameItems, pb, mainW);
@@ -382,12 +388,18 @@ export function composePage(doc, opts, drawMandala) {
       break;
     }
     case "esquinas": {
+      // Cada mandala de esquina queda ENTERO dentro del área útil (centro a rq del borde, radio rq):
+      // antes se centraba en la esquina y el recorte dejaba astillas junto al marco. Además no
+      // puede pisar el disco central: su centro debe estar a R + rq del centro de la hoja.
       const R = maxR * 0.8;
-      const d = Math.hypot(aw / 2, ah / 2);
-      const rq = Math.min(d - R - gap * 2, Math.min(aw, ah) * 0.42);
-      if (rq > 12) {
+      const dMax = Math.hypot(aw / 2, ah / 2) - R;
+      let rq = Math.min(aw, ah) * 0.42;
+      rq = Math.min(rq, aw / 2, ah / 2);
+      // Reduce el radio hasta que el mandala de esquina no choque con el central ni salga del área
+      while (rq > 12 && Math.hypot(aw / 2 - rq, ah / 2 - rq) < R + rq + gap) rq -= 0.5;
+      if (rq > 12 && dMax > 0) {
         let i = 0;
-        for (const [x, y] of [[A.x0, A.y0], [A.x1, A.y0], [A.x1, A.y1], [A.x0, A.y1]]) {
+        for (const [x, y] of [[A.x0 + rq, A.y0 + rq], [A.x1 - rq, A.y0 + rq], [A.x1 - rq, A.y1 - rq], [A.x0 + rq, A.y1 - rq]]) {
           content.push(...sub(x, y, rq, { ...miniOpts(i++, rq), seed: ((seed >>> 0) + 104729) >>> 0, complexity, outlineMode, strokeWidthMm, detailSimplification: opts.detailSimplification ?? 0.5 }));
           obstacles.push({ x, y, r: rq });
         }

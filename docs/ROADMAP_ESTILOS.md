@@ -666,3 +666,15 @@ Los cuatro marcos nuevos pasan las pruebas de márgenes KDP, igual que los origi
 - **Nivel experto**: la puntuación propia es una construcción sin validar con personas.
 - **Marcos por estilo**: los marcos no tienen afinidad con el estilo (un festón puede ir con
   cualquier estilo). Es una opción de diseño que todavía no está decidida.
+
+### 10.14 Marcos: afinidad, esquinas sin astillas y recinto como marco
+
+- **Afinidad marco ↔ estilo** (`FRAME_AFFINITY` en `bookPlan.js`): cada página toma un marco de los
+  que le sientan a su estilo y que el libro permite; nunca dos seguidos iguales. Verificado en planes
+  generados: 0 páginas con un marco fuera de su estilo. La tabla es una propuesta de diseño, no una
+  medida: lo que se midió es que todos los marcos funcionan con todos los estilos.
+- **Composición «esquinas» sin astillas:** cada mandala de esquina queda entero dentro del área útil y
+  no pisa el disco central. Antes se recortaba con el marco y dejaba 16 celdas diminutas junto al borde
+  en 14 páginas. Ahora hay cero con cualquier marco.
+- **Recinto como marco elegible:** el dibujo del recinto del yantra vive en `generators/recinto.js` y lo
+  usan el motor y el compositor, así que el yantra ya no pierde su recinto al cambiar de composición.

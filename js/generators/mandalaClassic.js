@@ -13,6 +13,7 @@ import { wantsComposition, composePage } from "./pageComposer.js";
 import { drawMedallionWeb } from "./figureFill.js";
 import { fitBandCount } from "../core/bandMetrics.js";
 import { polarKit, echoPaths } from "./styles/common.js";
+import { recintoPaths } from "./recinto.js";
 import { grammarOf } from "./styles/index.js";
 
 const TAU = Math.PI * 2;
@@ -679,32 +680,10 @@ export function generateMandalaClassic(doc, opts) {
         .lineTo(x0 + rc, y1).quadTo(x0, y1, x0, y1 - rc).lineTo(x0, y0 + rc).quadTo(x0, y0, x0 + rc, y0).close();
     };
     if (grammar.recinto) {
-      // Recinto cuadrado con cuatro puertas en T (yantra): el mismo margen que el marco redondeado,
-      // para que las pruebas de márgenes KDP sigan valiendo. Cada puerta es un hueco centrado en
-      // el lado y un tabique corto hacia dentro; los vértices van rectos.
-      const x0 = m, y0 = m, x1 = page.wMm - m, y1 = page.hMm - m, gx = (x1 - x0) * 0.09, gy = (y1 - y0) * 0.09;
-      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, door = 4.5;
-      pb.moveTo(x0, y0).lineTo(mx - gx, y0).moveTo(mx + gx, y0).lineTo(x1, y0).lineTo(x1, my - gy).moveTo(x1, my + gy).lineTo(x1, y1)
-        .lineTo(mx + gx, y1).moveTo(mx - gx, y1).lineTo(x0, y1).lineTo(x0, my + gy).moveTo(x0, my - gy).lineTo(x0, y0);
-      emit(pb, mainW);
-      // Puerta en T: el hueco del lado queda abierto y, hacia dentro, dos jambas paralelas que
-      // cierran un travesaño (el umbral). Así cada puerta es una abertura de forma T, no un corchete.
-      const tabs = mainPB();
-      const jamb = (xa, ya, xb, yb) => tabs.moveTo(xa, ya).lineTo(xb, yb);
-      // Puerta inferior y superior (jambas verticales y umbral horizontal)
-      for (const [yE, dir] of [[y0, 1], [y1, -1]]) {
-        const yIn = yE + dir * door, jw = gx * 0.55;
-        jamb(mx - jw, yE, mx - jw, yIn); jamb(mx + jw, yE, mx + jw, yIn);
-        jamb(mx - jw, yIn, mx + jw, yIn);
-      }
-      // Puerta izquierda y derecha (jambas horizontales y umbral vertical)
-      for (const [xE, dir] of [[x0, 1], [x1, -1]]) {
-        const xIn = xE + dir * door, jh = gy * 0.55;
-        jamb(xE, my - jh, xIn, my - jh); jamb(xE, my + jh, xIn, my + jh);
-        jamb(xIn, my - jh, xIn, my + jh);
-      }
-      emit(tabs, mainW);
-      if (includeFrames) { const p2 = mainPB(); p2.moveTo(x0 + 2.5, y0 + 2.5).lineTo(x1 - 2.5, y0 + 2.5).lineTo(x1 - 2.5, y1 - 2.5).lineTo(x0 + 2.5, y1 - 2.5).close(); emit(p2, detailW); }
+      // Recinto cuadrado con cuatro puertas en T (yantra): geometría compartida con el compositor
+      // (generators/recinto.js), dentro del mismo margen KDP que el marco redondeado.
+      const { outline, tabs, inner } = recintoPaths(page, m, { includeFrames });
+      emit(outline, mainW); emit(tabs, mainW); if (includeFrames) emit(inner, detailW);
     } else {
       rect(pb, m, m, page.wMm - m, page.hMm - m, rr);
       emit(pb, mainW);

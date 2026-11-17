@@ -135,3 +135,38 @@ test("fondos afines: cada estilo tiene al menos dos tramas de su familia y el se
     assert.ok(got.size >= 2, `${id}: sólo ${got.size} trama(s)`);
   }
 });
+
+test("marcos: cada estilo tiene afinidad con marcos permitidos y el reparto nunca saca uno no permitido", async () => {
+  const { FRAME_AFFINITY, framesFor, BOOK_FRAMES } = await import("../js/core/bookPlan.js");
+  const { FRAME_STYLES } = await import("../js/generators/pageComposer.js");
+  for (const id of BOOK_STYLES) {
+    const list = FRAME_AFFINITY[id];
+    assert.ok(list && list.length >= 2, `${id}: menos de dos marcos afines`);
+    for (const f of list) assert.ok(FRAME_STYLES.includes(f), `${id}: «${f}» no es un marco`);
+  }
+  assert.deepEqual(framesFor("floral", ["doble", "cordon"]), ["doble", "cordon"], "sin afinidad en el permitido: se usa lo permitido");
+  assert.deepEqual(framesFor("floral", ["gotas", "doble"]), ["gotas"], "la intersección afín gana");
+  assert.deepEqual(framesFor("inexistente", ["ninguno"]), ["ninguno"]);
+  for (const f of FRAME_STYLES) if (!BOOK_FRAMES.includes(f)) assert.fail(`«${f}» no está en el libro`);
+});
+
+test("marcos: en composición de esquinas ningún marco deja astillas junto al borde", async () => {
+  const { createDoc } = await import("../js/core/svgDoc.js");
+  const { generateMandalaClassic } = await import("../js/generators/mandalaClassic.js");
+  const { levelToGeneratorOpts } = await import("../js/core/levels.js");
+  const { flattenSubpaths } = await import("../js/core/commercialMetrics.js");
+  const { FRAME_STYLES } = await import("../js/generators/pageComposer.js");
+  const area = (pts) => Math.abs(pts.reduce((s, [x, y], i) => { const [u, v] = pts[(i + 1) % pts.length]; return s + x * v - u * y; }, 0)) / 2;
+  for (const fr of FRAME_STYLES) for (const st of ["floral", "yantra"]) {
+    const doc = createDoc({ preset: "KDP_8_5x11", seed: 38, marginMm: 12 });
+    generateMandalaClassic(doc, { ...levelToGeneratorOpts("adulto"), organicLevel: 0.2, textures: false, pageBorder: true, seed: 38, petals: 16, styleMode: st, composition: "esquinas", frameStyle: fr });
+    for (const frag of doc.body) {
+      const d = (frag.match(/ d="([^"]+)"/) || [])[1]; if (!d) continue;
+      for (const sub of flattenSubpaths(d)) {
+        if (!sub.closed || sub.pts.length < 3 || area(sub.pts) >= 6) continue;
+        const [x, y] = sub.pts[0];
+        assert.ok(Math.min(x, y, doc.page.wMm - x, doc.page.hMm - y) >= 6, `${fr}/${st}: celda diminuta junto al borde`);
+      }
+    }
+  }
+});

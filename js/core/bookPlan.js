@@ -8,7 +8,24 @@ import { mulberry32 } from "./prng.js";
 
 export const BOOK_STYLES = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
 export const BOOK_COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio", "trama"];
-export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno", "cordon", "ondas", "gotas", "esquinas"];
+export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno", "cordon", "ondas", "gotas", "esquinas", "recinto"];
+
+// Afinidad marco ↔ estilo (propuesta de diseño, ver docs/ROADMAP_ESTILOS.md § 10.14). Cada página
+// toma un marco de los que le sientan a su estilo y de los que el libro permite. Si la intersección
+// queda vacía, se usa lo que el libro permita: nunca se devuelve un marco no permitido.
+export const FRAME_AFFINITY = {
+  floral: ["redondeado", "gotas", "esquinas"],
+  geometric: ["doble", "cordon", "ninguno", "recinto"],
+  islamico: ["doble", "feston", "ninguno"],
+  sashiko: ["ondas", "feston", "gotas"],
+  celtico: ["cordon", "redondeado", "ondas"],
+  azteca: ["doble", "feston", "ninguno"],
+  yantra: ["recinto", "doble", "ninguno"],
+};
+export function framesFor(style, allowed) {
+  const fit = FRAME_AFFINITY[style] ? allowed.filter(f => FRAME_AFFINITY[style].includes(f)) : [];
+  return fit.length ? fit : allowed;
+}
 export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 
 // Silueta: la banda exterior del mandala, lo primero que se reconoce al hojear. Antes la
@@ -559,6 +576,20 @@ export function planBook(opts) {
   const nextStyle = shuffleBag(rng, styles, styleWeights);
   const nextComp = shuffleBag(rng, compositions, compositionWeights);
   const nextFrame = shuffleBag(rng, frames, frameWeights);
+  // Marco de cada página: el del sorteo si le sienta al estilo; si no, uno afín que no repita el de la
+  // página anterior (nunca dos seguidos iguales, que es lo que pide el plan)
+  let k0 = 0, lastFrame = null;
+  const pickFrame = (style) => {
+    const f0 = nextFrame(), ok = framesFor(style, frames);
+    let f = ok.includes(f0) && f0 !== lastFrame ? f0 : null;
+    if (!f) {
+      const other = ok.filter(x => x !== lastFrame);
+      const pool = other.length ? other : ok;
+      f = pool[(k0++) % pool.length];
+    }
+    lastFrame = f;
+    return f;
+  };
   const nextPetals = shuffleBag(rng, petals);
   // Generador propio: añadir la silueta no cambia los sorteos de las demás dimensiones
   const nextSilhouette = silhouettePicker(mulberry32(((seed >>> 0) ^ 0x51A0E77E) >>> 0));
@@ -612,7 +643,7 @@ export function planBook(opts) {
       structure: nextStructure(),
       background: nextBackground(composition, styleMode),
       composition,
-      frameStyle: nextFrame(),
+      frameStyle: pickFrame(styleMode),
       // El sorteo se consume siempre (no altera el resto del libro); un estilo con conteos
       // propios los toma por turno
       petals: ((drawn) => STYLE_PETALS[styleMode] ? STYLE_PETALS[styleMode][i % STYLE_PETALS[styleMode].length] : drawn)(nextPetals()),
