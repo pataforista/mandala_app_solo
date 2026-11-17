@@ -687,11 +687,22 @@ export function generateMandalaClassic(doc, opts) {
       pb.moveTo(x0, y0).lineTo(mx - gx, y0).moveTo(mx + gx, y0).lineTo(x1, y0).lineTo(x1, my - gy).moveTo(x1, my + gy).lineTo(x1, y1)
         .lineTo(mx + gx, y1).moveTo(mx - gx, y1).lineTo(x0, y1).lineTo(x0, my + gy).moveTo(x0, my - gy).lineTo(x0, y0);
       emit(pb, mainW);
+      // Puerta en T: el hueco del lado queda abierto y, hacia dentro, dos jambas paralelas que
+      // cierran un travesaño (el umbral). Así cada puerta es una abertura de forma T, no un corchete.
       const tabs = mainPB();
-      tabs.moveTo(mx - gx, y0).lineTo(mx - gx, y0 + door).moveTo(mx + gx, y0).lineTo(mx + gx, y0 + door)
-        .moveTo(mx - gx, y1).lineTo(mx - gx, y1 - door).moveTo(mx + gx, y1).lineTo(mx + gx, y1 - door)
-        .moveTo(x0, my - gy).lineTo(x0 + door, my - gy).moveTo(x0, my + gy).lineTo(x0 + door, my + gy)
-        .moveTo(x1, my - gy).lineTo(x1 - door, my - gy).moveTo(x1, my + gy).lineTo(x1 - door, my + gy);
+      const jamb = (xa, ya, xb, yb) => tabs.moveTo(xa, ya).lineTo(xb, yb);
+      // Puerta inferior y superior (jambas verticales y umbral horizontal)
+      for (const [yE, dir] of [[y0, 1], [y1, -1]]) {
+        const yIn = yE + dir * door, jw = gx * 0.55;
+        jamb(mx - jw, yE, mx - jw, yIn); jamb(mx + jw, yE, mx + jw, yIn);
+        jamb(mx - jw, yIn, mx + jw, yIn);
+      }
+      // Puerta izquierda y derecha (jambas horizontales y umbral vertical)
+      for (const [xE, dir] of [[x0, 1], [x1, -1]]) {
+        const xIn = xE + dir * door, jh = gy * 0.55;
+        jamb(xE, my - jh, xIn, my - jh); jamb(xE, my + jh, xIn, my + jh);
+        jamb(xIn, my - jh, xIn, my + jh);
+      }
       emit(tabs, mainW);
       if (includeFrames) { const p2 = mainPB(); p2.moveTo(x0 + 2.5, y0 + 2.5).lineTo(x1 - 2.5, y0 + 2.5).lineTo(x1 - 2.5, y1 - 2.5).lineTo(x0 + 2.5, y1 - 2.5).close(); emit(p2, detailW); }
     } else {
