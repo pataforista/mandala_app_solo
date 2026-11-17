@@ -657,7 +657,9 @@ export function planBook(opts) {
 
 // ---------- Páginas sorprendentes ----------
 export const GROWTH_STAGES = 4;
-const MYSTERY_ORDER = ["corazon", "estrella", "gato", "mariposa", "luna", "pez", "casa"];
+// Mismo orden que MYSTERY_SHAPES (mysteryMandala.js); el libro las baraja con su semilla.
+// tests/book.test.mjs comprueba que las dos listas coinciden.
+export const MYSTERY_ORDER = ["corazon", "estrella", "gato", "mariposa", "luna", "pez", "casa", "arbol", "flor", "hoja", "gota", "campana", "ancla", "barco", "pajaro", "trebol", "manzana", "seta", "nube", "sol"];
 const NATURE_ORDER = ["girasol", "estrella", "copo", "diatomea"];
 
 /** Cuántas páginas añaden las opciones especiales (sin contar los reversos). */
