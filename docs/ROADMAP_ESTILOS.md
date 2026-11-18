@@ -707,3 +707,32 @@ Los cuatro marcos nuevos pasan las pruebas de márgenes KDP, igual que los origi
   niveles (zarcillo cambia el sorteo de esos estilos).
 - Lo que no mejora: la puntuación no sube. Los dos cambios buscan ritmo y variedad, y eso sólo se
   puede juzgar a ojo y con la prueba a ciegas.
+
+### 10.16 Reconocimiento de estilo, segundo instrumento
+
+`scripts/bench-identity2.mjs` mide lo mismo que `bench-identity.mjs` con un instrumento más fino. El
+original **no se tocó** (sus 7 rasgos siguen congelados, § 10.2) para no romper la comparación
+antes/después. El nuevo añade 17 rasgos de forma (histograma de giros, orientación de los trazos
+respecto al radio, solidez y elongación de las celdas, distribución de áreas) y un análisis
+discriminante lineal con covarianza común regularizada.
+
+| Instrumento (adulto, 80 páginas por estilo) | Global | Mínimo por estilo |
+|---|---|---|
+| Original: 7 rasgos + centroide, validación cruzada de 5 pliegues | 65,7 % | 39 % (islámico) |
+| 24 rasgos + centroide, validación cruzada | 74,1 % | 55 % (islámico) |
+| 24 rasgos + LDA, validación cruzada | **85,0 %** | 64 % (islámico) |
+| 24 rasgos + LDA, entrenado con la semilla 4242 y probado con la 9137 | **87,9 %** | 60 % (islámico) |
+
+Lectura honesta:
+
+- **La mejora es del instrumento, no de los dibujos.** Las páginas son las mismas. El banco antiguo
+  subestimaba la separabilidad porque sus 7 rasgos no veían la orientación respecto al radio ni la forma
+  de la celda.
+- **Cumple el global (≥ 80 %), no el mínimo por estilo (≥ 70 %).** El islámico queda en 60–64 % y casi
+  todo su error va al celta (17 de 80 en el lote nuevo): comparten cintas entrelazadas (lacería y trenza)
+  y el zarcillo.
+- **Probado en la gramática y descartado.** Quitar el zarcillo del islámico y bajar la lacería a 1,5 dio
+  58,8 % → 63,3 % en tres semillas (141/240 → 152/240). Son 4,5 puntos, dentro del ruido de ±5, y suben
+  las confusiones con floral y yantra. No se cambió la gramática.
+- **Sigue siendo un proxy.** Mide si una máquina separa los estilos, no si una persona los reconoce. La
+  prueba a ciegas (`scripts/blind-test.mjs`) sigue pendiente y es la que decide.

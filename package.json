@@ -11,7 +11,7 @@
     "sw:rev": "node scripts/sw-revisions.mjs",
     "check": "node scripts/sw-revisions.mjs --check && node --test tests/*.test.mjs",
     "golden:estilos": "node scripts/golden-styles.mjs",
-    "bench:estilos": "node scripts/bench-styles.mjs 10 && node scripts/bench-identity.mjs 80 adulto",
+    "bench:estilos": "node scripts/bench-styles.mjs 10 && node scripts/bench-identity.mjs 80 adulto && node scripts/bench-identity2.mjs 80 adulto",
     "e2e": "node scripts/e2e-book.cjs \"\" es && node scripts/e2e-book.cjs \"\" en"
   },
   "keywords": [],
