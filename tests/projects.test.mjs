@@ -64,3 +64,11 @@ test("proyectos: serialización y deserialización JSON", () => {
 
   assert.throws(() => deserializeProject(JSON.stringify({ format: "otro" })), /no es un proyecto válido/);
 });
+
+test("proyectos: detecta los guardados con otra versión del dibujo de los estilos", async () => {
+  const { stylesChangedSince } = await import("../js/core/projects.js");
+  const { STYLE_GRAMMAR_VERSION } = await import("../js/generators/styles/index.js");
+  assert.equal(stylesChangedSince({ state: {} }, STYLE_GRAMMAR_VERSION), true, "sin el campo: anterior a las gramáticas");
+  assert.equal(stylesChangedSince({ grammarVersion: STYLE_GRAMMAR_VERSION }, STYLE_GRAMMAR_VERSION), false);
+  assert.equal(stylesChangedSince(null, STYLE_GRAMMAR_VERSION), false);
+});

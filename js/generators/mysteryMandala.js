@@ -11,6 +11,7 @@ import { mulberry32 } from "../core/prng.js";
 import { pageTexts } from "../core/pageTexts.js";
 import { PathBuilder } from "../core/pathBuilder.js";
 import { svgText, wrapLines } from "../core/svgText.js";
+import { maskTest } from "./mysteryMasks.js";
 
 const TAU = Math.PI * 2;
 
@@ -66,8 +67,114 @@ export const MYSTERY_SHAPES = {
       return body && !door && !win;
     },
   },
+  // Figuras añadidas (de 7 a 20): siluetas simples que se reconocen a la escala de la rejilla.
+  arbol: { name: "árbol", test: (x, y) => inEllipse(x, y, 0, 0.22, 0.62, 0.62) || (x >= -0.14 && x <= 0.14 && y >= -0.88 && y <= -0.2) },
+  flor: {
+    name: "flor",
+    test: (x, y) => {
+      for (let k = 0; k < 5; k++) { const a = Math.PI / 2 + (k * 2 * Math.PI) / 5; if (inEllipse(x, y, 0.42 * Math.cos(a), 0.28 + 0.42 * Math.sin(a), 0.3, 0.2, a)) return true; }
+      return inEllipse(x, y, 0, 0.28, 0.2, 0.2) || (x >= -0.07 && x <= 0.07 && y >= -0.9 && y <= 0.1);
+    },
+  },
+  hoja: { name: "hoja", test: (x, y) => inEllipse(x, y, 0.05, 0.05, 0.85, 0.42, 0.75) || (Math.abs(x + y + 0.95) < 0.08 && x < -0.45) },
+  gota: { name: "gota", test: (x, y) => inEllipse(x, y, 0, -0.3, 0.58, 0.58) || inPoly(x, y, [[-0.5, -0.05], [0.5, -0.05], [0, 0.95]]) },
+  campana: {
+    name: "campana",
+    test: (x, y) => inPoly(x, y, [[-0.2, 0.75], [0.2, 0.75], [0.45, 0.2], [0.55, -0.45], [0.75, -0.6], [-0.75, -0.6], [-0.55, -0.45], [-0.45, 0.2]])
+      || inEllipse(x, y, 0, 0.8, 0.14, 0.1) || inEllipse(x, y, 0, -0.75, 0.16, 0.14),
+  },
+  ancla: {
+    name: "ancla",
+    test: (x, y) => {
+      const ring = inEllipse(x, y, 0, 0.72, 0.22, 0.22) && !inEllipse(x, y, 0, 0.72, 0.1, 0.1);
+      const shaft = x >= -0.08 && x <= 0.08 && y >= -0.75 && y <= 0.52;
+      const bar = y >= 0.25 && y <= 0.38 && x >= -0.42 && x <= 0.42;
+      const arc = inEllipse(x, y, 0, -0.35, 0.75, 0.55) && !inEllipse(x, y, 0, -0.35, 0.6, 0.42) && y <= -0.35;
+      return ring || shaft || bar || arc;
+    },
+  },
+  barco: {
+    name: "barco",
+    // Casco ancho abajo y dos velas grandes; la vela mayor cubre el centro (si no, queda un hueco)
+    test: (x, y) => inPoly(x, y, [[-0.92, -0.3], [0.92, -0.3], [0.62, -0.78], [-0.62, -0.78]])
+      || inPoly(x, y, [[-0.06, -0.22], [-0.06, 0.95], [0.78, -0.22]]) || inPoly(x, y, [[-0.2, -0.22], [-0.2, 0.72], [-0.72, -0.22]]),
+  },
+  pajaro: {
+    name: "pájaro",
+    test: (x, y) => inEllipse(x, y, -0.05, -0.1, 0.55, 0.36) || inEllipse(x, y, 0.5, 0.25, 0.24, 0.24)
+      || inPoly(x, y, [[0.7, 0.3], [0.95, 0.22], [0.7, 0.16]]) || inPoly(x, y, [[-0.3, 0.05], [0.15, 0.1], [-0.35, 0.72]])
+      || inPoly(x, y, [[-0.55, -0.05], [-0.95, 0.2], [-0.9, -0.3]]),
+  },
+  trebol: {
+    name: "trébol",
+    test: (x, y) => inEllipse(x, y, 0, 0.5, 0.33, 0.33) || inEllipse(x, y, -0.36, 0.0, 0.33, 0.33) || inEllipse(x, y, 0.36, 0.0, 0.33, 0.33)
+      || inEllipse(x, y, 0, 0.12, 0.2, 0.2) || (Math.abs(x - 0.25 * (y + 0.2)) < 0.07 && y <= -0.15 && y >= -0.9),
+  },
+  manzana: {
+    name: "manzana",
+    test: (x, y) => inEllipse(x, y, -0.28, -0.1, 0.48, 0.62) || inEllipse(x, y, 0.28, -0.1, 0.48, 0.62)
+      || (x >= -0.05 && x <= 0.06 && y >= 0.45 && y <= 0.82) || inEllipse(x, y, 0.28, 0.7, 0.22, 0.1, 0.5),
+  },
+  seta: {
+    name: "seta",
+    test: (x, y) => (inEllipse(x, y, 0, 0.1, 0.9, 0.7) && y >= 0.1) || (x >= -0.22 && x <= 0.22 && y >= -0.85 && y <= 0.12),
+  },
+  nube: {
+    name: "nube",
+    test: (x, y) => inEllipse(x, y, -0.45, -0.12, 0.38, 0.32) || inEllipse(x, y, 0.45, -0.12, 0.38, 0.32)
+      || inEllipse(x, y, -0.05, 0.18, 0.45, 0.42) || (x >= -0.75 && x <= 0.75 && y >= -0.44 && y <= -0.1),
+  },
+  sol: {
+    name: "sol",
+    test: (x, y) => {
+      if (inEllipse(x, y, 0, 0, 0.45, 0.45)) return true;
+      for (let k = 0; k < 8; k++) {
+        const a = (k * Math.PI) / 4, c = Math.cos(a), s = Math.sin(a);
+        if (inPoly(x, y, [[0.55 * c - 0.16 * s, 0.55 * s + 0.16 * c], [0.95 * c, 0.95 * s], [0.55 * c + 0.16 * s, 0.55 * s - 0.16 * c]])) return true;
+      }
+      return false;
+    },
+  },
 };
+// Figuras originales de temas genéricos (comida tierna y objetos rústicos), hechas con formas simples.
+Object.assign(MYSTERY_SHAPES, {
+  pera: {
+    name: "pera",
+    test: (x, y) => inEllipse(x, y, 0, -0.35, 0.56, 0.52) || inEllipse(x, y, 0, 0.18, 0.34, 0.42)
+      || (x >= -0.06 && x <= 0.06 && y >= 0.5 && y <= 0.9) || inEllipse(x, y, 0.24, 0.78, 0.2, 0.09, 0.5),
+  },
+  donut: { name: "dónut", test: (x, y) => inEllipse(x, y, 0, 0, 0.82, 0.82) && !inEllipse(x, y, 0, 0, 0.3, 0.3) },
+  taza: {
+    name: "taza",
+    test: (x, y) => inPoly(x, y, [[-0.6, 0.42], [0.42, 0.42], [0.32, -0.58], [-0.5, -0.58]])
+      || (inEllipse(x, y, 0.5, -0.04, 0.34, 0.3) && !inEllipse(x, y, 0.5, -0.04, 0.17, 0.14))
+      || inEllipse(x, y, -0.08, -0.72, 0.85, 0.15),
+  },
+  magdalena: {
+    name: "magdalena",
+    // Base estrecha y, separada por una franja blanca, la crema en tres pisos con una cereza arriba
+    test: (x, y) => inPoly(x, y, [[-0.4, -0.92], [0.4, -0.92], [0.58, -0.25], [-0.58, -0.25]])
+      || (y >= -0.08 && (inEllipse(x, y, 0, 0.06, 0.82, 0.22) || inEllipse(x, y, 0, 0.36, 0.6, 0.2) || inEllipse(x, y, 0, 0.6, 0.38, 0.16)))
+      || inEllipse(x, y, 0, 0.86, 0.13, 0.13),
+  },
+  lazo: {
+    name: "lazo",
+    test: (x, y) => inPoly(x, y, [[-0.1, 0.02], [-0.92, 0.55], [-0.92, -0.38]]) || inPoly(x, y, [[0.1, 0.02], [0.92, 0.55], [0.92, -0.38]])
+      || inEllipse(x, y, 0, 0, 0.2, 0.22) || inPoly(x, y, [[-0.1, -0.08], [-0.5, -0.88], [-0.26, -0.92], [0.04, -0.15]])
+      || inPoly(x, y, [[0.1, -0.08], [0.5, -0.88], [0.26, -0.92], [-0.04, -0.15]]),
+  },
+  sandia: {
+    name: "sandía",
+    // Cuña de sandía: triángulo con la punta arriba y la corteza curva abajo (las pepitas rompían
+    // la silueta en la rejilla y se quitaron)
+    test: (x, y) => inPoly(x, y, [[0, 0.82], [-0.8, -0.5], [0.8, -0.5]]) || (inEllipse(x, y, 0, -0.5, 0.8, 0.32) && y <= -0.5),
+  },
+});
+// Siluetas de boceto (mysteryMasks.js): sustituyen a las geométricas del mismo nombre y suman 15.
+for (const [k, name] of Object.entries({"perro": "perro", "gato": "gato", "colibri": "colibrí", "caballo": "caballo", "jirafa": "jirafa", "pino": "pino", "tulipan": "tulipán", "montana": "sol y montaña", "nube": "nube", "mariposa": "mariposa", "buho": "búho", "pez": "pez", "oso": "oso", "saturno": "Saturno", "cohete": "cohete", "ovni": "ovni", "avion": "avión", "torre_eiffel": "torre Eiffel", "ubicacion": "ubicación", "gota": "gota"})) MYSTERY_SHAPES[k] = { name, test: maskTest(k) };
 export const MYSTERY_KEYS = Object.keys(MYSTERY_SHAPES);
+/** Máximo de mandalas misteriosos por libro: uno por figura distinta. */
+export const MYSTERY_MAX = MYSTERY_KEYS.length;
 
 /**
  * Geometría de la rejilla (pura): anillos con sus celdas y si cada celda va marcada.

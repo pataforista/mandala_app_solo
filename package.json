@@ -9,12 +9,17 @@
     "test": "node --test tests/*.test.mjs",
     "check:figuras": "node scripts/checkFigures.mjs assets/figuras-dinosaurios.json",
     "sw:rev": "node scripts/sw-revisions.mjs",
-    "check": "node scripts/sw-revisions.mjs --check && node --test tests/*.test.mjs"
+    "check": "node scripts/sw-revisions.mjs --check && node --test tests/*.test.mjs",
+    "golden:estilos": "node scripts/golden-styles.mjs",
+    "bench:estilos": "node scripts/bench-styles.mjs 10 && node scripts/bench-identity.mjs 80 adulto && node scripts/bench-identity2.mjs 80 adulto",
+    "e2e": "node scripts/e2e-book.cjs \"\" es && node scripts/e2e-book.cjs \"\" en"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@shoelace-style/shoelace": "^2.19.1",
+    "jspdf": "^2.5.1",
     "serve": "^14.2.6"
   },
   "type": "module"

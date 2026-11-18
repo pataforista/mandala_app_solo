@@ -189,6 +189,14 @@
     }
 
     .comp-box > .hint { grid-column: 1 / -1; }
+    .style-thumbs { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; margin: 4px 0 8px; }
+    .style-thumb { border: 2px solid transparent; border-radius: 10px; background: #fff; padding: 4px; cursor: pointer; font: inherit; color: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .style-thumb[aria-pressed="true"] { border-color: var(--m3-primary, #6750A4); }
+    .style-thumb.off { opacity: .45; filter: grayscale(1); }
+    .style-thumb:focus-visible { outline: 3px solid var(--m3-primary, #6750A4); outline-offset: 2px; }
+    .style-thumb-art { width: 100%; aspect-ratio: 8.5 / 11; overflow: hidden; border-radius: 6px; }
+    .style-thumb-art svg { width: 100%; height: 100%; }
+    .style-thumb-name { font-size: 12px; font-weight: 600; }
     .comp-box.hidden-by-profile { display: none !important; }
     #bookPkgBox { margin: 6px 0 10px; grid-template-columns: 1fr; }
     #bookPkgBox > :not(.bookPkg) { grid-column: 1 / -1; }
@@ -545,6 +553,11 @@
               <sl-option value="doble">Doble con rombos</sl-option>
               <sl-option value="feston">Festón</sl-option>
               <sl-option value="ninguno">Sin marco</sl-option>
+              <sl-option value="cordon">Cordón (dos líneas con rombos)</sl-option>
+              <sl-option value="ondas">Ondas</sl-option>
+              <sl-option value="gotas">Gotas (festón hacia dentro)</sl-option>
+              <sl-option value="esquinas">Sólo esquinas</sl-option>
+              <sl-option value="recinto">Recinto cuadrado con puertas (yantra)</sl-option>
             </sl-select>
             <sl-range id="petals" label="Pétalos" min="6" max="96" value="12"></sl-range>
             <sl-range id="complexity" label="Complejidad" min="20" max="320" value="130"></sl-range>
@@ -702,7 +715,6 @@
             <sl-select id="bookTheme" label="Tema del libro" size="small" value="none">
               <sl-option value="none">Sin tema (variado)</sl-option>
               <sl-option value="oceano">Océano y vida marina (olas, conchas, escamas)</sl-option>
-              <sl-option value="navidad">Navidad e invierno (estrellas, copos)</sl-option>
               <sl-option value="bosque">Bosque y naturaleza (hojas, viñas)</sl-option>
               <sl-option value="espacio">Espacio y cosmos (planetas, galaxias)</sl-option>
               <sl-option value="mistico">Místico, tarot y alquimia (lunas, arcanos)</sl-option>
@@ -738,6 +750,7 @@
               <sl-checkbox class="bookComp" value="gigante" checked>Gigante</sl-checkbox>
               <sl-checkbox class="bookComp" value="medio" checked>Medio mandala</sl-checkbox>
               <div class="hint" style="font-weight:600; margin-top:6px;">Estilos</div>
+              <div id="styleThumbs" class="style-thumbs" aria-label="Vista previa de cada estilo"></div>
               <sl-checkbox class="bookStyle" value="sashiko" checked>Sashiko</sl-checkbox>
               <sl-checkbox class="bookStyle" value="floral" checked>Floral</sl-checkbox>
               <sl-checkbox class="bookStyle" value="geometric" checked>Geométrico</sl-checkbox>
@@ -750,6 +763,11 @@
               <sl-checkbox class="bookFrame" value="doble" checked>Doble con rombos</sl-checkbox>
               <sl-checkbox class="bookFrame" value="feston" checked>Festón</sl-checkbox>
               <sl-checkbox class="bookFrame" value="ninguno" checked>Sin marco</sl-checkbox>
+              <sl-checkbox class="bookFrame" value="cordon" checked>Cordón</sl-checkbox>
+              <sl-checkbox class="bookFrame" value="ondas" checked>Ondas</sl-checkbox>
+              <sl-checkbox class="bookFrame" value="gotas" checked>Gotas</sl-checkbox>
+              <sl-checkbox class="bookFrame" value="esquinas" checked>Sólo esquinas</sl-checkbox>
+              <sl-checkbox class="bookFrame" value="recinto" checked>Recinto</sl-checkbox>
               <div class="hint">Si desmarcas todo un grupo, se usa lo elegido en «Diseñar». Tu elección manda sobre el tema y el público.</div>
             </div>
             <sl-checkbox id="bookVary" checked>Variar estilo, pétalos, composición y marco entre páginas</sl-checkbox>
@@ -787,13 +805,22 @@
                   <sl-option value="2">2 secuencias (8 páginas)</sl-option>
                   <sl-option value="3">3 secuencias (12 páginas)</sl-option>
                 </sl-select>
-                <sl-input id="bookMystery" type="number" label="Mandalas misteriosos" size="small" min="0" max="7" value="3" help-text="Esconden una figura que aparece al colorear. Las soluciones van al final."></sl-input>
+                <sl-input id="bookMystery" type="number" label="Mandalas misteriosos" size="small" min="0" max="41" value="3" help-text="Esconden una figura que aparece al colorear. Las soluciones van al final."></sl-input>
                 <sl-checkbox id="bookNature" checked>Capítulo «Simetrías de la naturaleza» (girasol, estrella de mar, copo de nieve y diatomea, con una nota científica)</sl-checkbox>
                 <sl-select id="bookMural" label="Mural para armar (al final del libro)" size="small" value="3x3" help-text="Un mandala gigante repartido en varias hojas, con guía para unirlas.">
                   <sl-option value="ninguno">Ninguno</sl-option>
-                  <sl-option value="2x2">2×2 hojas</sl-option>
-                  <sl-option value="3x3">3×3 hojas</sl-option>
+                  <sl-option value="2x1">2 hojas (2×1)</sl-option>
+                  <sl-option value="2x2">4 hojas (2×2)</sl-option>
+                  <sl-option value="3x2">6 hojas (3×2)</sl-option>
+                  <sl-option value="3x3">9 hojas (3×3)</sl-option>
+                  <sl-option value="4x4">16 hojas (4×4)</sl-option>
+                  <sl-option value="custom">Otro tamaño…</sl-option>
                 </sl-select>
+                <div id="bookMuralCustom" style="display:none; gap:8px;">
+                  <sl-input id="bookMuralCols" type="number" label="Hojas de ancho" size="small" min="1" max="6" value="3" style="flex:1;"></sl-input>
+                  <sl-input id="bookMuralRows" type="number" label="Hojas de alto" size="small" min="1" max="6" value="2" style="flex:1;"></sl-input>
+                </div>
+                <div class="hint" id="bookMuralTotal"></div>
 
               <div class="hint" style="font-weight:600; margin-top:6px;">Al principio y al final</div>
               <sl-checkbox id="bookTitlePage" checked>Hoja de título</sl-checkbox>

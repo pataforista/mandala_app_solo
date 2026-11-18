@@ -6,11 +6,12 @@ import { mulberry32, pick, rFloat, rInt } from "./core/prng.js";
 import { generateMandalaLayers } from "./generators/mandalaLayers.js";
 import { generateMandalaRadial } from "./generators/mandalaRadial.js";
 import { generateMandalaClassic } from "./generators/mandalaClassic.js";
+import { BOOK_STYLES as THUMB_STYLES } from "./core/bookPlan.js";
 import { StateHistory } from "./core/history.js";
 import { saveToFavorites, getFavorites, deleteFavorite } from "./core/storage.js";
 import { ImageProcessor } from "./core/imageProcessor.js";
 import { PathBuilder } from "./core/pathBuilder.js";
-import { planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, BOOK_STYLES, BESTSELLER_STYLE_W, chapterLayout, insertChapterDividers, applyPageOverride, PRODUCT_PROFILES, BOOK_THEMES, shuffleBag } from "./core/bookPlan.js";
+import { parseMuralSize, planBook, bestSellerProfile, pageStrokeMm, addSpecialPages, specialPageCount, muralTilePositions, GROWTH_STAGES, BOOK_STYLES, BESTSELLER_STYLE_W, chapterLayout, insertChapterDividers, applyPageOverride, PRODUCT_PROFILES, BOOK_THEMES, shuffleBag } from "./core/bookPlan.js";
 import { curateBook, attemptChoice, twinTargets as curatorTwinTargets, WEAK_SCORE, CURATE_TRIES } from "./core/bookCurator.js";
 import { withSpecialPages, specialLabel } from "./generators/specialPages.js";
 import { MYSTERY_SHAPES } from "./generators/mysteryMandala.js";
@@ -20,11 +21,12 @@ import { kdpSafeMarginMm, kdpChecklist, bookLayout, kdpCoverDimensions } from ".
 import { loadImageFile, figureFromImage, withStamp, withThinInk } from "./core/figureImport.js";
 import { fitOf } from "./generators/pageComposer.js";
 import { packFigures, unpackFigures, encodeCls, decodeCls } from "./core/figurePack.js";
-import { autoSaveProject, loadAutoSave, saveNamedProject, listProjects, loadProject, deleteProject, duplicateProject, serializeProject, deserializeProject } from "./core/projects.js";
+import { autoSaveProject, loadAutoSave, saveNamedProject, listProjects, loadProject, deleteProject, duplicateProject, serializeProject, deserializeProject, stylesChangedSince } from "./core/projects.js";
+import { STYLE_GRAMMAR_VERSION } from "./generators/styles/index.js";
 import { checkFigure, checklistHtml, REQUIREMENTS_HTML, CHECKLIST_CSS } from "./core/figureChecks.js";
 import { measureSvg, commercialScore } from "./core/commercialMetrics.js";
 import { pageFingerprint, similarPairs } from "./core/variety.js";
-import { COLORING_PRESETS } from "./core/levels.js";
+import { COLORING_PRESETS, levelToGeneratorOpts } from "./core/levels.js";
 
 // Helper de notificaciones no intrusivas usando Shoelace Toast
 export function showToast(message, variant = "primary", icon = "info-circle", duration = 3000) {
@@ -1908,6 +1910,46 @@ function bindUI() {
   const bookPaperEl = document.getElementById("bookPaper");
   const bookFigureThinEl = document.getElementById("bookFigureThin");
   const checkedValues = (sel) => [...document.querySelectorAll(sel)].filter(b => b.checked).map(b => b.value);
+  // Miniaturas de cada estilo: una página pequeña del motor clásico, generada al abrir la pestaña.
+  // Cada miniatura marca (o desmarca) su casilla; no se guarda nada, se calcula en el navegador.
+  const STYLE_LABELS = { sashiko: "Sashiko", floral: "Floral", geometric: "Geométrico", islamico: "Islámico", azteca: "Azteca", yantra: "Yantra", celtico: "Céltico" };
+  const renderStyleThumbs = () => {
+    const box = document.getElementById("styleThumbs");
+    if (!box || box.dataset.ready) return;
+    box.dataset.ready = "1";
+    for (const st of THUMB_STYLES) {
+      const doc = createDoc({ preset: "KDP_8_5x11", seed: 4242, marginMm: 12 });
+      try { generateMandalaClassic(doc, { ...levelToGeneratorOpts("adulto"), organicLevel: 0.2, textures: false, pageBorder: true, seed: 4242, petals: 16, styleMode: st }); } catch (e) { continue; }
+      // El SVG del motor trae su viewBox en mm; sólo hay que quitarle el tamaño fijo para que escale
+      const svg = renderDocToSvgString(doc).replace(/(<svg\b[^>]*?)\swidth="[^"]*"/, "$1").replace(/(<svg\b[^>]*?)\sheight="[^"]*"/, "$1");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "style-thumb";
+      btn.setAttribute("aria-pressed", "true");
+      btn.dataset.style = st;
+      btn.title = STYLE_LABELS[st] || st;
+      btn.innerHTML = `<span class="style-thumb-art">${svg.replace("<svg ", '<svg style="width:100%;height:auto;display:block" ')}</span><span class="style-thumb-name">${STYLE_LABELS[st] || st}</span>`;
+      btn.addEventListener("click", () => {
+        const cb = document.querySelector(`.bookStyle[value="${st}"]`);
+        if (!cb) return;
+        cb.checked = !cb.checked;
+        btn.setAttribute("aria-pressed", String(cb.checked));
+        btn.classList.toggle("off", !cb.checked);
+        cb.dispatchEvent(new CustomEvent("sl-change", { bubbles: true }));
+      });
+      box.appendChild(btn);
+    }
+  };
+  const syncStyleThumbs = () => document.querySelectorAll(".style-thumb").forEach(btn => {
+    const cb = document.querySelector(`.bookStyle[value="${btn.dataset.style}"]`);
+    if (!cb) return;
+    btn.setAttribute("aria-pressed", String(cb.checked));
+    btn.classList.toggle("off", !cb.checked);
+  });
+  renderStyleThumbs();
+  syncStyleThumbs();
+  document.querySelectorAll(".bookStyle").forEach(cb => cb.addEventListener("sl-change", syncStyleThumbs));
+
   const setChecked = (sel, values) => {
     if (!Array.isArray(values)) return;
     document.querySelectorAll(sel).forEach(b => { b.checked = values.includes(b.value); });
@@ -1930,13 +1972,26 @@ function bindUI() {
   const bookMysteryEl = document.getElementById("bookMystery");
   const bookNatureEl = document.getElementById("bookNature");
   const bookMuralEl = document.getElementById("bookMural");
+  const bookMuralColsEl = document.getElementById("bookMuralCols");
+  const bookMuralRowsEl = document.getElementById("bookMuralRows");
+  const bookMuralCustomEl = document.getElementById("bookMuralCustom");
+  const bookMuralTotalEl = document.getElementById("bookMuralTotal");
+  const muralFromUI = () => parseMuralSize(bookMuralEl?.value, bookMuralColsEl?.value, bookMuralRowsEl?.value);
+  // Muestra las casillas de «Otro tamaño…» y cuántas hojas saldrán
+  const refreshMuralUI = () => {
+    const custom = bookMuralEl?.value === "custom", m = muralFromUI();
+    if (bookMuralCustomEl) bookMuralCustomEl.style.display = custom ? "flex" : "none";
+    if (bookMuralTotalEl) bookMuralTotalEl.textContent = m
+      ? `Mural de ${m.cols}×${m.rows}: ${m.cols * m.rows} hojas para colorear y recortar, más 1 hoja guía.`
+      : (custom ? "Elige al menos 2 hojas en total (de 1 a 6 por lado)." : "");
+  };
   const specialOpts = () => {
-    const mural = bookMuralEl?.value && bookMuralEl.value !== "ninguno" ? bookMuralEl.value.split("x").map(Number) : null;
+    const mural = muralFromUI();
     return {
       growth: Math.max(0, Math.min(3, parseInt(bookGrowthEl?.value, 10) || 0)),
-      mystery: Math.max(0, Math.min(7, parseInt(bookMysteryEl?.value, 10) || 0)),
+      mystery: Math.max(0, Math.min(41, parseInt(bookMysteryEl?.value, 10) || 0)), // 41 figuras distintas
       nature: !!bookNatureEl?.checked,
-      mural: mural ? { cols: mural[0], rows: mural[1] } : null,
+      mural,
     };
   };
   // Capítulos temáticos: estilos y pesos del libro (los mismos que usa el plan)
@@ -2037,7 +2092,7 @@ function bindUI() {
   const SELECT_SETTINGS = { title: "bookTitle", subtitle: "bookSubtitle", author: "bookAuthor", pages: "bookPages",
     difficulty: "bookDifficulty", productProfile: "bookProductProfile", theme: "bookTheme", back: "bookBack",
     dpi: "bookDpi", language: "bookLanguage", paper: "bookPaper", growth: "bookGrowth", mystery: "bookMystery",
-    mural: "bookMural", figureShare: "bookFigureShare", designs: "bookProfile" };
+    mural: "bookMural", muralCols: "bookMuralCols", muralRows: "bookMuralRows", figureShare: "bookFigureShare", designs: "bookProfile" };
   const CHECK_SETTINGS = { titlePage: "bookTitlePage", copyright: "bookCopyright", belongsPage: "bookBelongsPage",
     welcomePage: "bookWelcomePage", reviewPage: "bookReviewPage", colorTest: "bookColorTest",
     pageNumbers: "bookPageNumbers", nature: "bookNature", vary: "bookVary", chapters: "bookChapters",
@@ -2055,6 +2110,9 @@ function bindUI() {
     for (const [k, id] of Object.entries(SELECT_SETTINGS)) { const el = document.getElementById(id); if (el && s[k] !== undefined) el.value = String(s[k]); }
     for (const [k, id] of Object.entries(CHECK_SETTINGS)) { const el = document.getElementById(id); if (el && s[k] !== undefined) el.checked = !!s[k]; }
     for (const [k, sel] of Object.entries(GROUP_SETTINGS)) setChecked(sel, s[k]);
+    // Un tema guardado que ya no existe (p. ej. «navidad», retirado) vuelve a «Sin tema»
+    if (bookThemeEl && !BOOK_THEMES[bookThemeEl.value]) bookThemeEl.value = "none";
+    refreshMuralUI();
   };
   const saveBookSettings = () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collectBookSettings())); } catch (e) {}
@@ -2718,9 +2776,11 @@ function bindUI() {
   bookVaryEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateGeneratorUI(); });
   bookChaptersEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); updateBookSummary(); });
   bookDifficultyEl?.addEventListener("sl-change", () => { bookOverrides = new Map(); updateReviewInfo(); });
-  [bookGrowthEl, bookMysteryEl, bookNatureEl, bookMuralEl].forEach(el => el?.addEventListener("sl-change", () => {
-    bookOverrides = new Map(); updateReviewInfo(); updateBookSummary();
+  [bookGrowthEl, bookMysteryEl, bookNatureEl, bookMuralEl, bookMuralColsEl, bookMuralRowsEl].forEach(el => el?.addEventListener("sl-change", () => {
+    refreshMuralUI(); bookOverrides = new Map(); updateReviewInfo(); updateBookSummary();
   }));
+  [bookMuralColsEl, bookMuralRowsEl].forEach(el => el?.addEventListener("sl-input", () => { refreshMuralUI(); updateBookSummary(); }));
+  refreshMuralUI();
   bookMysteryEl?.addEventListener("sl-input", updateBookSummary);
 
   const downloadBook = async () => {
@@ -2883,6 +2943,7 @@ function bindUI() {
     }));
 
     return {
+      grammarVersion: STYLE_GRAMMAR_VERSION,
       id: currentProjectId,
       name: currentProjectName,
       state: JSON.parse(JSON.stringify(state)),
@@ -2907,6 +2968,10 @@ function bindUI() {
 
   async function applyProjectPayload(data, projName = null) {
     if (!data) return;
+    // Proyecto guardado antes de un cambio en el dibujo de los estilos: se avisa, sin bloquear
+    if (stylesChangedSince(data, STYLE_GRAMMAR_VERSION) && (data.state || data.bookSettings)) {
+      showToast("Los estilos se han renovado desde que guardaste este proyecto: sus páginas se han redibujado. Revísalas antes de crear el libro.", "warning", "exclamation-triangle", 12000);
+    }
     if (data.state) {
       Object.assign(state, data.state);
       bindUI();

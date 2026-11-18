@@ -26,8 +26,8 @@ test("cada tema del libro: paquetes del catálogo, fondos dibujables y opción e
     }
     if (key !== "none") assert.match(html, new RegExp(`<sl-option value="${key}">`), `${key}: opción en el selector de tema`);
   }
-  // Navidad cargaba el paquete de dinosaurios zentangle
-  assert.ok(!BOOK_THEMES.navidad.packages.includes("zentangle"));
+  // Navidad se retiró: no debe quedar el tema
+  assert.ok(!BOOK_THEMES.navidad);
 });
 
 test("cada paquete de ilustraciones se puede marcar en la pestaña del libro", () => {

@@ -1,0 +1,148 @@
+# Línea base de estilos · 14 nov 2026 · commit 8eefe8b
+
+$ node scripts/bench-styles.mjs 10
+1. Puntuación por motor, nivel y estilo
+┌─────────┬───────────┬────────────────┬─────────────┬───────┬─────┐
+│ (index) │ motor     │ nivel          │ estilo      │ media │ mín │
+├─────────┼───────────┼────────────────┼─────────────┼───────┼─────┤
+│ 0       │ 'classic' │ 'ninos'        │ 'sashiko'   │ 90.1  │ 84  │
+│ 1       │ 'classic' │ 'ninos'        │ 'floral'    │ 89    │ 83  │
+│ 2       │ 'classic' │ 'ninos'        │ 'geometric' │ 90.9  │ 84  │
+│ 3       │ 'classic' │ 'ninos'        │ 'islamico'  │ 88.9  │ 74  │
+│ 4       │ 'classic' │ 'ninos'        │ 'azteca'    │ 90.6  │ 80  │
+│ 5       │ 'classic' │ 'ninos'        │ 'yantra'    │ 90.8  │ 85  │
+│ 6       │ 'classic' │ 'ninos'        │ 'celtico'   │ 89.3  │ 84  │
+│ 7       │ 'classic' │ 'letra_grande' │ 'sashiko'   │ 83.8  │ 74  │
+│ 8       │ 'classic' │ 'letra_grande' │ 'floral'    │ 83.2  │ 73  │
+│ 9       │ 'classic' │ 'letra_grande' │ 'geometric' │ 84.5  │ 71  │
+│ 10      │ 'classic' │ 'letra_grande' │ 'islamico'  │ 83.5  │ 71  │
+│ 11      │ 'classic' │ 'letra_grande' │ 'azteca'    │ 83.2  │ 69  │
+│ 12      │ 'classic' │ 'letra_grande' │ 'yantra'    │ 83.2  │ 68  │
+│ 13      │ 'classic' │ 'letra_grande' │ 'celtico'   │ 82.7  │ 71  │
+│ 14      │ 'classic' │ 'adulto'       │ 'sashiko'   │ 80    │ 71  │
+│ 15      │ 'classic' │ 'adulto'       │ 'floral'    │ 79.1  │ 62  │
+│ 16      │ 'classic' │ 'adulto'       │ 'geometric' │ 79.6  │ 61  │
+│ 17      │ 'classic' │ 'adulto'       │ 'islamico'  │ 79.5  │ 68  │
+│ 18      │ 'classic' │ 'adulto'       │ 'azteca'    │ 73.1  │ 37  │
+│ 19      │ 'classic' │ 'adulto'       │ 'yantra'    │ 75.3  │ 42  │
+│ 20      │ 'classic' │ 'adulto'       │ 'celtico'   │ 78    │ 60  │
+│ 21      │ 'classic' │ 'experto'      │ 'sashiko'   │ 40    │ 17  │
+│ 22      │ 'classic' │ 'experto'      │ 'floral'    │ 38.3  │ 0   │
+│ 23      │ 'classic' │ 'experto'      │ 'geometric' │ 42.4  │ 6   │
+│ 24      │ 'classic' │ 'experto'      │ 'islamico'  │ 42.6  │ 16  │
+│ 25      │ 'classic' │ 'experto'      │ 'azteca'    │ 39.5  │ 18  │
+│ 26      │ 'classic' │ 'experto'      │ 'yantra'    │ 38.8  │ 16  │
+│ 27      │ 'classic' │ 'experto'      │ 'celtico'   │ 41.7  │ 19  │
+│ 28      │ 'radial'  │ 'ninos'        │ 'sashiko'   │ 61    │ 57  │
+│ 29      │ 'radial'  │ 'ninos'        │ 'floral'    │ 61    │ 57  │
+│ 30      │ 'radial'  │ 'ninos'        │ 'geometric' │ 61    │ 57  │
+│ 31      │ 'radial'  │ 'ninos'        │ 'islamico'  │ 61    │ 57  │
+│ 32      │ 'radial'  │ 'ninos'        │ 'azteca'    │ 61    │ 57  │
+│ 33      │ 'radial'  │ 'ninos'        │ 'yantra'    │ 61    │ 57  │
+│ 34      │ 'radial'  │ 'ninos'        │ 'celtico'   │ 61    │ 57  │
+│ 35      │ 'radial'  │ 'letra_grande' │ 'sashiko'   │ 83.3  │ 76  │
+│ 36      │ 'radial'  │ 'letra_grande' │ 'floral'    │ 83.3  │ 76  │
+│ 37      │ 'radial'  │ 'letra_grande' │ 'geometric' │ 83.3  │ 76  │
+│ 38      │ 'radial'  │ 'letra_grande' │ 'islamico'  │ 83.3  │ 76  │
+│ 39      │ 'radial'  │ 'letra_grande' │ 'azteca'    │ 83.3  │ 76  │
+│ 40      │ 'radial'  │ 'letra_grande' │ 'yantra'    │ 83.3  │ 76  │
+│ 41      │ 'radial'  │ 'letra_grande' │ 'celtico'   │ 83.3  │ 76  │
+│ 42      │ 'radial'  │ 'adulto'       │ 'sashiko'   │ 60.2  │ 50  │
+│ 43      │ 'radial'  │ 'adulto'       │ 'floral'    │ 60.2  │ 50  │
+│ 44      │ 'radial'  │ 'adulto'       │ 'geometric' │ 60.2  │ 50  │
+│ 45      │ 'radial'  │ 'adulto'       │ 'islamico'  │ 60.2  │ 50  │
+│ 46      │ 'radial'  │ 'adulto'       │ 'azteca'    │ 60.2  │ 50  │
+│ 47      │ 'radial'  │ 'adulto'       │ 'yantra'    │ 60.2  │ 50  │
+│ 48      │ 'radial'  │ 'adulto'       │ 'celtico'   │ 60.2  │ 50  │
+│ 49      │ 'radial'  │ 'experto'      │ 'sashiko'   │ 4.8   │ 0   │
+│ 50      │ 'radial'  │ 'experto'      │ 'floral'    │ 4.8   │ 0   │
+│ 51      │ 'radial'  │ 'experto'      │ 'geometric' │ 4.8   │ 0   │
+│ 52      │ 'radial'  │ 'experto'      │ 'islamico'  │ 4.8   │ 0   │
+│ 53      │ 'radial'  │ 'experto'      │ 'azteca'    │ 4.8   │ 0   │
+│ 54      │ 'radial'  │ 'experto'      │ 'yantra'    │ 4.8   │ 0   │
+│ 55      │ 'radial'  │ 'experto'      │ 'celtico'   │ 4.8   │ 0   │
+│ 56      │ 'layers'  │ 'ninos'        │ 'sashiko'   │ 69.2  │ 65  │
+│ 57      │ 'layers'  │ 'ninos'        │ 'floral'    │ 70    │ 65  │
+│ 58      │ 'layers'  │ 'ninos'        │ 'geometric' │ 81.2  │ 74  │
+│ 59      │ 'layers'  │ 'ninos'        │ 'islamico'  │ 80.5  │ 74  │
+│ 60      │ 'layers'  │ 'ninos'        │ 'azteca'    │ 77.3  │ 65  │
+│ 61      │ 'layers'  │ 'ninos'        │ 'yantra'    │ 71    │ 65  │
+│ 62      │ 'layers'  │ 'ninos'        │ 'celtico'   │ 68.7  │ 65  │
+│ 63      │ 'layers'  │ 'letra_grande' │ 'sashiko'   │ 86.3  │ 81  │
+│ 64      │ 'layers'  │ 'letra_grande' │ 'floral'    │ 88.2  │ 81  │
+│ 65      │ 'layers'  │ 'letra_grande' │ 'geometric' │ 94.4  │ 89  │
+│ 66      │ 'layers'  │ 'letra_grande' │ 'islamico'  │ 93.8  │ 89  │
+│ 67      │ 'layers'  │ 'letra_grande' │ 'azteca'    │ 91.6  │ 80  │
+│ 68      │ 'layers'  │ 'letra_grande' │ 'yantra'    │ 88.4  │ 81  │
+│ 69      │ 'layers'  │ 'letra_grande' │ 'celtico'   │ 85.3  │ 81  │
+│ 70      │ 'layers'  │ 'adulto'       │ 'sashiko'   │ 68.5  │ 62  │
+│ 71      │ 'layers'  │ 'adulto'       │ 'floral'    │ 69    │ 57  │
+│ 72      │ 'layers'  │ 'adulto'       │ 'geometric' │ 77.4  │ 72  │
+│ 73      │ 'layers'  │ 'adulto'       │ 'islamico'  │ 72.8  │ 58  │
+│ 74      │ 'layers'  │ 'adulto'       │ 'azteca'    │ 74.4  │ 66  │
+│ 75      │ 'layers'  │ 'adulto'       │ 'yantra'    │ 70.2  │ 62  │
+│ 76      │ 'layers'  │ 'adulto'       │ 'celtico'   │ 67.8  │ 61  │
+│ 77      │ 'layers'  │ 'experto'      │ 'sashiko'   │ 0     │ 0   │
+│ 78      │ 'layers'  │ 'experto'      │ 'floral'    │ 0     │ 0   │
+│ 79      │ 'layers'  │ 'experto'      │ 'geometric' │ 0     │ 0   │
+│ 80      │ 'layers'  │ 'experto'      │ 'islamico'  │ 0     │ 0   │
+│ 81      │ 'layers'  │ 'experto'      │ 'azteca'    │ 0     │ 0   │
+│ 82      │ 'layers'  │ 'experto'      │ 'yantra'    │ 0     │ 0   │
+│ 83      │ 'layers'  │ 'experto'      │ 'celtico'   │ 0     │ 0   │
+└─────────┴───────────┴────────────────┴─────────────┴───────┴─────┘
+2. Identidad de estilo (misma semilla, distinto estilo; 1 = página idéntica)
+┌─────────┬───────────┬────────────────┬────────────────────────────────┬──────────────┐
+│ (index) │ motor     │ nivel          │ parecido entre estilos (media) │ pares ≥ 0,90 │
+├─────────┼───────────┼────────────────┼────────────────────────────────┼──────────────┤
+│ 0       │ 'classic' │ 'ninos'        │ 0.972                          │ '198/210'    │
+│ 1       │ 'classic' │ 'letra_grande' │ 0.965                          │ '197/210'    │
+│ 2       │ 'classic' │ 'adulto'       │ 0.962                          │ '197/210'    │
+│ 3       │ 'classic' │ 'experto'      │ 0.96                           │ '198/210'    │
+│ 4       │ 'radial'  │ 'ninos'        │ 1                              │ '210/210'    │
+│ 5       │ 'radial'  │ 'letra_grande' │ 1                              │ '210/210'    │
+│ 6       │ 'radial'  │ 'adulto'       │ 1                              │ '210/210'    │
+│ 7       │ 'radial'  │ 'experto'      │ 1                              │ '210/210'    │
+│ 8       │ 'layers'  │ 'ninos'        │ 0.96                           │ '210/210'    │
+│ 9       │ 'layers'  │ 'letra_grande' │ 0.963                          │ '210/210'    │
+│ 10      │ 'layers'  │ 'adulto'       │ 0.97                           │ '210/210'    │
+│ 11      │ 'layers'  │ 'experto'      │ 0.951                          │ '203/210'    │
+└─────────┴───────────┴────────────────┴────────────────────────────────┴──────────────┘
+3. Perfiles de producto antes de la curaduría (2 libros de 40 páginas, dificultad progresiva)
+┌─────────┬────────────────────┬───────────┬───────┬─────┬──────────────┬─────────────────┐
+│ (index) │ perfil             │ nivel     │ media │ mín │ flojas (<60) │ complejidad máx │
+├─────────┼────────────────────┼───────────┼───────┼─────┼──────────────┼─────────────────┤
+│ 0       │ 'más vendidos'     │ 'adulto'  │ 82.2  │ 61  │ '0/80'       │ 200             │
+│ 1       │ 'mindful_patterns' │ 'adulto'  │ 71.5  │ 43  │ '7/80'       │ 200             │
+│ 2       │ 'large_print_easy' │ 'adulto'  │ 83.3  │ 60  │ '0/80'       │ 200             │
+│ 3       │ 'intricate_sacred' │ 'adulto'  │ 71.3  │ 42  │ '8/80'       │ 200             │
+│ 4       │ 'kids_mandalas'    │ 'adulto'  │ 81.9  │ 58  │ '1/80'       │ 200             │
+│ 5       │ 'más vendidos'     │ 'experto' │ 41.8  │ 14  │ '76/80'      │ 220             │
+│ 6       │ 'intricate_sacred' │ 'experto' │ 50.6  │ 20  │ '60/80'      │ 200             │
+└─────────┴────────────────────┴───────────┴───────┴─────┴──────────────┴─────────────────┘
+
+$ node scripts/bench-identity.mjs 80 adulto
+Identificabilidad de estilo · nivel adulto · 80 páginas por estilo (mitad de prueba)
+┌───────────┬─────────┬────────┬───────────┬──────────┬────────┬────────┬─────────┬───────────┐
+│ (index)   │ sashiko │ floral │ geometric │ islamico │ azteca │ yantra │ celtico │ acierto % │
+├───────────┼─────────┼────────┼───────────┼──────────┼────────┼────────┼─────────┼───────────┤
+│ sashiko   │ 9       │ 9      │ 3         │ 5        │ 4      │ 2      │ 8       │ 23        │
+│ floral    │ 7       │ 15     │ 0         │ 3        │ 2      │ 3      │ 10      │ 38        │
+│ geometric │ 3       │ 4      │ 15        │ 1        │ 6      │ 10     │ 1       │ 38        │
+│ islamico  │ 4       │ 11     │ 4         │ 4        │ 3      │ 10     │ 4       │ 10        │
+│ azteca    │ 1       │ 0      │ 12        │ 3        │ 10     │ 11     │ 3       │ 25        │
+│ yantra    │ 1       │ 20     │ 1         │ 2        │ 0      │ 11     │ 5       │ 28        │
+│ celtico   │ 6       │ 16     │ 1         │ 2        │ 2      │ 0      │ 13      │ 33        │
+└───────────┴─────────┴────────┴───────────┴──────────┴────────┴────────┴─────────┴───────────┘
+Centroides (en desviaciones estándar):
+┌───────────┬────────┬────────────────┬────────────────┬──────────┬───────────────┬─────────────────┬────────────┐
+│ (index)   │ rectas │ esquinas/100mm │ ángulos rectos │ redondez │ celdas chicas │ trazos abiertos │ log celdas │
+├───────────┼────────┼────────────────┼────────────────┼──────────┼───────────────┼─────────────────┼────────────┤
+│ sashiko   │ -0.21  │ -0.12          │ 0.44           │ 0.35     │ -0.1          │ 0.25            │ 0.05       │
+│ floral    │ -0.92  │ -0.1           │ 0.25           │ 0.05     │ -0.16         │ -0.47           │ 0.44       │
+│ geometric │ 0.65   │ 0.13           │ -0.52          │ -0.11    │ 0.18          │ 0.34            │ -0.38      │
+│ islamico  │ -0.06  │ 0.16           │ 0.06           │ 0.13     │ -0.08         │ 0.05            │ 0.16       │
+│ azteca    │ 0.46   │ -0.12          │ -0.13          │ -0.28    │ 0.21          │ 0.37            │ -0.42      │
+│ yantra    │ 0.74   │ 0.47           │ -0.22          │ -0.27    │ 0.05          │ -0.52           │ 0.01       │
+│ celtico   │ -0.66  │ -0.42          │ 0.12           │ 0.12     │ -0.1          │ -0.02           │ 0.14       │
+└───────────┴────────┴────────────────┴────────────────┴──────────┴───────────────┴─────────────────┴────────────┘
+Acierto global: 27.5 % (azar: 14.3 %)

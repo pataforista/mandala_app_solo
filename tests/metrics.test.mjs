@@ -51,3 +51,25 @@ test("measureSvg: los trazos tapados por un relleno blanco posterior o recortado
   const clip = `<defs><clipPath id="c"><rect x="50" y="50" width="40" height="40" /></clipPath></defs>`;
   assert.equal(measureSvg(vb(`${clip}<g clip-path="url(#c)">${pair}</g>`)).huecos, 0);
 });
+
+test("nivel experto: la puntuación propia mide celdas dentro del disco, astillas y puntos de contraste", async () => {
+  const { expertScore, regionAreas } = await import("../js/core/commercialMetrics.js");
+  const { createDoc } = await import("../js/core/svgDoc.js");
+  const { renderDocToSvgString } = await import("../js/core/svgRender.js");
+  const { generateMandalaClassic } = await import("../js/generators/mandalaClassic.js");
+  const { levelToGeneratorOpts, COLORING_PRESETS } = await import("../js/core/levels.js");
+  const p = COLORING_PRESETS.experto, layers = Object.fromEntries(Object.entries(p).filter(([k]) => k.startsWith("layer")));
+  const doc = createDoc({ preset: "KDP_8_5x8_5", seed: 38, marginMm: 12 });
+  generateMandalaClassic(doc, { ...levelToGeneratorOpts("experto"), ...layers, organicLevel: p.organic, textures: p.textures, pageBorder: false, kaleidoscope: true, seed: 38, petals: 16, styleMode: "floral" });
+  const svg = renderDocToSvgString(doc);
+  const r = expertScore(svg, doc.page);
+  assert.ok(Number.isInteger(r.score) && r.score >= 0 && r.score <= 100, "puntuación entera 0–100");
+  assert.ok(r.partes["celdas en el disco"] > 300, "un mandala experto tiene cientos de celdas en el disco");
+  assert.ok(r.partes["puntos de contraste"] >= 1, "el experto lleva puntos de contraste");
+  // Una página en blanco no tiene celdas: no puede puntuar alto
+  const blank = createDoc({ preset: "KDP_8_5x8_5", seed: 1, marginMm: 12 });
+  assert.ok(expertScore(renderDocToSvgString(blank), blank.page).score < 60, "una página vacía no puntúa como experto");
+  // Las áreas son mm² reales: las regiones del disco suman menos que el disco
+  const { areas, discArea } = regionAreas(svg, doc.page);
+  assert.ok(areas.reduce((t, a) => t + a, 0) < discArea, "las regiones caben en el disco");
+});

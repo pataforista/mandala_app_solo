@@ -8,7 +8,24 @@ import { mulberry32 } from "./prng.js";
 
 export const BOOK_STYLES = ["sashiko", "floral", "geometric", "islamico", "azteca", "yantra", "celtico"];
 export const BOOK_COMPOSITIONS = ["centro", "fondo", "constelacion", "esquinas", "gigante", "medio", "trama"];
-export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno"];
+export const BOOK_FRAMES = ["redondeado", "doble", "feston", "ninguno", "cordon", "ondas", "gotas", "esquinas", "recinto"];
+
+// Afinidad marco ↔ estilo (propuesta de diseño, ver docs/ROADMAP_ESTILOS.md § 10.14). Cada página
+// toma un marco de los que le sientan a su estilo y de los que el libro permite. Si la intersección
+// queda vacía, se usa lo que el libro permita: nunca se devuelve un marco no permitido.
+export const FRAME_AFFINITY = {
+  floral: ["redondeado", "gotas", "esquinas"],
+  geometric: ["doble", "cordon", "ninguno", "recinto"],
+  islamico: ["doble", "feston", "ninguno"],
+  sashiko: ["ondas", "feston", "gotas"],
+  celtico: ["cordon", "redondeado", "ondas"],
+  azteca: ["doble", "feston", "ninguno"],
+  yantra: ["recinto", "doble", "ninguno"],
+};
+export function framesFor(style, allowed) {
+  const fit = FRAME_AFFINITY[style] ? allowed.filter(f => FRAME_AFFINITY[style].includes(f)) : [];
+  return fit.length ? fit : allowed;
+}
 export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 
 // Silueta: la banda exterior del mandala, lo primero que se reconoce al hojear. Antes la
@@ -16,20 +33,26 @@ export const BOOK_PETALS = [8, 10, 12, 14, 16, 18, 20, 24];
 // loto: páginas distintas por dentro parecían el mismo dibujo. Ahora la reparte el plan.
 // Dos familias: flor abierta y medallón cerrado (rombo, triángulo: contorno circular).
 // El zigzag (chevron) queda fuera: como silueta deja una corona casi vacía.
-export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle"];
-const SILHOUETTES_BY_STYLE = {
-  floral:    ["lotus", "petal", "round", "heart", "leaf", "scallop", "ogee"],
-  geometric: ["diamond", "triangle", "petal", "lotus", "ogee", "scallop"],
-  azteca:    ["triangle", "diamond", "petal", "lotus", "scallop"],
-  islamico:  ["ogee", "scallop", "diamond", "lotus", "petal", "round"],
-  yantra:    ["lotus", "petal", "triangle", "diamond", "ogee"],
-  sashiko:   ["scallop", "round", "diamond", "lotus", "ogee", "petal"],
-  celtico:   ["round", "heart", "leaf", "scallop", "ogee", "lotus"],
+// Las siluetas propias de un estilo (p. ej. «arco», islámico) sólo aparecen en su lista.
+export const BOOK_SILHOUETTES = ["lotus", "scallop", "ogee", "petal", "leaf", "round", "heart", "diamond", "triangle", "arco", "eslabones", "rayos", "greca", "seigaiha", "padma", "facetas", "corola"];
+// Cada lista respeta los vetos de la gramática del estilo (js/generators/styles/*.js):
+// tests/styles.test.mjs falla si una silueta vetada vuelve a entrar aquí.
+export const SILHOUETTES_BY_STYLE = {
+  floral:    ["corola", "lotus", "petal", "round", "heart", "leaf", "scallop", "ogee"],
+  geometric: ["facetas", "diamond", "triangle"],
+  azteca:    ["rayos", "greca", "triangle", "diamond", "petal", "lotus"],
+  islamico:  ["arco", "ogee", "diamond", "lotus", "scallop", "petal"],
+  yantra:    ["padma", "lotus", "petal", "triangle", "ogee"],
+  sashiko:   ["seigaiha", "scallop", "round", "diamond", "lotus", "ogee", "petal"],
+  celtico:   ["eslabones", "round", "heart", "leaf", "scallop", "ogee", "lotus"],
 };
 
 // Estructura del disco (ver STRUCTURES en mandalaClassic.js) y tema de fondo (ver
 // BACKGROUNDS en pageComposer.js). Se reparten igual que la silueta: sin repetir en
 // páginas seguidas y equilibrados en el libro.
+// Conteos de pétalos propios de un estilo. Yantra: 12 deja en el centro los dos triángulos
+// entrelazados (simetría de orden 6); 8 y 16 son los lotos tradicionales del diagrama.
+export const STYLE_PETALS = { yantra: [12, 16, 12, 8] };
 export const BOOK_STRUCTURES = ["corona", "heroe", "equilibrio", "nucleo", "aurea", "doble"];
 const STRUCTURE_WEIGHTS = [1.2, 1.1, 1.1, 1, 1, 0.9]; // muy equilibrado para evitar repeticiones
 export const SCATTER_BACKGROUNDS = ["jardin", "cielo", "hojas", "dulce", "estrellas", "vinas"];
@@ -63,20 +86,6 @@ export const BOOK_THEMES = {
     titlePreset: {
       title: "Mándalas del Océano",
       subtitle: "Criaturas Marinas, Arrecifes y Serenidad"
-    }
-  },
-  // Sin paquete navideño propio: fondos de copos y pinos; las ilustraciones se eligen a mano
-  navidad: {
-    name: "Navidad y Fiestas",
-    description: "Mandalas invernales: copos de nieve, pinos y estrellas (no hay paquete navideño: marca las ilustraciones que quieras abajo)",
-    packages: [],
-    styles: ["geometric", "celtico", "floral"],
-    styleWeights: [2.5, 1.5, 1],
-    backgrounds: ["sol", "flor_vida", "navidad", "estrellas"],
-    scatterTheme: "navidad",
-    titlePreset: {
-      title: "Mándalas de Invierno y Navidad",
-      subtitle: "Diseños Festivos de Copos de Nieve, Estrellas y Magia Invernal"
     }
   },
   bosque: {
@@ -221,9 +230,17 @@ export const PRODUCT_PROFILES = {
 // Temas sueltos que no combinan con todos los estilos (corazones alrededor de un mandala
 // geométrico se ven fuera de lugar). Cielo, jardín (figuras del propio estilo) y las
 // tramas van con todos.
+// Fondos con afinidad por estilo. Las tramas continuas (escamas, flor de la vida, sol, ondas,
+// mosaico) antes salían igual con cualquier estilo: un mosaico detrás de un sashiko o unas ondas
+// detrás de un azteca no tienen sentido. Cada estilo recibe al menos dos tramas de su familia.
 const BACKGROUND_STYLES = {
   dulce: ["floral", "celtico", "sashiko"],
   hojas: ["floral", "celtico", "sashiko", "yantra", "islamico"],
+  escamas: ["floral", "celtico", "sashiko"],
+  flor_vida: ["islamico", "geometric", "yantra", "celtico"],
+  sol: ["floral", "azteca", "yantra"],
+  ondas: ["floral", "sashiko", "celtico"],
+  mosaico: ["geometric", "islamico", "azteca", "yantra"],
 };
 // Composiciones con espacio libre que se decora (el resto no usa tema de fondo)
 const FILLED = new Set(["fondo", "constelacion", "esquinas", "medio"]);
@@ -258,7 +275,8 @@ export function backgroundPicker(rng, { fillCentro = false, patternOnly = false,
     // Con patternOnly, usar solo tramas continuas (para perfiles de adulto)
     const basePool = patternOnly ? PATTERN_BACKGROUNDS :
       (composition === "fondo" || centro ? [...SCATTER_BACKGROUNDS, ...PATTERN_BACKGROUNDS] : SCATTER_BACKGROUNDS);
-    const allowed = basePool.filter(b => !style || !BACKGROUND_STYLES[b] || BACKGROUND_STYLES[b].includes(style));
+    const fitted = basePool.filter(b => !style || !BACKGROUND_STYLES[b] || BACKGROUND_STYLES[b].includes(style));
+    const allowed = fitted.length ? fitted : basePool;
     // Cuenta por encuadre: si no, los temas sueltos (que también usan constelación y
     // esquinas) parecían «muy usados» y el fondo decorado repetía siempre las tramas.
     // Primero el menos usado; entre empatados, distinto del de la página anterior
@@ -284,6 +302,13 @@ export const SILHOUETTE_FAMILY = {
   scallop: "lobulos", round: "lobulos",
   heart: "corazones", leaf: "rayos",
   diamond: "medallon", triangle: "medallon",
+  arco: "arcos", eslabones: "cadena",
+  rayos: "solar",
+  greca: "almenas",
+  seigaiha: "olas",
+  padma: "medallon_loto",
+  facetas: "gemas",
+  corola: "muesca",
 };
 
 /**
@@ -443,9 +468,14 @@ export function shuffleBag(rng, options, weights = null) {
 // ---------- Capítulos temáticos ----------
 // Los libros más vendidos agrupan los diseños por tema (p. ej. 125 Mandalas: vitral,
 // étnico, gemas). Cada capítulo reúne estilos afines y abre con una portadilla.
+// Desde que cada estilo tiene gramática propia (js/generators/styles), celta y sashiko abren
+// capítulo aparte: un nudo celta dentro de «Jardín» o unas olas japonesas dentro de «Arabescos»
+// rompían el tono del capítulo. Un capítulo corto se sigue uniendo a su afín (near).
 export const CHAPTERS = [
-  { key: "floral", title: "Jardín de mandalas", styles: ["floral", "celtico"], near: "arabesco" },
-  { key: "arabesco", title: "Arabescos y vitrales", styles: ["islamico", "sashiko"], near: "geometrico" },
+  { key: "floral", title: "Jardín de mandalas", styles: ["floral"], near: "oriente" },
+  { key: "celta", title: "Nudos y trenzas", styles: ["celtico"], near: "floral" },
+  { key: "oriente", title: "Olas y tramas", styles: ["sashiko"], near: "floral" },
+  { key: "arabesco", title: "Arabescos y vitrales", styles: ["islamico"], near: "geometrico" },
   { key: "geometrico", title: "Geometría sagrada", styles: ["geometric", "yantra"], near: "solar" },
   { key: "solar", title: "Soles y piedras", styles: ["azteca"], near: "geometrico" },
 ];
@@ -532,6 +562,20 @@ export function planBook(opts) {
   const nextStyle = shuffleBag(rng, styles, styleWeights);
   const nextComp = shuffleBag(rng, compositions, compositionWeights);
   const nextFrame = shuffleBag(rng, frames, frameWeights);
+  // Marco de cada página: el del sorteo si le sienta al estilo; si no, uno afín que no repita el de la
+  // página anterior (nunca dos seguidos iguales, que es lo que pide el plan)
+  let k0 = 0, lastFrame = null;
+  const pickFrame = (style) => {
+    const f0 = nextFrame(), ok = framesFor(style, frames);
+    let f = ok.includes(f0) && f0 !== lastFrame ? f0 : null;
+    if (!f) {
+      const other = ok.filter(x => x !== lastFrame);
+      const pool = other.length ? other : ok;
+      f = pool[(k0++) % pool.length];
+    }
+    lastFrame = f;
+    return f;
+  };
   const nextPetals = shuffleBag(rng, petals);
   // Generador propio: añadir la silueta no cambia los sorteos de las demás dimensiones
   const nextSilhouette = silhouettePicker(mulberry32(((seed >>> 0) ^ 0x51A0E77E) >>> 0));
@@ -585,8 +629,10 @@ export function planBook(opts) {
       structure: nextStructure(),
       background: nextBackground(composition, styleMode),
       composition,
-      frameStyle: nextFrame(),
-      petals: nextPetals(),
+      frameStyle: pickFrame(styleMode),
+      // El sorteo se consume siempre (no altera el resto del libro); un estilo con conteos
+      // propios los toma por turno
+      petals: ((drawn) => STYLE_PETALS[styleMode] ? STYLE_PETALS[styleMode][i % STYLE_PETALS[styleMode].length] : drawn)(nextPetals()),
       complexity,
       centerArt,
       ...(cp ? { chapter: { key: cp.ch.key, title: cp.ch.title, n: cp.k + 1, size: cp.ch.size, first: cp.j === 0 } } : {}),
@@ -597,10 +643,33 @@ export function planBook(opts) {
 
 // ---------- Páginas sorprendentes ----------
 export const GROWTH_STAGES = 4;
-const MYSTERY_ORDER = ["corazon", "estrella", "gato", "mariposa", "luna", "pez", "casa"];
+// Mismo orden que MYSTERY_SHAPES (mysteryMandala.js); el libro las baraja con su semilla.
+// tests/book.test.mjs comprueba que las dos listas coinciden.
+export const MYSTERY_ORDER = ["corazon", "estrella", "gato", "mariposa", "luna", "pez", "casa", "arbol", "flor", "hoja", "gota", "campana", "ancla", "barco", "pajaro", "trebol", "manzana", "seta", "nube", "sol",
+  "perro", "colibri", "caballo", "jirafa", "pino", "tulipan", "montana", "buho", "oso", "saturno", "cohete", "ovni", "avion", "torre_eiffel", "ubicacion",
+  "pera", "donut", "taza", "magdalena", "lazo", "sandia"];
 const NATURE_ORDER = ["girasol", "estrella", "copo", "diatomea"];
 
 /** Cuántas páginas añaden las opciones especiales (sin contar los reversos). */
+/** Máximo de hojas a lo ancho o a lo alto del mural (el generador rotula columnas con A–H). */
+export const MURAL_MAX_SIDE = 6;
+
+/**
+ * Tamaño del mural desde los controles de la interfaz. «choice» es el valor del selector
+ * («ninguno», «2x2», «3x2»… o «custom»); con «custom» se leen cols y rows. Devuelve
+ * { cols, rows } o null si no hay mural. Cada lado se limita a 1–MURAL_MAX_SIDE y un mural
+ * necesita al menos 2 hojas: una sola hoja no es un mural.
+ */
+export function parseMuralSize(choice, cols = null, rows = null) {
+  if (!choice || choice === "ninguno") return null;
+  const [c0, r0] = choice === "custom" ? [cols, rows] : String(choice).split("x");
+  let c = parseInt(c0, 10), r = parseInt(r0, 10);
+  if (!Number.isInteger(c) || !Number.isInteger(r)) return null;
+  c = Math.min(MURAL_MAX_SIDE, Math.max(1, c));
+  r = Math.min(MURAL_MAX_SIDE, Math.max(1, r));
+  return c * r >= 2 ? { cols: c, rows: r } : null;
+}
+
 export function specialPageCount({ growth = 0, mystery = 0, nature = false, mural = null } = {}) {
   return growth * GROWTH_STAGES + mystery + (nature ? NATURE_ORDER.length : 0)
     + (mural ? mural.cols * mural.rows + 1 : 0) + (mystery > 0 ? 1 : 0);
