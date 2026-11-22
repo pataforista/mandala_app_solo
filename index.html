@@ -427,6 +427,12 @@
       border-top: 1px solid var(--m3-outline);
     }
     #bookActionBar .hint { margin: 0 0 6px; }
+    /* Los dos botones no cabían en los 360 px de la barra lateral: «Crear libro (PDF)» se salía
+       8 px. Relleno más corto y, si aun así no caben (letra grande), pasan a dos filas. */
+    #bookActionBar .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    #bookActionBar .actions sl-button { flex: 1 1 auto; min-width: 0; }
+    #bookActionBar .actions sl-button::part(label) { padding-inline: 8px; }
+    #bookActionBar .actions sl-button::part(prefix) { padding-inline-start: 12px; }
   </style>
 </head>
 
@@ -872,12 +878,12 @@
             <p id="bookReviewInfo" class="hint"></p>
             <div id="bookActionBar">
               <div id="bookStickyInfo" class="hint" aria-live="polite"></div>
-              <div style="display:flex; gap:6px;">
-                <sl-button id="reviewBook" variant="primary" outline size="medium" pill style="flex:1;">
+              <div class="actions">
+                <sl-button id="reviewBook" variant="primary" outline size="medium" pill>
                   <sl-icon slot="prefix" name="grid-3x3-gap"></sl-icon>
                   Revisar páginas
                 </sl-button>
-                <sl-button id="downloadBook" variant="success" size="medium" pill style="flex:1.3;">
+                <sl-button id="downloadBook" variant="success" size="medium" pill>
                   <sl-icon slot="prefix" name="journal-bookmark"></sl-icon>
                   Crear libro (PDF)
                 </sl-button>
