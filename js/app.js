@@ -745,7 +745,10 @@ function render() {
   if (commercialScoreEl) {
     const { score } = commercialScore(measureSvg(svgStr), { strokeWidthMm: state.strokeWidth, minCellAreaMm2: state.minCellArea });
     commercialScoreEl.textContent = String(score);
-    commercialScoreEl.style.color = score >= 80 ? "#2e7d32" : score >= 60 ? "#b45309" : "#c62828";
+    commercialScoreEl.style.color = score >= 80 ? "var(--state-ok)" : score >= 60 ? "var(--state-warn)" : "var(--state-bad)";
+    // El color no basta (daltonismo, WCAG 1.4.1): también una palabra
+    const scoreLabelEl = document.getElementById("commercialScoreLabel");
+    if (scoreLabelEl) scoreLabelEl.textContent = score >= 80 ? "· buena" : score >= 60 ? "· regular" : "· floja";
   }
 
   // Track recent seeds
@@ -884,7 +887,7 @@ function renderFigureList() {
     const thumb = document.createElement("img");
     thumb.src = m.fig.href;
     thumb.title = `Imagen ${i + 1} — clic para verla en la vista previa`;
-    thumb.style.cssText = `width:52px;height:52px;border-radius:8px;object-fit:contain;background:#fff;cursor:pointer;border:2px solid ${i === activeFigure ? "var(--m3-primary, #6750a4)" : "#ccc"};`;
+    thumb.style.cssText = `width:52px;height:52px;border-radius:8px;object-fit:contain;background:#fff;cursor:pointer;border:2px solid ${i === activeFigure ? "var(--m3-primary, #5D7096)" : "#ccc"};`;
     thumb.onclick = () => { activeFigure = i; renderFigureList(); update(); };
     const del = document.createElement("button");
     del.textContent = "×";
@@ -907,7 +910,7 @@ function renderFigureList() {
     const dot = document.createElement("span");
     const used = (m.use || "ninguno") !== "ninguno";
     dot.textContent = !used ? "· sin uso" : st.ready ? "✅ lista" : "❌ revisar";
-    dot.style.cssText = `font-size:10px;color:${!used ? "#777" : st.ready ? "#2e7d32" : "#c62828"};`;
+    dot.style.cssText = `font-size:10px;color:${!used ? "#6B7480" : st.ready ? "var(--state-ok)" : "var(--state-bad)"};`;
     wrap.append(thumb, del, sel, dot);
     list.appendChild(wrap);
   });
@@ -1971,12 +1974,13 @@ function bindUI() {
       setBookUIMode(bookUIModeEl.value);
     });
   }
+  // Abre el paso; sólo pasa a «Todas las opciones» si ese paso está oculto en «Rápido»
   const openBookStep = (stepNumber) => {
-    if (bookUIModeEl && bookUIModeEl.value !== "advanced") {
+    const details = document.getElementById(`stepDetails${stepNumber}`);
+    if (details?.classList.contains("advanced-step") && bookUIModeEl && bookUIModeEl.value !== "advanced") {
       bookUIModeEl.value = "advanced";
       setBookUIMode("advanced");
     }
-    const details = document.getElementById(`stepDetails${stepNumber}`);
     if (details) {
       details.open = true;
       try { details.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (_) {}
@@ -2347,7 +2351,7 @@ function bindUI() {
       if (pend.length) info.innerHTML += `<br>❌ ${pend.length} no entran (no están listas). Revisa su lista de verificación en «Mis imágenes».`;
     }
     const slots = bookFigureSlots(chosen, bookCount());
-    if (chosen.length > slots) bookSummaryEl.innerHTML += `<br>🎲 ${slots} de ${chosen.length} ilustraciones entran en este libro (una selección distinta con cada semilla).`;
+    if (chosen.length > slots) bookSummaryEl.innerHTML += `<br>🎲 ${slots} de ${chosen.length} ilustraciones entran en este libro (otra selección con cada número de diseño).`;
 
     // Actualizar badges de pasos (1 a 6)
     const prodKey = bookProductProfileEl?.value || "none";
@@ -2364,7 +2368,7 @@ function bindUI() {
     const b3 = document.getElementById("stepBadge3");
     if (b3) {
       const share = Math.round(parseFloat(bookFigureShareEl?.value || "0.5") * 100);
-      b3.textContent = chosen.length ? `${chosen.length} figuras (${share}%)` : "Sin figuras";
+      b3.textContent = chosen.length ? `${chosen.length} ilustraciones (${share}%)` : "Sin ilustraciones";
     }
 
     const b4 = document.getElementById("stepBadge4");
@@ -2372,7 +2376,7 @@ function bindUI() {
       const spParts = [];
       if (sp.mystery) spParts.push(`${sp.mystery} misteriosos`);
       if (sp.mural) spParts.push(`Mural ${sp.mural.cols}×${sp.mural.rows}`);
-      if (sp.growth) spParts.push(`${sp.growth * 4}p crece`);
+      if (sp.growth) spParts.push(`Crece (${sp.growth * 4} págs)`);
       if (sp.nature) spParts.push("Naturaleza");
       b4.textContent = spParts.length ? spParts.join(" · ") : "Estándar";
     }
@@ -2381,7 +2385,7 @@ function bindUI() {
     if (b5) {
       const titleStr = (bookTitleEl?.value || "").trim();
       const langStr = (bookLanguageEl?.value || "es") === "en" ? "EN" : "ES";
-      b5.textContent = `${titleStr ? titleStr.slice(0, 15) : "Estándar"} · ${langStr}`;
+      b5.textContent = `${titleStr ? titleStr.slice(0, 15) : "Sin título"} · ${langStr}`;
     }
 
     const b6 = document.getElementById("stepBadge6");
@@ -2389,16 +2393,21 @@ function bindUI() {
 
     // Actualizar Ficha de Receta en Vivo (Live Recipe)
     const recipeTotalEl = document.getElementById("recipeTotalPages");
-    if (recipeTotalEl) recipeTotalEl.textContent = `${total} págs KDP`;
+    if (recipeTotalEl) {
+      recipeTotalEl.textContent = `${total} págs en total`;
+      recipeTotalEl.title = "Páginas del PDF interior: mandalas, páginas extra, portadillas y reversos";
+    }
 
     const recipeBadgesEl = document.getElementById("recipeBadges");
     if (recipeBadgesEl) {
       recipeBadgesEl.innerHTML = "";
       const addPill = (label, icon, stepNum, extraClass = "") => {
-        const pill = document.createElement("span");
+        const pill = document.createElement("button");
+        pill.type = "button";
         pill.className = `recipe-pill ${extraClass}`.trim();
-        pill.innerHTML = `<sl-icon name="${icon}"></sl-icon> ${escapeXml(label)}`;
-        pill.title = `Paso ${stepNum}: haz clic para editar`;
+        pill.innerHTML = `<sl-icon name="${icon}" aria-hidden="true"></sl-icon> ${escapeXml(label)}`;
+        pill.title = "Cambiar";
+        pill.setAttribute("aria-label", `${label}: cambiar`);
         pill.addEventListener("click", () => openBookStep(stepNum));
         recipeBadgesEl.appendChild(pill);
       };
@@ -2419,14 +2428,14 @@ function bindUI() {
         addPill(`Mural ${sp.mural.cols}×${sp.mural.rows}`, "grid-1x2", 4);
       }
       if (sp.growth) {
-        addPill(`Crecimiento (${sp.growth * 4}p)`, "arrow-up-right-circle", 4);
+        addPill(`Mandala que crece (${sp.growth * 4} págs)`, "arrow-up-right-circle", 4);
       }
       if (sp.nature) {
         addPill("Naturaleza", "flower1", 4);
       }
       const backText = backMode() === "negro" ? "Reverso negro" : (backMode() === "ninguno" ? "Doble cara" : "Reverso blanco");
       addPill(backText, "shield-check", 5);
-      addPill("Canva Ready", "palette", 6);
+      addPill("Medidas de portada", "palette", 6);
     }
   };
 
@@ -2598,7 +2607,7 @@ function bindUI() {
   const reviewScores = new Map(); // índice → puntuación (o null si no se mide)
   const scorable = (o) => !o.special || o.special.type === "grow" || o.special.type === "mural";
   const scoreSvg = (svg, o) => commercialScore(measureSvg(svg), { strokeWidthMm: o.strokeWidthMm, minCellAreaMm2: o.minCellAreaMm2 });
-  const scoreColor = (n) => (n >= 80 ? "#2e7d32" : n >= WEAK_SCORE ? "#b45309" : "#c62828");
+  const scoreColor = (n) => (n >= 80 ? "var(--state-ok)" : n >= WEAK_SCORE ? "var(--state-warn)" : "var(--state-bad)");
   const reviewQualityEl = document.getElementById("reviewQuality");
   const reviewFixBtn = document.getElementById("reviewFixWeak");
   // Repetición: huella geométrica de cada página (variety.js), medida sobre el dibujo.
@@ -2619,7 +2628,7 @@ function bindUI() {
     reviewQualityEl.innerHTML =
       `Calidad para colorear: media <b style="color:${scoreColor(avg)}">${avg}</b>/100 en ${vals.length} páginas medidas · ` +
       (weak.length
-        ? `<b style="color:#c62828">${weak.length} floja(s)</b> (&lt; ${WEAK_SCORE}): págs. ${weak.map(i => i + 1).join(", ")}.` +
+        ? `<b style="color:var(--state-bad)">${weak.length} floja(s)</b> (&lt; ${WEAK_SCORE}): págs. ${weak.map(i => i + 1).join(", ")}.` +
           (weak.length > fixable.length
             ? ((g) => g.length === 1
                 ? ` La pág. ${g[0]} es de un grupo (mandala que crece o mural): cámbiala con «Cambiar todo el grupo».`
@@ -2643,7 +2652,7 @@ function bindUI() {
       }
     }
     reviewQualityEl.innerHTML += "<br><br>Variedad: " + (twins.length
-      ? `<b style="color:#b45309">${twins.length} par(es) de páginas gemelas</b> (se ven casi iguales al hojear): ` +
+      ? `<b style="color:var(--state-warn)">${twins.length} par(es) de páginas gemelas</b> (se ven casi iguales al hojear): ` +
         twins.slice(0, 8).map(t => `págs. ${t.i + 1} y ${t.j + 1}`).join(" · ") + (twins.length > 8 ? "…" : "") + "."
       : "sin páginas gemelas ✅.");
     // Una página floja de un grupo cuenta una vez por grupo (se rehace el grupo entero)
@@ -2675,6 +2684,12 @@ function bindUI() {
       b.textContent = ` · ${sc}`;
       b.style.color = scoreColor(sc);
       meta.appendChild(b);
+      if (sc < WEAK_SCORE) {
+        const tag = document.createElement("span");
+        tag.className = "state-tag";
+        tag.textContent = "Floja";
+        meta.appendChild(tag);
+      }
       meta.title = issues.length ? `Puntuación ${sc}/100:\n• ${issues.join("\n• ")}` : `Puntuación ${sc}/100: sin defectos medidos.`;
       // En el móvil no hay «title» al tocar: el motivo de una página floja va a la vista
       if (sc < WEAK_SCORE && issues.length) {
