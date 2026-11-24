@@ -1954,6 +1954,34 @@ function bindUI() {
     if (!Array.isArray(values)) return;
     document.querySelectorAll(sel).forEach(b => { b.checked = values.includes(b.value); });
   };
+  const bookUIModeEl = document.getElementById("bookUIMode");
+  const bookControlGroupEl = document.getElementById("bookControlGroup");
+  const setBookUIMode = (mode) => {
+    if (!bookControlGroupEl) return;
+    const isQuick = mode === "quick";
+    bookControlGroupEl.classList.toggle("mode-quick", isQuick);
+    bookControlGroupEl.classList.toggle("mode-advanced", !isQuick);
+    try { localStorage.setItem("mandala_book_ui_mode", mode); } catch (_) {}
+  };
+  if (bookUIModeEl) {
+    const savedMode = (typeof localStorage !== "undefined" && localStorage.getItem("mandala_book_ui_mode")) || "quick";
+    bookUIModeEl.value = savedMode;
+    setBookUIMode(savedMode);
+    bookUIModeEl.addEventListener("sl-change", () => {
+      setBookUIMode(bookUIModeEl.value);
+    });
+  }
+  const openBookStep = (stepNumber) => {
+    if (bookUIModeEl && bookUIModeEl.value !== "advanced") {
+      bookUIModeEl.value = "advanced";
+      setBookUIMode("advanced");
+    }
+    const details = document.getElementById(`stepDetails${stepNumber}`);
+    if (details) {
+      details.open = true;
+      try { details.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (_) {}
+    }
+  };
   const bookProductProfileEl = document.getElementById("bookProductProfile");
   const bookThemeEl = document.getElementById("bookTheme");
   const themeActionBox = document.getElementById("themeActionBox");
@@ -2320,6 +2348,86 @@ function bindUI() {
     }
     const slots = bookFigureSlots(chosen, bookCount());
     if (chosen.length > slots) bookSummaryEl.innerHTML += `<br>🎲 ${slots} de ${chosen.length} ilustraciones entran en este libro (una selección distinta con cada semilla).`;
+
+    // Actualizar badges de pasos (1 a 6)
+    const prodKey = bookProductProfileEl?.value || "none";
+    const prod = prodKey !== "none" ? PRODUCT_PROFILES[prodKey] : null;
+    const themeKey = bookThemeEl?.value || "none";
+    const theme = themeKey !== "none" ? BOOK_THEMES[themeKey] : null;
+
+    const b1 = document.getElementById("stepBadge1");
+    if (b1) b1.textContent = theme ? theme.name : (prod ? prod.name.split("·")[0].trim() : "Variado");
+
+    const b2 = document.getElementById("stepBadge2");
+    if (b2) b2.textContent = `${bookCount()} mandalas · ${bestSeller() ? "automático" : "personalizado"}`;
+
+    const b3 = document.getElementById("stepBadge3");
+    if (b3) {
+      const share = Math.round(parseFloat(bookFigureShareEl?.value || "0.5") * 100);
+      b3.textContent = chosen.length ? `${chosen.length} figuras (${share}%)` : "Sin figuras";
+    }
+
+    const b4 = document.getElementById("stepBadge4");
+    if (b4) {
+      const spParts = [];
+      if (sp.mystery) spParts.push(`${sp.mystery} misteriosos`);
+      if (sp.mural) spParts.push(`Mural ${sp.mural.cols}×${sp.mural.rows}`);
+      if (sp.growth) spParts.push(`${sp.growth * 4}p crece`);
+      if (sp.nature) spParts.push("Naturaleza");
+      b4.textContent = spParts.length ? spParts.join(" · ") : "Estándar";
+    }
+
+    const b5 = document.getElementById("stepBadge5");
+    if (b5) {
+      const titleStr = (bookTitleEl?.value || "").trim();
+      const langStr = (bookLanguageEl?.value || "es") === "en" ? "EN" : "ES";
+      b5.textContent = `${titleStr ? titleStr.slice(0, 15) : "Estándar"} · ${langStr}`;
+    }
+
+    const b6 = document.getElementById("stepBadge6");
+    if (b6) b6.textContent = `${total} págs ${bad.length ? "⚠️ avisos" : "✅ listo"}`;
+
+    // Actualizar Ficha de Receta en Vivo (Live Recipe)
+    const recipeTotalEl = document.getElementById("recipeTotalPages");
+    if (recipeTotalEl) recipeTotalEl.textContent = `${total} págs KDP`;
+
+    const recipeBadgesEl = document.getElementById("recipeBadges");
+    if (recipeBadgesEl) {
+      recipeBadgesEl.innerHTML = "";
+      const addPill = (label, icon, stepNum, extraClass = "") => {
+        const pill = document.createElement("span");
+        pill.className = `recipe-pill ${extraClass}`.trim();
+        pill.innerHTML = `<sl-icon name="${icon}"></sl-icon> ${escapeXml(label)}`;
+        pill.title = `Paso ${stepNum}: haz clic para editar`;
+        pill.addEventListener("click", () => openBookStep(stepNum));
+        recipeBadgesEl.appendChild(pill);
+      };
+
+      addPill(`${bookCount()} Mandalas`, "journal-bookmark", 2);
+      if (theme) {
+        addPill(theme.name, "stars", 1, "highlight");
+      } else if (prod) {
+        addPill(prod.name.split("·")[0].trim(), "people", 1);
+      }
+      if (chosen.length) {
+        addPill(`${chosen.length} ilustraciones`, "image", 3);
+      }
+      if (sp.mystery) {
+        addPill(`${sp.mystery} misteriosos`, "star-fill", 4, "star");
+      }
+      if (sp.mural) {
+        addPill(`Mural ${sp.mural.cols}×${sp.mural.rows}`, "grid-1x2", 4);
+      }
+      if (sp.growth) {
+        addPill(`Crecimiento (${sp.growth * 4}p)`, "arrow-up-right-circle", 4);
+      }
+      if (sp.nature) {
+        addPill("Naturaleza", "flower1", 4);
+      }
+      const backText = backMode() === "negro" ? "Reverso negro" : (backMode() === "ninguno" ? "Doble cara" : "Reverso blanco");
+      addPill(backText, "shield-check", 5);
+      addPill("Canva Ready", "palette", 6);
+    }
   };
 
   // ---------- Plan del libro (compartido por la revisión y la descarga) ----------
