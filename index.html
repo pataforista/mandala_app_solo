@@ -313,7 +313,7 @@
         font-size: 0.7rem;
         gap: 2px 10px;
       }
-      .meta-footer sl-tooltip { display: none; }
+      .meta-footer sl-tooltip, .meta-footer .meta-paths { display: none; }
       #stage-zoom-controls {
         top: 8px;
         right: 8px;
@@ -405,6 +405,8 @@
       header { padding: 8px 12px; gap: 8px; flex-wrap: wrap; }
       .brand { gap: 4px; min-width: 0; }
       .brand h1 { font-size: 1.1rem; white-space: nowrap; }
+      .header-actions { gap: 4px; }
+      .header-actions sl-button::part(label) { padding-inline: 8px; }
       main { display: flex; flex-direction: column; overflow: visible; }
       #stage-container {
         order: -1; position: sticky; top: 0; z-index: 6;
@@ -437,8 +439,34 @@
     /* Modo Rápido vs Modo Estudio y Acordeones KDP */
     .mode-quick .advanced-only { display: none !important; }
     .mode-quick .advanced-step { display: none !important; }
-    .mode-quick #bookQuickBanner { display: flex !important; }
-    .mode-advanced #bookQuickBanner { display: none !important; }
+    .mode-advanced .quick-only { display: none !important; }
+
+    /* Selector de modo: dos mitades iguales que caben en los 312 px útiles de la barra lateral */
+    .book-mode-bar { margin-bottom: 8px; }
+    #bookUIMode::part(button-group) { display: block; width: 100%; }
+    #bookUIMode::part(button-group__base) { display: flex; width: 100%; }
+    #bookUIMode::part(form-control-label) { font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; }
+    #bookUIMode sl-radio-button { flex: 1 1 0; min-width: 0; }
+    #bookUIMode sl-radio-button::part(button) { width: 100%; }
+    .mode-hint { margin-top: 6px; }
+
+    /* Numeración de pasos: sólo cuenta los visibles (en «Rápido» no hay saltos 1, 2, 5, 6) */
+    #bookControlGroup { counter-reset: paso; }
+    .book-step-details { counter-increment: paso; }
+    .step-num::before { content: counter(paso) " · "; }
+
+    /* Cabecera */
+    .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .seed-row { display: flex; gap: 12px; align-items: flex-start; }
+    .seed-row > div { padding-top: 26px; }
+
+    /* Camino rápido en «Diseñar» */
+    .quick-start { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--sl-color-primary-50); border: 1px solid var(--sl-color-primary-200); }
+    .quick-start-title { font-size: 0.8rem; font-weight: 600; color: var(--sl-color-primary-800); display: flex; align-items: center; gap: 6px; }
+    .quick-start .hint sl-icon { vertical-align: -2px; }
+    details.shortcuts summary { cursor: pointer; font-size: 0.78rem; color: var(--m3-on-surface-variant); }
+    details.shortcuts .hint { margin-top: 4px; }
+    @media (pointer: coarse) { details.shortcuts { display: none; } }
 
     .book-step-details {
       margin-bottom: 8px;
@@ -512,31 +540,20 @@
       border: 1px solid var(--m3-outline);
       cursor: pointer;
       user-select: none;
-      transition: all 0.15s ease;
+      font-family: inherit;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
     }
     .recipe-pill:hover {
       background: var(--sl-color-primary-100);
       color: var(--sl-color-primary-800);
       border-color: var(--sl-color-primary-400);
-      transform: translateY(-1px);
     }
+    .recipe-pill:focus-visible { outline: 3px solid var(--m3-primary); outline-offset: 2px; }
+    @media (pointer: coarse) { .recipe-pill { min-height: 32px; padding: 4px 10px; } }
     .recipe-pill.star {
       background: #FFF8E1;
       color: #B78103;
       border-color: #FFE082;
-    }
-    #bookQuickBanner {
-      display: none;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 10px;
-      margin-bottom: 10px;
-      border-radius: 8px;
-      background: var(--sl-color-primary-50);
-      border: 1px solid var(--sl-color-primary-200);
-      font-size: 0.74rem;
-      line-height: 1.35;
-      color: var(--sl-color-primary-900);
     }
     .badge-feature {
       display: inline-flex;
@@ -557,9 +574,6 @@
   <a class="skip-link" href="#stage-container">Saltar a la vista previa</a>
   <header>
     <div class="brand">
-      <sl-tooltip content="Ver mis favoritos">
-        <sl-icon-button id="openGallery" name="grid" label="Ver mis favoritos" style="font-size: 1.5rem;"></sl-icon-button>
-      </sl-tooltip>
       <h1>Mandala Studio</h1>
       <div style="display:flex; gap:2px; margin-left: 6px;">
         <sl-tooltip content="Deshacer diseño (Ctrl+Z)">
@@ -570,11 +584,17 @@
         </sl-tooltip>
       </div>
     </div>
-    <div style="display:flex; gap:8px;">
+    <div class="header-actions">
+      <sl-tooltip content="Abre los diseños que guardaste y los últimos que viste">
+        <sl-button id="openGallery" variant="text" size="medium">
+          <sl-icon slot="prefix" name="collection"></sl-icon>
+          Mis favoritos
+        </sl-button>
+      </sl-tooltip>
       <sl-tooltip content="Guarda este diseño en «Mis favoritos» (tecla S)">
-        <sl-button id="saveFav" variant="text" size="medium">
+        <sl-button id="saveFav" variant="default" size="medium" pill>
           <sl-icon slot="prefix" name="heart"></sl-icon>
-          Favorito
+          Guardar
         </sl-button>
       </sl-tooltip>
       <sl-dropdown placement="bottom-end">
@@ -614,29 +634,36 @@
         <!-- ===== Diseñar ===== -->
         <sl-tab-panel name="disenar">
           <div class="control-group">
-            <div style="display:flex; gap:12px; align-items: flex-end;">
-              <sl-input id="seed" type="number" label="Semilla" size="small" style="flex:1; min-width:0;" value="1"></sl-input>
+            <div class="seed-row">
+              <sl-input id="seed" type="number" label="Número de diseño" size="small" style="flex:1; min-width:0;" value="1" help-text="El mismo número repite el mismo dibujo."></sl-input>
               <div style="display:flex; gap:2px;">
-                <sl-tooltip content="Semilla anterior (←)">
-                  <sl-icon-button id="prevSeed" name="chevron-left" label="Anterior"></sl-icon-button>
+                <sl-tooltip content="Número anterior (←)">
+                  <sl-icon-button id="prevSeed" name="chevron-left" label="Número de diseño anterior"></sl-icon-button>
                 </sl-tooltip>
-                <sl-tooltip content="Semilla siguiente (→)">
-                  <sl-icon-button id="nextSeed" name="chevron-right" label="Siguiente"></sl-icon-button>
+                <sl-tooltip content="Número siguiente (→)">
+                  <sl-icon-button id="nextSeed" name="chevron-right" label="Número de diseño siguiente"></sl-icon-button>
                 </sl-tooltip>
                 <sl-tooltip content="Otro diseño con los mismos ajustes (R o Espacio)">
                   <sl-icon-button id="regen" name="dice-5" label="Otro diseño con los mismos ajustes" style="font-size: 1.5rem; color: var(--m3-primary);"></sl-icon-button>
                 </sl-tooltip>
               </div>
             </div>
-            <sl-button id="magicShuffle" variant="primary" size="medium" pill style="width: 100%; --sl-color-primary-600: #d81b60; --sl-color-primary-500: #e91e63;">
-              <sl-icon slot="prefix" name="magic"></sl-icon>
-              Sorpréndeme: cambiar todo al azar
-            </sl-button>
-            <p class="hint" style="margin-top:4px;">El dado cambia sólo el dibujo; «Sorpréndeme» cambia también estilo, pétalos, composición y marco.</p>
-            <p class="hint">Atajos (con el foco fuera de los controles): <b>R</b> o espacio = otro diseño · <b>←</b> <b>→</b> = semilla anterior/siguiente · <b>S</b> = guardar en favoritos · <b>Ctrl+Z</b>/<b>Ctrl+Y</b> = deshacer/rehacer.</p>
+            <div class="quick-start">
+              <div class="quick-start-title"><sl-icon name="lightning-charge"></sl-icon> Rápido: prueba al azar hasta que te guste</div>
+              <sl-button id="magicShuffle" variant="primary" outline size="medium" pill style="width: 100%;">
+                <sl-icon slot="prefix" name="shuffle"></sl-icon>
+                Sorpréndeme: cambiar todo al azar
+              </sl-button>
+              <p class="hint">El dado <sl-icon name="dice-5" aria-hidden="true"></sl-icon> cambia sólo el dibujo y conserva tus ajustes. «Sorpréndeme» cambia también estilo, pétalos, composición y marco. Si te equivocas, <b>Deshacer</b> (arriba) vuelve al anterior.</p>
+            </div>
+            <details class="shortcuts">
+              <summary>Atajos de teclado</summary>
+              <p class="hint"><b>R</b> o espacio: otro diseño · <b>←</b> <b>→</b>: número anterior/siguiente · <b>S</b>: guardar en favoritos · <b>Ctrl+Z</b> / <b>Ctrl+Y</b>: deshacer/rehacer. Funcionan con el foco fuera de los campos.</p>
+            </details>
 
-            <div class="section-title" style="margin:8px 0 0;"><sl-icon name="sliders"></sl-icon> Lo esencial</div>
-            <sl-select id="coloringPreset" label="Nivel de dificultad" size="small" value="adulto" help-text="Se aplica al elegirlo.">
+            <div class="section-title" style="margin:8px 0 0;"><sl-icon name="sliders"></sl-icon> Experimentar: lo esencial</div>
+            <p class="hint" style="margin-top:-8px;">Cada cambio se ve al instante en la vista previa. Los ajustes finos están más abajo, plegados.</p>
+            <sl-select id="coloringPreset" label="Nivel de dificultad" size="small" value="adulto" help-text="Atajo: ajusta grosor de línea y detalle de una vez. Después puedes retocarlos en «Trazo y detalle».">
               <sl-option value="ninos">Niños (5-8 años) - Muy simple</sl-option>
               <sl-option value="ninos_grande">Niños grandes (9-12) - Simple</sl-option>
               <sl-option value="letra_grande">Adulto - Trazo grueso (fácil de colorear)</sl-option>
@@ -645,7 +672,7 @@
               <sl-option value="experto">Experto - Detallado</sl-option>
               <sl-option value="zen">Zen - Minimalista</sl-option>
             </sl-select>
-            <sl-select id="structurePreset" label="Plantilla" size="small" value="custom" help-text="Se aplica al elegirla.">
+            <sl-select id="structurePreset" label="Plantilla" size="small" value="custom" help-text="Atajo: ajusta estilo, pétalos y complejidad de una vez. Vuelve a «Personalizada» en cuanto tocas uno.">
               <sl-option value="custom">Personalizada</sl-option>
               <sl-option value="simple">Simple</sl-option>
               <sl-option value="balanced">Equilibrada</sl-option>
@@ -682,8 +709,8 @@
               <sl-option value="esquinas">Sólo esquinas</sl-option>
               <sl-option value="recinto">Recinto cuadrado con puertas (yantra)</sl-option>
             </sl-select>
-            <sl-range id="petals" label="Pétalos" min="6" max="96" value="12"></sl-range>
-            <sl-range id="complexity" label="Complejidad" min="20" max="320" value="130"></sl-range>
+            <sl-range id="petals" label="Pétalos" min="6" max="96" value="12" help-text="Cuántas veces se repite el motivo alrededor del centro."></sl-range>
+            <sl-range id="complexity" label="Complejidad" min="20" max="320" value="130" help-text="Más alto = más anillos y piezas pequeñas."></sl-range>
             <sl-checkbox id="outlineMode">
               <span style="font-weight: 600; color: var(--m3-primary);">Sólo contornos</span>
               <span class="hint" style="display:block;">Sin texturas internas: formas grandes, fáciles de colorear.</span>
@@ -706,7 +733,7 @@
             </sl-details>
 
             <sl-details>
-              <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="gear"></sl-icon> Motor y vista previa</span>
+              <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="gear"></sl-icon> Motor y vista previa (avanzado)</span>
               <div class="control-group" style="padding: 12px 0;">
                 <sl-select id="generatorType" label="Tipo de motor" size="small" value="classic" help-text="El clásico es el único con composiciones, marcos e imágenes.">
                   <sl-option value="classic">Clásico (calidad libro comercial) ★</sl-option>
@@ -733,44 +760,44 @@
         <sl-details id="layersAccordionItem">
           <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="layers"></sl-icon> Capas (8)</span>
           <div class="control-group" style="padding: 12px 0;">
-            <sl-select id="layerPreset" label="Perfil de Capas" size="small" value="custom">
+            <sl-select id="layerPreset" label="Perfil de capas" size="small" value="custom">
               <sl-option value="custom">Personalizado</sl-option>
               <sl-option value="equilibrado">Equilibrado</sl-option>
               <sl-option value="centro">Centro</sl-option>
               <sl-option value="borde">Borde</sl-option>
               <sl-option value="alterno">Alterno</sl-option>
             </sl-select>
-            <sl-range id="layer1Intensity" label="Capas 1 (Centro)" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
-            <sl-range id="layer2Intensity" label="Capas 2" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
-            <sl-range id="layer3Intensity" label="Capas 3" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
-            <sl-range id="layer4Intensity" label="Capas 4" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
-            <sl-range id="layer5Intensity" label="Capas 5" min="0" max="1" step="0.05" value="0.6" size="small"></sl-range>
-            <sl-range id="layer6Intensity" label="Capas 6" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
-            <sl-range id="layer7Intensity" label="Capas 7" min="0" max="1" step="0.05" value="0.5" size="small"></sl-range>
-            <sl-range id="layer8Intensity" label="Capas 8 (Borde)" min="0" max="1" step="0.05" value="0.4" size="small"></sl-range>
+            <sl-range id="layer1Intensity" label="Capa 1 (Centro)" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
+            <sl-range id="layer2Intensity" label="Capa 2" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
+            <sl-range id="layer3Intensity" label="Capa 3" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
+            <sl-range id="layer4Intensity" label="Capa 4" min="0" max="1" step="0.05" value="0.8" size="small"></sl-range>
+            <sl-range id="layer5Intensity" label="Capa 5" min="0" max="1" step="0.05" value="0.6" size="small"></sl-range>
+            <sl-range id="layer6Intensity" label="Capa 6" min="0" max="1" step="0.05" value="0.7" size="small"></sl-range>
+            <sl-range id="layer7Intensity" label="Capa 7" min="0" max="1" step="0.05" value="0.5" size="small"></sl-range>
+            <sl-range id="layer8Intensity" label="Capa 8 (Borde)" min="0" max="1" step="0.05" value="0.4" size="small"></sl-range>
           </div>
         </sl-details>
 
         <sl-details id="imageAccordionItem">
-          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Integración de Imagen</span>
+          <span slot="summary" class="section-title" style="margin:0;"><sl-icon name="image"></sl-icon> Foto dentro del mandala</span>
           <div class="control-group" style="padding: 12px 0;">
             <input type="file" id="imageUpload" accept="image/*" style="display: none;">
             <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
               <sl-button id="uploadBtn" variant="primary" size="small" pill style="flex: 1;">
                 <sl-icon slot="prefix" name="upload"></sl-icon>
-                Subir Foto/Líneas
+                Subir foto o dibujo
               </sl-button>
               <sl-spinner id="imageSpinner" style="display: none; font-size: 1.2rem;"></sl-spinner>
             </div>
-            <sl-range id="imageThreshold" label="Sensibilidad (Bordes)" min="10" max="240" value="128"></sl-range>
+            <sl-range id="imageThreshold" label="Sensibilidad de bordes" min="10" max="240" value="128"></sl-range>
             <sl-range id="imageZoom" label="Zoom" min="0.1" max="3" step="0.05" value="1.0"></sl-range>
-            <sl-range id="imageScale" label="Escala en Mandala" min="0.5" max="2.5" step="0.1" value="1.0"></sl-range>
+            <sl-range id="imageScale" label="Tamaño dentro del mandala" min="0.5" max="2.5" step="0.1" value="1.0"></sl-range>
             <div style="display: flex; gap: 8px;">
                <sl-range id="imageOffsetX" label="X" min="-100" max="100" value="0" style="flex:1;"></sl-range>
                <sl-range id="imageOffsetY" label="Y" min="-100" max="100" value="0" style="flex:1;"></sl-range>
             </div>
-            <sl-range id="imageIntensity" label="Intensidad de Capa" min="0" max="1" step="0.05" value="1.0"></sl-range>
-            <sl-checkbox id="imageMirror" checked>Simetría de Espejo (Caleidoscopio)</sl-checkbox>
+            <sl-range id="imageIntensity" label="Intensidad de la capa" min="0" max="1" step="0.05" value="1.0"></sl-range>
+            <sl-checkbox id="imageMirror" checked>Simetría de espejo (caleidoscopio)</sl-checkbox>
           </div>
         </sl-details>
 
@@ -805,55 +832,50 @@
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:6px 10px; background:var(--m3-surface); border:1px solid var(--m3-outline); border-radius:8px;">
               <div style="font-size:0.75rem; font-weight:600; display:flex; align-items:center; gap:6px;">
                 <sl-icon name="folder2-open" style="color:var(--m3-primary); font-size:1rem;"></sl-icon>
-                <span>Proyecto: <b id="currentProjectName">Sin guardar</b></span>
+                <span><b id="currentProjectName">Sin guardar</b></span>
               </div>
-              <div style="display:flex; gap:2px;">
-                <sl-tooltip content="Guardar proyecto en el navegador">
-                  <sl-icon-button id="btnSaveProject" name="save" label="Guardar"></sl-icon-button>
-                </sl-tooltip>
-                <sl-tooltip content="Mis proyectos guardados">
-                  <sl-icon-button id="btnOpenProjects" name="folder" label="Proyectos"></sl-icon-button>
-                </sl-tooltip>
-                <sl-tooltip content="Descargar archivo .json del proyecto">
-                  <sl-icon-button id="btnExportProject" name="download" label="Exportar"></sl-icon-button>
-                </sl-tooltip>
-                <sl-tooltip content="Abrir archivo .json de proyecto">
-                  <sl-icon-button id="btnImportProject" name="upload" label="Importar"></sl-icon-button>
-                </sl-tooltip>
-              </div>
+              <sl-dropdown placement="bottom-end">
+                <sl-button slot="trigger" size="small" variant="text" caret>Proyecto</sl-button>
+                <sl-menu>
+                  <sl-menu-item id="btnSaveProject"><sl-icon slot="prefix" name="save"></sl-icon>Guardar en este navegador</sl-menu-item>
+                  <sl-menu-item id="btnOpenProjects"><sl-icon slot="prefix" name="folder2-open"></sl-icon>Abrir un proyecto guardado…</sl-menu-item>
+                  <sl-divider></sl-divider>
+                  <sl-menu-item id="btnExportProject"><sl-icon slot="prefix" name="download"></sl-icon>Descargar como archivo (.json)</sl-menu-item>
+                  <sl-menu-item id="btnImportProject"><sl-icon slot="prefix" name="upload"></sl-icon>Abrir archivo (.json)…</sl-menu-item>
+                </sl-menu>
+              </sl-dropdown>
             </div>
             <input type="file" id="projectFileInput" accept=".json,application/json" style="display:none;">
 
             <!-- Selector de Modo: Rápido vs Estudio -->
-            <div class="book-mode-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <sl-radio-group id="bookUIMode" value="quick" size="small" style="width:100%;">
-                <sl-radio-button value="quick" style="flex:1;"><sl-icon name="lightning-charge-fill"></sl-icon> Modo Rápido (1 Clic)</sl-radio-button>
-                <sl-radio-button value="advanced" style="flex:1;"><sl-icon name="sliders"></sl-icon> Modo Estudio (Avanzado)</sl-radio-button>
+            <div class="book-mode-bar">
+              <sl-radio-group id="bookUIMode" value="quick" size="small" label="¿Cómo quieres trabajar?">
+                <sl-radio-button value="quick"><sl-icon slot="prefix" name="lightning-charge-fill"></sl-icon>Rápido</sl-radio-button>
+                <sl-radio-button value="advanced"><sl-icon slot="prefix" name="sliders"></sl-icon>Todas las opciones</sl-radio-button>
               </sl-radio-group>
+              <p class="hint mode-hint quick-only">Pocas preguntas y valores recomendados para KDP. Rellena lo que quieras y pulsa <b>Crear libro (PDF)</b>.</p>
+              <p class="hint mode-hint advanced-only">Todos los pasos a la vista: ilustraciones, páginas extra, papel, reverso y control de calidad. Nada se pierde al volver a «Rápido».</p>
             </div>
 
             <!-- Ficha Visual del Libro (Live Recipe) -->
             <div id="bookLiveRecipe" class="recipe-card" style="margin-bottom:10px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                 <span style="font-size:0.74rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--m3-primary); display:flex; align-items:center; gap:5px;">
-                  <sl-icon name="journal-bookmark-fill"></sl-icon> Ficha del libro en curso
+                  <sl-icon name="journal-bookmark-fill"></sl-icon> Tu libro ahora
                 </span>
-                <span id="recipeTotalPages" style="font-size:0.72rem; font-weight:700; background:var(--sl-color-primary-100); color:var(--sl-color-primary-800); padding:2px 8px; border-radius:12px;">50 págs</span>
+                <span id="recipeTotalPages" style="font-size:0.72rem; font-weight:700; background:var(--sl-color-primary-100); color:var(--sl-color-primary-800); padding:2px 8px; border-radius:12px; white-space:nowrap;">50 págs</span>
               </div>
-              <div id="recipeBadges" class="recipe-badges" style="display:flex; flex-wrap:wrap; gap:5px;" aria-label="Etiquetas interactivas de configuración">
+              <div id="recipeBadges" class="recipe-badges" style="display:flex; flex-wrap:wrap; gap:5px;" role="group" aria-label="Resumen del libro: pulsa una etiqueta para cambiarla">
                 <!-- Badges generados dinámicamente -->
               </div>
+              <p class="hint" style="margin-top:6px;">Pulsa una etiqueta para ir al paso donde se cambia.</p>
             </div>
 
-            <div id="bookQuickBanner">
-              <sl-icon name="info-circle" style="font-size:1.1rem; flex-shrink:0; color:var(--sl-color-primary-600);"></sl-icon>
-              <span><b>Modo Rápido:</b> interior listo para KDP con las mejores prácticas (márgenes, hojas extra y sin repeticiones). Para ajustar marcos o detalles finos, activa <i>Modo Estudio</i> arriba.</span>
-            </div>
 
             <!-- 1 · Público y tema -->
             <sl-details id="stepDetails1" class="book-step-details" open>
               <div slot="summary" class="step-summary">
-                <span class="step-title-text"><sl-icon name="people"></sl-icon> 1 · Público y tema</span>
+                <span class="step-title-text"><sl-icon name="people"></sl-icon> <span class="step-num" aria-hidden="true"></span>Público y tema</span>
                 <span class="step-badge" id="stepBadge1">Variado</span>
               </div>
               <sl-select id="bookProductProfile" label="Público" size="small" value="none" help-text="Fija trazo, detalle y estilos pensados para ese público.">
@@ -890,10 +912,10 @@
             <!-- 2 · Páginas y diseños -->
             <sl-details id="stepDetails2" class="book-step-details" open>
               <div slot="summary" class="step-summary">
-                <span class="step-title-text"><sl-icon name="grid-3x3"></sl-icon> 2 · Páginas y diseños</span>
+                <span class="step-title-text"><sl-icon name="grid-3x3"></sl-icon> <span class="step-num" aria-hidden="true"></span>Páginas y diseños</span>
                 <span class="step-badge" id="stepBadge2">50 mandalas</span>
               </div>
-              <sl-input id="bookPages" type="number" label="Mandalas para colorear" size="small" min="1" max="120" value="50" help-text="Entre 1 y 120. Las páginas extra del paso 4 se suman aparte."></sl-input>
+              <sl-input id="bookPages" type="number" label="Mandalas para colorear" size="small" min="1" max="120" value="50" help-text="Entre 1 y 120. Las páginas extra (misteriosos, mural…) se suman aparte."></sl-input>
               <sl-select id="bookProfile" class="advanced-only" label="Qué diseños pueden salir" size="small" value="rentable" help-text="«Los elijo yo» muestra composiciones, estilos y marcos para marcar.">
                 <sl-option value="rentable">Automático según el formato</sl-option>
                 <sl-option value="personalizada">Los elijo yo</sl-option>
@@ -935,7 +957,7 @@
             <!-- 3 · Ilustraciones (opcional) -->
             <sl-details id="stepDetails3" class="book-step-details advanced-step">
               <div slot="summary" class="step-summary">
-                <span class="step-title-text"><sl-icon name="image"></sl-icon> 3 · Ilustraciones (opcional)</span>
+                <span class="step-title-text"><sl-icon name="image"></sl-icon> <span class="step-num" aria-hidden="true"></span>Ilustraciones (opcional)</span>
                 <span class="step-badge" id="stepBadge3">Sin ilustraciones</span>
               </div>
               <div id="bookPkgBox" class="comp-box">
@@ -952,7 +974,7 @@
                 <sl-button id="btnLoadBookPkgs" size="small" variant="default" style="width:100%; margin-top:4px;">
                   <sl-icon slot="prefix" name="box-arrow-in-down"></sl-icon> Cargar ilustraciones marcadas
                 </sl-button>
-                <sl-select id="bookFigureShare" label="Páginas con ilustración" size="small" value="0.5" help-text="El resto son mandalas sin ilustración. Si hay más ilustraciones que páginas, cada semilla elige otras.">
+                <sl-select id="bookFigureShare" label="Páginas con ilustración" size="small" value="0.5" help-text="El resto son mandalas sin ilustración. Si hay más ilustraciones que páginas, cada número de diseño elige otras.">
                   <sl-option value="1">Todas las que se pueda</sl-option>
                   <sl-option value="0.66">2 de cada 3</sl-option>
                   <sl-option value="0.5">La mitad</sl-option>
@@ -967,7 +989,7 @@
             <!-- 4 · Páginas extra -->
             <sl-details id="stepDetails4" class="book-step-details advanced-step">
               <div slot="summary" class="step-summary">
-                <span class="step-title-text"><sl-icon name="stars"></sl-icon> 4 · Páginas extra</span>
+                <span class="step-title-text"><sl-icon name="stars"></sl-icon> <span class="step-num" aria-hidden="true"></span>Páginas extra</span>
                 <span class="step-badge" id="stepBadge4">3 misteriosos · Mural</span>
               </div>
               <div class="control-group">
@@ -1010,7 +1032,7 @@
             <!-- 5 · Datos e impresión -->
             <sl-details id="stepDetails5" class="book-step-details" open>
               <div slot="summary" class="step-summary">
-                <span class="step-title-text"><sl-icon name="printer"></sl-icon> 5 · Datos e impresión</span>
+                <span class="step-title-text"><sl-icon name="printer"></sl-icon> <span class="step-num" aria-hidden="true"></span>Datos e impresión</span>
                 <span class="step-badge" id="stepBadge5">8.5×11" · Español</span>
               </div>
               <sl-input id="bookTitle" label="Título" size="small" help-text="Va en la hoja de título. Vacío: «Mandalas para Colorear» (o «Mandala Coloring Book» en inglés)."></sl-input>
@@ -1039,7 +1061,7 @@
             <!-- 6 · Revisar y crear -->
             <sl-details id="stepDetails6" class="book-step-details" open>
               <div slot="summary" class="step-summary">
-                <span class="step-title-text"><sl-icon name="check2-circle"></sl-icon> 6 · Revisar y crear</span>
+                <span class="step-title-text"><sl-icon name="check2-circle"></sl-icon> <span class="step-num" aria-hidden="true"></span>Revisar y crear</span>
                 <span class="step-badge" id="stepBadge6">Listo para KDP</span>
               </div>
               <div id="bookSummary" class="hint"></div>
@@ -1088,7 +1110,7 @@
               e importa aquí el paquete.
             </p>
             <!-- Biblioteca de paquetes prediseñados -->
-            <sl-details summary="📚 Biblioteca incluida: añadir a mi lista" open style="font-size:0.8rem; margin-bottom:8px;">
+            <sl-details summary="Biblioteca incluida: añadir a mi lista" open style="font-size:0.8rem; margin-bottom:8px;">
               <div id="libraryContainer" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
                 <div style="border:1px solid var(--m3-outline); border-radius:8px; padding:8px; background:var(--m3-surface); display:flex; justify-content:space-between; align-items:center;">
                   <div>
@@ -1186,7 +1208,9 @@
             <sl-checkbox id="figureFillOutside" checked>Decorar el fondo alrededor</sl-checkbox>
             <sl-range id="figureDensity" label="Densidad del relleno (menos = más fácil de colorear)" min="0" max="1" step="0.05" value="0.3"></sl-range>
             <sl-range id="centerArtScale" label="Tamaño del medallón" min="0.3" max="0.55" step="0.01" value="0.42"></sl-range>
-            <sl-divider></sl-divider>
+            <sl-details summary="Ajustes de conversión de mis imágenes (avanzado)">
+            <div class="control-group">
+            <p class="hint">Sólo afectan a las imágenes que subes tú. Cambia uno y vuelve a subir la imagen si el contorno no te convence.</p>
             <sl-select id="medallionMode" label="Tipo de imagen" size="small" value="colores">
               <sl-option value="colores">Caricatura / cartel de colores planos</sl-option>
               <sl-option value="lineas">Dibujo o grabado en blanco y negro</sl-option>
@@ -1199,6 +1223,8 @@
             <sl-range id="figureBgTol" label="Tolerancia del fondo" min="8" max="60" value="26"></sl-range>
             <sl-range id="figureSimplify" label="Simplificar (menos detalle)" min="0" max="1" step="0.05" value="0.3"></sl-range>
             <sl-checkbox id="figureKeepMain" checked>Sólo la figura principal (quita textos y restos)</sl-checkbox>
+            </div>
+            </sl-details>
             <p style="font-size: 0.72rem; color: var(--m3-on-surface-variant); margin: 0;">
               ¿Fotos antiguas con fondo oscuro o marcos? En <a href="preprocesar.html" target="_blank">preprocesar.html</a>
               haz clic sobre el fondo para borrarlo y recorta textos.
@@ -1229,11 +1255,12 @@
       <div id="stage"></div>
       
       <div class="meta-footer">
-        <span>Semilla: <b id="seedText">—</b></span>
-        <span>Caminos: <b id="pathsText">—</b></span>
-        <span>Puntuación comercial: <b id="commercialScore">—</b></span>
-        <sl-tooltip content="Presiona 'R' para aleatorio, '&larr;' o '&rarr;' para cambiar semilla">
-          <sl-icon name="info-circle"></sl-icon>
+        <span>Diseño nº <b id="seedText">—</b></span>
+        <span class="meta-paths">Trazos: <b id="pathsText">—</b></span>
+        <span>Facilidad para colorear: <span><b id="commercialScore">—</b>/100</span></span>
+        <sl-tooltip>
+          <div slot="content">Facilidad para colorear: verde ≥ 80 (buena), naranja 60–79, rojo &lt; 60 (zonas demasiado pequeñas o líneas finas).<br>Trazos: piezas de dibujo del SVG; más trazos = más detalle y archivo más pesado.</div>
+          <sl-icon name="info-circle" label="Qué significan estos números" tabindex="0"></sl-icon>
         </sl-tooltip>
       </div>
     </div>
@@ -1255,7 +1282,11 @@
 
   <!-- Revisión del libro: cambiar las páginas que no sirven antes de crear el PDF -->
   <sl-dialog id="reviewDialog" label="Revisar páginas del libro" style="--width: min(1100px, 96vw);">
-    <p class="hint" style="margin-bottom:12px;">
+    <p class="hint" style="margin-bottom:6px;">
+      Revisa cada página: <b>Borrar y crear otro</b> la cambia por un mandala nuevo; <b>Otro encuadre</b> cambia su composición.
+      Rojo = floja (dice por qué); borde naranja punteado = casi igual a otra.
+    </p>
+    <details class="hint" style="margin-bottom:12px;"><summary style="cursor:pointer;">Cómo se puntúa y qué hace cada botón</summary><p class="hint">
       Cada página muestra su <b>puntuación para colorear</b> (0–100; las rojas dicen por qué):
       verde ≥ 80, naranja 60–79, <span style="color:#c62828">rojo &lt; 60 = floja</span>.
       Las páginas <span style="color:#e65100">gemelas</span> (casi iguales a otra del libro) llevan borde naranja punteado.
@@ -1263,8 +1294,8 @@
       Con el <b>control de calidad automático</b> activado, esto ocurre solo al abrir la revisión y al crear el PDF.
       ¿Una página se ve mal? Pulsa <b>Borrar y crear otro</b>: se descarta y aparece al instante un mandala nuevo en su lugar.
       <b>Otro encuadre</b> cambia la composición de esa página.
-      Los cambios se aplican al crear el libro y se mantienen mientras no cambies la semilla.
-    </p>
+      Los cambios se aplican al crear el libro y se mantienen mientras no cambies el número de diseño.
+    </p></details>
     <p id="reviewQuality" class="hint" style="margin-bottom:12px;"></p>
     <div id="reviewGrid"></div>
     <sl-button slot="footer" id="reviewReset" variant="text">Deshacer todos los cambios</sl-button>
@@ -1277,8 +1308,8 @@
   <sl-dialog id="projectsDialog" label="Mis Proyectos de Libro" style="--width: 520px;">
     <div style="display:flex; flex-direction:column; gap:12px;">
       <div style="display:flex; gap:8px;">
-        <sl-input id="newProjectNameInput" placeholder="Nombre para guardar este proyecto..." size="small" style="flex:1;"></sl-input>
-        <sl-button id="btnCreateNewProject" size="small" variant="primary">Guardar</sl-button>
+        <sl-input id="newProjectNameInput" label="Nombre del proyecto" placeholder="p. ej. Océano 8.5×11" size="small" style="flex:1;"></sl-input>
+        <sl-button id="btnCreateNewProject" size="small" variant="primary" style="align-self:flex-end;">Guardar proyecto</sl-button>
       </div>
       <sl-divider style="margin: 4px 0;"></sl-divider>
       <div style="font-size:0.75rem; font-weight:600; color:var(--m3-on-surface-variant);">Proyectos guardados en este navegador:</div>
