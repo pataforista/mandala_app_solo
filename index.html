@@ -49,6 +49,13 @@
       --app-accent-line: #F6D3CD;
       --app-accent-ink: #9E3B2D;
 
+      /* Estados de calidad: nunca se mezclan con el coral, que sólo marca la acción
+         «Crear libro». Siempre van con texto («floja», «gemela»), no sólo color. */
+      --state-ok: #2E7D32;
+      --state-warn: #A15C07;
+      --state-bad: #B3261E;
+      --state-bad-soft: #FCEEEE;
+
       --app-font-heading: 'Rubik', sans-serif;
       --app-font-body: 'DM Sans', sans-serif;
 
@@ -230,11 +237,12 @@
       gap: 4px;
     }
 
-    .review-card.weak { border-color: #c62828; }
+    .review-card.weak { border-color: var(--state-bad); background: var(--state-bad-soft); }
     .review-card .meta .score { font-weight: 700; }
-    .review-card .meta .why { color: #c62828; font-size: 0.65rem; margin-top: 2px; }
-    .review-card.twin { border-color: #f57c00; border-style: dashed; }
-    .review-card .meta .twin-note { color: #e65100; font-size: 0.65rem; margin-top: 2px; }
+    .review-card .meta .why { color: var(--state-bad); font-size: 0.7rem; margin-top: 2px; }
+    .review-card .meta .state-tag { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 6px; font-size: 0.65rem; font-weight: 700; color: #fff; background: var(--state-bad); }
+    .review-card.twin { border-color: var(--state-warn); border-style: dashed; }
+    .review-card .meta .twin-note { color: var(--state-warn); font-size: 0.7rem; margin-top: 2px; }
     .review-card.changed { border-color: var(--m3-primary); box-shadow: 0 0 0 2px var(--m3-primary-container); }
     .review-card .thumb { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
     .review-card .thumb svg { width: 100%; height: 100%; }
@@ -1272,7 +1280,7 @@
       <div class="meta-footer">
         <span>Diseño nº <b id="seedText">—</b></span>
         <span class="meta-paths">Trazos: <b id="pathsText">—</b></span>
-        <span>Facilidad para colorear: <span><b id="commercialScore">—</b>/100</span></span>
+        <span>Facilidad para colorear: <span><b id="commercialScore">—</b>/100 <span id="commercialScoreLabel"></span></span></span>
         <sl-tooltip>
           <div slot="content">Facilidad para colorear: verde ≥ 80 (buena), naranja 60–79, rojo &lt; 60 (zonas demasiado pequeñas o líneas finas).<br>Trazos: piezas de dibujo del SVG; más trazos = más detalle y archivo más pesado.</div>
           <sl-icon name="info-circle" label="Qué significan estos números" tabindex="0"></sl-icon>
@@ -1299,12 +1307,12 @@
   <sl-dialog id="reviewDialog" label="Revisar páginas del libro" style="--width: min(1100px, 96vw);">
     <p class="hint" style="margin-bottom:6px;">
       Revisa cada página: <b>Borrar y crear otro</b> la cambia por un mandala nuevo; <b>Otro encuadre</b> cambia su composición.
-      Rojo = floja (dice por qué); borde naranja punteado = casi igual a otra.
+      Etiqueta roja <b>Floja</b> = difícil de colorear (dice por qué); borde ámbar punteado = casi igual a otra.
     </p>
     <details class="hint" style="margin-bottom:12px;"><summary style="cursor:pointer;">Cómo se puntúa y qué hace cada botón</summary><p class="hint">
-      Cada página muestra su <b>puntuación para colorear</b> (0–100; las rojas dicen por qué):
-      verde ≥ 80, naranja 60–79, <span style="color:#c62828">rojo &lt; 60 = floja</span>.
-      Las páginas <span style="color:#e65100">gemelas</span> (casi iguales a otra del libro) llevan borde naranja punteado.
+      Cada página muestra su <b>facilidad para colorear</b> (0–100; las rojas dicen por qué):
+      verde ≥ 80, naranja 60–79, <span style="color:var(--state-bad)">rojo &lt; 60 = floja</span>.
+      Las páginas <span style="color:var(--state-warn)">gemelas</span> (casi iguales a otra del libro) llevan borde naranja punteado.
       <b>Rehacer flojas y gemelas</b> prueba varios diseños nuevos para cada una y se queda con el mejor que no repita otra página.
       Con el <b>control de calidad automático</b> activado, esto ocurre solo al abrir la revisión y al crear el PDF.
       ¿Una página se ve mal? Pulsa <b>Borrar y crear otro</b>: se descarta y aparece al instante un mandala nuevo en su lugar.

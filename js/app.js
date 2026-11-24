@@ -745,7 +745,10 @@ function render() {
   if (commercialScoreEl) {
     const { score } = commercialScore(measureSvg(svgStr), { strokeWidthMm: state.strokeWidth, minCellAreaMm2: state.minCellArea });
     commercialScoreEl.textContent = String(score);
-    commercialScoreEl.style.color = score >= 80 ? "#2e7d32" : score >= 60 ? "#b45309" : "#c62828";
+    commercialScoreEl.style.color = score >= 80 ? "var(--state-ok)" : score >= 60 ? "var(--state-warn)" : "var(--state-bad)";
+    // El color no basta (daltonismo, WCAG 1.4.1): también una palabra
+    const scoreLabelEl = document.getElementById("commercialScoreLabel");
+    if (scoreLabelEl) scoreLabelEl.textContent = score >= 80 ? "· buena" : score >= 60 ? "· regular" : "· floja";
   }
 
   // Track recent seeds
@@ -907,7 +910,7 @@ function renderFigureList() {
     const dot = document.createElement("span");
     const used = (m.use || "ninguno") !== "ninguno";
     dot.textContent = !used ? "· sin uso" : st.ready ? "✅ lista" : "❌ revisar";
-    dot.style.cssText = `font-size:10px;color:${!used ? "#777" : st.ready ? "#2e7d32" : "#c62828"};`;
+    dot.style.cssText = `font-size:10px;color:${!used ? "#6B7480" : st.ready ? "var(--state-ok)" : "var(--state-bad)"};`;
     wrap.append(thumb, del, sel, dot);
     list.appendChild(wrap);
   });
@@ -2604,7 +2607,7 @@ function bindUI() {
   const reviewScores = new Map(); // índice → puntuación (o null si no se mide)
   const scorable = (o) => !o.special || o.special.type === "grow" || o.special.type === "mural";
   const scoreSvg = (svg, o) => commercialScore(measureSvg(svg), { strokeWidthMm: o.strokeWidthMm, minCellAreaMm2: o.minCellAreaMm2 });
-  const scoreColor = (n) => (n >= 80 ? "#2e7d32" : n >= WEAK_SCORE ? "#b45309" : "#c62828");
+  const scoreColor = (n) => (n >= 80 ? "var(--state-ok)" : n >= WEAK_SCORE ? "var(--state-warn)" : "var(--state-bad)");
   const reviewQualityEl = document.getElementById("reviewQuality");
   const reviewFixBtn = document.getElementById("reviewFixWeak");
   // Repetición: huella geométrica de cada página (variety.js), medida sobre el dibujo.
@@ -2625,7 +2628,7 @@ function bindUI() {
     reviewQualityEl.innerHTML =
       `Calidad para colorear: media <b style="color:${scoreColor(avg)}">${avg}</b>/100 en ${vals.length} páginas medidas · ` +
       (weak.length
-        ? `<b style="color:#c62828">${weak.length} floja(s)</b> (&lt; ${WEAK_SCORE}): págs. ${weak.map(i => i + 1).join(", ")}.` +
+        ? `<b style="color:var(--state-bad)">${weak.length} floja(s)</b> (&lt; ${WEAK_SCORE}): págs. ${weak.map(i => i + 1).join(", ")}.` +
           (weak.length > fixable.length
             ? ((g) => g.length === 1
                 ? ` La pág. ${g[0]} es de un grupo (mandala que crece o mural): cámbiala con «Cambiar todo el grupo».`
@@ -2649,7 +2652,7 @@ function bindUI() {
       }
     }
     reviewQualityEl.innerHTML += "<br><br>Variedad: " + (twins.length
-      ? `<b style="color:#b45309">${twins.length} par(es) de páginas gemelas</b> (se ven casi iguales al hojear): ` +
+      ? `<b style="color:var(--state-warn)">${twins.length} par(es) de páginas gemelas</b> (se ven casi iguales al hojear): ` +
         twins.slice(0, 8).map(t => `págs. ${t.i + 1} y ${t.j + 1}`).join(" · ") + (twins.length > 8 ? "…" : "") + "."
       : "sin páginas gemelas ✅.");
     // Una página floja de un grupo cuenta una vez por grupo (se rehace el grupo entero)
@@ -2681,6 +2684,12 @@ function bindUI() {
       b.textContent = ` · ${sc}`;
       b.style.color = scoreColor(sc);
       meta.appendChild(b);
+      if (sc < WEAK_SCORE) {
+        const tag = document.createElement("span");
+        tag.className = "state-tag";
+        tag.textContent = "Floja";
+        meta.appendChild(tag);
+      }
       meta.title = issues.length ? `Puntuación ${sc}/100:\n• ${issues.join("\n• ")}` : `Puntuación ${sc}/100: sin defectos medidos.`;
       // En el móvil no hay «title» al tocar: el motivo de una página floja va a la vista
       if (sc < WEAK_SCORE && issues.length) {
