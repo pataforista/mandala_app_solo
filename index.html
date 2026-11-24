@@ -7,7 +7,7 @@
   <title>Mandala Studio (v0.2)</title>
   <link rel="icon" href="favicon.ico" type="image/png" />
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#6750A4" />
+  <meta name="theme-color" content="#4A5664" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.19.1/cdn/themes/light.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,40 +23,50 @@
     }
 
     :root {
-      /* M3 Tonal Palettes (Harmonized) */
-      --m3-primary: #6750A4;
+      /* Paleta pizarra y azul acero con acento coral.
+         Contrastes medidos (WCAG): primario #5D7096 con texto blanco 4.97:1; texto secundario
+         #4A5664 sobre la superficie 6.99:1; coral de botón #BF4A3A con blanco 4.93:1.
+         El coral claro #E9695A sólo se usa como acento decorativo, nunca de fondo para texto. */
+      --m3-primary: #5D7096;
       --m3-on-primary: #FFFFFF;
-      --m3-primary-container: #EADDFF;
-      --m3-on-primary-container: #21005D;
-      
-      --m3-secondary: #625B71;
+      --m3-primary-container: #C2D4E7;
+      --m3-on-primary-container: #252D3E;
+
+      --m3-secondary: #4A5664;
       --m3-on-secondary: #FFFFFF;
-      --m3-secondary-container: #E8DEF8;
-      --m3-on-secondary-container: #1D192B;
-      
-      --m3-surface: #FEF7FF;
-      --m3-surface-variant: #E7E0EC;
-      --m3-on-surface: #1C1B1F;
-      --m3-on-surface-variant: #49454F;
-      --m3-outline: #79747E;
-      
+      --m3-secondary-container: #E4EBF4;
+      --m3-on-secondary-container: #252D3E;
+
+      --m3-surface: #F6F7FC;
+      --m3-surface-variant: #E4EBF4;
+      --m3-on-surface: #26303B;
+      --m3-on-surface-variant: #4A5664;
+      --m3-outline: #C2D4E7;
+
+      --app-accent: #E9695A;
+      --app-accent-strong: #BF4A3A;
+      --app-accent-soft: #FEF6F4;
+      --app-accent-line: #F6D3CD;
+      --app-accent-ink: #9E3B2D;
+
       --app-font-heading: 'Rubik', sans-serif;
       --app-font-body: 'DM Sans', sans-serif;
 
-      /* Shoelace Theme Harmonization with M3 */
-      --sl-color-primary-50: #fbf8fd;
-      --sl-color-primary-100: #f2ebfc;
-      --sl-color-primary-200: #eaddff;
-      --sl-color-primary-300: #d0bcff;
-      --sl-color-primary-400: #b69df8;
-      --sl-color-primary-500: #8f72c7;
-      --sl-color-primary-600: #6750A4;
-      --sl-color-primary-700: #513b8a;
-      --sl-color-primary-800: #3c2671;
-      --sl-color-primary-900: #21005d;
-      --sl-color-primary-950: #140038;
-      --sl-focus-ring-color: rgba(103, 80, 164, 0.35);
-      --sl-input-focus-ring-color: #6750A4;
+      /* Escala de Shoelace derivada del azul acero */
+      --sl-color-primary-50: #F6F7FC;
+      --sl-color-primary-100: #E4EBF4;
+      --sl-color-primary-200: #C2D4E7;
+      --sl-color-primary-300: #9FB4D0;
+      --sl-color-primary-400: #7E93B6;
+      --sl-color-primary-500: #6A7EA6;
+      --sl-color-primary-600: #5D7096;
+      --sl-color-primary-700: #4E6088;
+      --sl-color-primary-800: #414F6E;
+      --sl-color-primary-900: #333E56;
+      --sl-color-primary-950: #252D3E;
+      --sl-focus-ring-color: rgba(93, 112, 150, 0.4);
+      --sl-input-focus-ring-color: #5D7096;
+      --sl-input-border-color: #C2D4E7;
     }
 
     body {
@@ -95,7 +105,7 @@
       font-family: var(--app-font-heading);
       font-size: 1.4rem;
       font-weight: 600;
-      color: var(--m3-primary);
+      color: var(--m3-secondary);
       letter-spacing: -0.02em;
       line-height: 1.2;
     }
@@ -166,10 +176,9 @@
     .section-title::after {
       content: '';
       height: 2px;
-      background: linear-gradient(to right, var(--m3-primary), transparent);
+      background: var(--m3-primary-container);
       flex-grow: 1;
       margin-left: 8px;
-      opacity: 0.3;
     }
 
     .hint {
@@ -191,9 +200,9 @@
     .comp-box > .hint { grid-column: 1 / -1; }
     .style-thumbs { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; margin: 4px 0 8px; }
     .style-thumb { border: 2px solid transparent; border-radius: 10px; background: #fff; padding: 4px; cursor: pointer; font: inherit; color: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-    .style-thumb[aria-pressed="true"] { border-color: var(--m3-primary, #6750A4); }
+    .style-thumb[aria-pressed="true"] { border-color: var(--m3-primary, #5D7096); }
     .style-thumb.off { opacity: .45; filter: grayscale(1); }
-    .style-thumb:focus-visible { outline: 3px solid var(--m3-primary, #6750A4); outline-offset: 2px; }
+    .style-thumb:focus-visible { outline: 3px solid var(--m3-primary, #5D7096); outline-offset: 2px; }
     .style-thumb-art { width: 100%; aspect-ratio: 8.5 / 11; overflow: hidden; border-radius: 6px; }
     .style-thumb-art svg { width: 100%; height: 100%; }
     .style-thumb-name { font-size: 12px; font-weight: 600; }
@@ -268,7 +277,7 @@
       border-radius: 100px;
       font-size: 0.8rem;
       color: var(--m3-on-surface-variant);
-      border: 1px solid rgba(231, 224, 236, 0.8);
+      border: 1px solid rgba(194, 212, 231, 0.8);
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
       font-family: var(--app-font-body);
       letter-spacing: 0.01em;
@@ -287,7 +296,7 @@
       backdrop-filter: blur(10px);
       padding: 4px 6px;
       border-radius: 10px;
-      border: 1px solid rgba(231, 224, 236, 0.8);
+      border: 1px solid rgba(194, 212, 231, 0.8);
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
       z-index: 5;
     }
@@ -461,8 +470,14 @@
     .seed-row > div { padding-top: 26px; }
 
     /* Camino rápido en «Diseñar» */
-    .quick-start { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--sl-color-primary-50); border: 1px solid var(--sl-color-primary-200); }
-    .quick-start-title { font-size: 0.8rem; font-weight: 600; color: var(--sl-color-primary-800); display: flex; align-items: center; gap: 6px; }
+    .quick-start { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--app-accent-soft); border: 1px solid var(--app-accent-line); }
+    .quick-start-title { font-size: 0.8rem; font-weight: 600; color: var(--app-accent-ink); display: flex; align-items: center; gap: 6px; }
+    .quick-start-title sl-icon { color: var(--app-accent); }
+    /* Botón de acento: coral profundo para que el texto blanco pase AA */
+    .btn-accent::part(base) { background: var(--app-accent-strong); border-color: var(--app-accent-strong); color: #fff; }
+    .btn-accent::part(base):hover { background: #A94032; border-color: #A94032; }
+    .btn-accent-outline::part(base) { background: #fff; border-color: var(--app-accent-line); color: var(--app-accent-ink); }
+    .btn-accent-outline::part(base):hover { background: var(--app-accent-soft); border-color: var(--app-accent); color: var(--app-accent-ink); }
     .quick-start .hint sl-icon { vertical-align: -2px; }
     details.shortcuts summary { cursor: pointer; font-size: 0.78rem; color: var(--m3-on-surface-variant); }
     details.shortcuts .hint { margin-top: 4px; }
@@ -551,9 +566,9 @@
     .recipe-pill:focus-visible { outline: 3px solid var(--m3-primary); outline-offset: 2px; }
     @media (pointer: coarse) { .recipe-pill { min-height: 32px; padding: 4px 10px; } }
     .recipe-pill.star {
-      background: #FFF8E1;
-      color: #B78103;
-      border-color: #FFE082;
+      background: var(--app-accent-soft);
+      color: var(--app-accent-ink);
+      border-color: var(--app-accent-line);
     }
     .badge-feature {
       display: inline-flex;
@@ -561,9 +576,9 @@
       gap: 4px;
       font-size: 0.67rem;
       font-weight: 700;
-      color: #B78103;
-      background: #FFF8E1;
-      border: 1px solid #FFE082;
+      color: var(--app-accent-ink);
+      background: var(--app-accent-soft);
+      border: 1px solid var(--app-accent-line);
       padding: 2px 7px;
       border-radius: 10px;
     }
@@ -650,7 +665,7 @@
             </div>
             <div class="quick-start">
               <div class="quick-start-title"><sl-icon name="lightning-charge"></sl-icon> Rápido: prueba al azar hasta que te guste</div>
-              <sl-button id="magicShuffle" variant="primary" outline size="medium" pill style="width: 100%;">
+              <sl-button id="magicShuffle" class="btn-accent-outline" size="medium" pill style="width: 100%;">
                 <sl-icon slot="prefix" name="shuffle"></sl-icon>
                 Sorpréndeme: cambiar todo al azar
               </sl-button>
@@ -1091,7 +1106,7 @@
                   <sl-icon slot="prefix" name="grid-3x3-gap"></sl-icon>
                   Revisar páginas
                 </sl-button>
-                <sl-button id="downloadBook" variant="success" size="medium" pill>
+                <sl-button id="downloadBook" class="btn-accent" size="medium" pill>
                   <sl-icon slot="prefix" name="journal-bookmark"></sl-icon>
                   Crear libro (PDF)
                 </sl-button>
@@ -1300,7 +1315,7 @@
     <div id="reviewGrid"></div>
     <sl-button slot="footer" id="reviewReset" variant="text">Deshacer todos los cambios</sl-button>
     <sl-button slot="footer" id="reviewFixWeak" variant="warning" outline disabled>Rehacer flojas y gemelas</sl-button>
-    <sl-button slot="footer" id="reviewCreate" variant="success">Crear libro (PDF)</sl-button>
+    <sl-button slot="footer" id="reviewCreate" class="btn-accent">Crear libro (PDF)</sl-button>
     <sl-button slot="footer" id="reviewClose" variant="primary">Listo</sl-button>
   </sl-dialog>
 

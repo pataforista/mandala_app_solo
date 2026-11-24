@@ -884,7 +884,7 @@ function renderFigureList() {
     const thumb = document.createElement("img");
     thumb.src = m.fig.href;
     thumb.title = `Imagen ${i + 1} — clic para verla en la vista previa`;
-    thumb.style.cssText = `width:52px;height:52px;border-radius:8px;object-fit:contain;background:#fff;cursor:pointer;border:2px solid ${i === activeFigure ? "var(--m3-primary, #6750a4)" : "#ccc"};`;
+    thumb.style.cssText = `width:52px;height:52px;border-radius:8px;object-fit:contain;background:#fff;cursor:pointer;border:2px solid ${i === activeFigure ? "var(--m3-primary, #5D7096)" : "#ccc"};`;
     thumb.onclick = () => { activeFigure = i; renderFigureList(); update(); };
     const del = document.createElement("button");
     del.textContent = "×";

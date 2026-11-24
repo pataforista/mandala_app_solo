@@ -5,9 +5,9 @@ if (workbox) {
 
   // Pre-cache core local resources on install
   workbox.precaching.precacheAndRoute([
-    { url: 'index.html', revision: '699d6334da' },
+    { url: 'index.html', revision: '8e7276a252' },
     { url: 'offline.html', revision: 'e3f75ca34c' },
-    { url: 'manifest.json', revision: '499c63e010' },
+    { url: 'manifest.json', revision: 'e190fef8be' },
     { url: 'dataset_taoista.js', revision: '40430edc17' },
     { url: 'favicon.ico', revision: '82b6de504a' },
     { url: 'assets/sekaiwo/SekaiwoRegular.ttf', revision: '18b91dca8a' },
